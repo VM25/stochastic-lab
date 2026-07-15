@@ -14,8 +14,16 @@ namespace {
 std::vector<SeedResult> make_results(const std::vector<double>& estimates) {
     std::vector<SeedResult> results;
     results.reserve(estimates.size());
-    for (std::size_t i = 0; i < estimates.size(); ++i) {
-        results.push_back(SeedResult{static_cast<std::uint64_t>(i + 1), estimates[i]});
+
+    // Counted in the field's own type rather than casting from size_t. The cast
+    // is not portable in the way it looks: on Linux uint64_t is unsigned long,
+    // identical to size_t, so GCC rejects it as useless, while on macOS uint64_t
+    // is unsigned long long and the cast is a real conversion. Sidestepping it
+    // keeps the code correct on both without a platform-conditional.
+    std::uint64_t seed = 1;
+    for (const double estimate : estimates) {
+        results.push_back(SeedResult{seed, estimate});
+        ++seed;
     }
     return results;
 }
