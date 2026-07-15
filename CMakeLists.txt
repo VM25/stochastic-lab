@@ -17,10 +17,47 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Keep floating-point semantics IEEE-conformant. The project measures numerical
-# error to several significant figures and compares against analytic references;
-# fast-math style reassociation would invalidate those measurements.
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+# ---------------------------------------------------------------------------
+# Floating-point semantics
+#
+# Disable contraction of a*b+c into a fused multiply-add. This is a correctness
+# and reproducibility setting, not a performance preference, and it is applied
+# globally rather than per target so that no target can quietly opt out.
+#
+# Why it matters here more than in most projects:
+#
+#   * Reproducibility across compilers. GCC defaults to -ffp-contract=fast and
+#     Clang to =on, and both decide *per expression* whether to contract. The
+#     same source then yields different low-order bits on different toolchains --
+#     while CI builds and compares results on both. A published result that
+#     depends on which compiler produced it is not reproducible (VALIDATION-PLAN
+#     section 19).
+#
+#   * It changes convergence, not just the last bit. The incomplete beta
+#     continued fraction in src/statistics/distributions.cpp is a fixed-point
+#     iteration. Under contraction its residual stalls near 1e-14 and never
+#     reaches the 3e-16 convergence criterion, so Student-t at large degrees of
+#     freedom fails outright -- which is exactly the ordinary case of a Monte
+#     Carlo run with 100,000 paths. Contraction perturbs each step's rounding,
+#     and an iteration seeking the last representable digit cannot settle.
+#
+# The cost is that FMA is unavailable in numeric kernels. That is measured in
+# Phase 13 rather than assumed, and disclosed with every benchmark: build flags
+# are part of the published metadata (BENCHMARK-PLAN section 2).
+#
+# This deliberately does not disable FMA formation the compiler cannot observe
+# (a library exp may still use it internally); the guarantee is over this
+# project's own expressions.
+#
+# Appended to CMAKE_CXX_FLAGS rather than set with add_compile_options so that it
+# reaches the published build metadata. A flag that changes the numbers must
+# appear alongside them, or a reader cannot tell which semantics produced the
+# result they are looking at.
+if(MSVC)
+    string(APPEND CMAKE_CXX_FLAGS " /fp:precise")
+else()
+    string(APPEND CMAKE_CXX_FLAGS " -ffp-contract=off")
+endif()
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)

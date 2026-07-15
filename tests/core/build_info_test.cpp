@@ -53,6 +53,34 @@ TEST(BuildInfoTest, GitCommitIsAFullHashOrExplicitlyUnknown) {
         << "short hash must prefix the full hash";
 }
 
+// Floating-point contraction must be disabled, and must be visible in the
+// published flags.
+//
+// This is not a style preference. GCC and Clang contract a*b+c into an FMA by
+// default and decide per expression, so the same source produces different
+// low-order bits on different toolchains -- while CI builds and compares both. It
+// also changes convergence rather than merely the last digit: the incomplete beta
+// continued fraction cannot reach its criterion under contraction, and Student-t
+// at large degrees of freedom fails outright.
+//
+// Asserting it through the metadata rather than by probing arithmetic checks the
+// property that actually matters: that the flag reached the compile line *and*
+// travels with every published result. A reader who cannot tell which
+// floating-point semantics produced a number cannot reproduce it.
+TEST(BuildInfoTest, DisclosesThatFloatingPointContractionIsDisabled) {
+    const BuildInfo info = collect_build_info();
+
+    ASSERT_FALSE(info.build_flags.empty()) << "build flags are required metadata";
+
+    const bool msvc = (info.compiler_id == "MSVC");
+    const std::string expected = msvc ? "/fp:precise" : "-ffp-contract=off";
+
+    EXPECT_NE(info.build_flags.find(expected), std::string::npos)
+        << "the build does not disable floating-point contraction, so results are not "
+           "reproducible across compilers.\n  compiler    : "
+        << info.compiler_id << "\n  build_flags : " << info.build_flags;
+}
+
 TEST(BuildInfoTest, PopulatesRuntimeEnvironment) {
     const BuildInfo info = collect_build_info();
 
