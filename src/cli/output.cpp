@@ -87,14 +87,11 @@ nlohmann::json to_json(const PricingResult& result) {
     }
 
     if (result.greeks.has_value()) {
+        const Greeks& greeks = *result.greeks;
+
         // Units travel with the numbers. A bare "vega": 12.1 is ambiguous
         // between per-unit and per-point, and the two differ by 100x.
-        document["greeks"] = nlohmann::json{
-            {"delta", result.greeks->delta},
-            {"gamma", result.greeks->gamma},
-            {"vega", result.greeks->vega},
-            {"theta", result.greeks->theta},
-            {"rho", result.greeks->rho},
+        nlohmann::json rendered{
             {"units",
              nlohmann::json{
                  {"delta", "per unit of spot"},
@@ -104,6 +101,32 @@ nlohmann::json to_json(const PricingResult& result) {
                  {"rho", "per unit of rate (divide by 10000 for a basis point)"},
              }},
         };
+
+        // A Greek that does not exist is omitted rather than emitted as null or
+        // zero, and its reason is reported beside the others. A consumer reading
+        // greeks["gamma"] therefore either finds a real derivative or finds
+        // nothing -- never a fabricated finite value standing in for a Dirac
+        // mass.
+        const auto emit = [&rendered](const char* name, const std::optional<double>& value) {
+            if (value.has_value()) {
+                rendered[name] = *value;
+            }
+        };
+        emit("delta", greeks.delta);
+        emit("gamma", greeks.gamma);
+        emit("vega", greeks.vega);
+        emit("theta", greeks.theta);
+        emit("rho", greeks.rho);
+
+        if (!greeks.undefined.empty()) {
+            nlohmann::json undefined = nlohmann::json::object();
+            for (const UndefinedGreek& entry : greeks.undefined) {
+                undefined[entry.name] = entry.reason;
+            }
+            rendered["undefined"] = std::move(undefined);
+        }
+
+        document["greeks"] = std::move(rendered);
     }
 
     nlohmann::json diagnostics = nlohmann::json::object();
@@ -166,11 +189,26 @@ std::string render_console(const nlohmann::json& document) {
         if (result.contains("greeks")) {
             const nlohmann::json& greeks = result["greeks"];
             out += "\ngreeks\n";
-            for (const std::string_view name : {"delta", "gamma", "vega", "theta", "rho"}) {
-                out += fmt::format("  {:<6}: {:>24}   [{}]\n",
-                                   name,
-                                   format_double(greeks[std::string(name)].get<double>()),
-                                   greeks["units"][std::string(name)].get<std::string>());
+            for (const std::string_view view : {"delta", "gamma", "vega", "theta", "rho"}) {
+                const std::string name(view);
+                if (greeks.contains(name)) {
+                    out += fmt::format("  {:<6}: {:>24}   [{}]\n",
+                                       name,
+                                       format_double(greeks[name].get<double>()),
+                                       greeks["units"][name].get<std::string>());
+                } else {
+                    // The word "undefined" is printed where the number would be,
+                    // so a reader scanning the column cannot mistake an absent
+                    // Greek for one that was simply not requested.
+                    out += fmt::format("  {:<6}: {:>24}\n", name, "undefined");
+                }
+            }
+
+            if (greeks.contains("undefined")) {
+                for (const auto& entry : greeks["undefined"].items()) {
+                    out += fmt::format(
+                        "    {} is undefined: {}\n", entry.key(), entry.value().get<std::string>());
+                }
             }
         }
 

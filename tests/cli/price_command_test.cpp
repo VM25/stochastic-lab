@@ -239,29 +239,84 @@ TEST(PriceCommandTest, ZeroVolatilitySucceedsWithWarning) {
     EXPECT_FALSE(result.value()["result"]["warnings"].empty());
 }
 
-// Greeks do not exist at the payoff kink, but the price does. The command must
-// return the price and say why the Greeks are absent, rather than fail outright
-// or drop the field silently.
-TEST(PriceCommandTest, ReportsWhyGreeksAreUnavailableAtTheKink) {
+/// A configuration sitting exactly on the zero-diffusion payoff kink: r = q makes
+/// the forward equal spot, so F = K = 100 with no diffusion.
+nlohmann::json kink_config() {
     nlohmann::json config = base_config();
     config["market"]["spot"] = 100.0;
     config["market"]["rate"] = 0.05;
-    config["market"]["dividend_yield"] = 0.05;  // r = q, so forward = spot
+    config["market"]["dividend_yield"] = 0.05;
     config["instrument"]["strike"] = 100.0;
     config["model"]["volatility"] = 0.0;
+    return config;
+}
 
-    const auto result = run(config);
+// At the kink the price is exact but the Greeks part company: delta jumps and
+// gamma is a Dirac mass, while vega is a genuine one-sided derivative. The
+// command must return the price, report the Greeks that exist, and omit the ones
+// that do not.
+TEST(PriceCommandTest, ReportsExactPriceAndSurvivingGreeksAtTheKink) {
+    const auto result = run(kink_config());
+
     ASSERT_TRUE(result.ok()) << result.error().describe();
     EXPECT_DOUBLE_EQ(result.value()["result"]["value"].get<double>(), 0.0);
-    EXPECT_FALSE(result.value()["result"].contains("greeks"));
 
-    bool explained = false;
-    for (const auto& warning : result.value()["result"]["warnings"]) {
-        if (warning.get<std::string>().find("Greeks") != std::string::npos) {
-            explained = true;
+    // The Greek block is present: refusing it wholesale would discard vega,
+    // which genuinely exists here.
+    ASSERT_TRUE(result.value()["result"].contains("greeks"));
+    const nlohmann::json& greeks = result.value()["result"]["greeks"];
+    EXPECT_TRUE(greeks.contains("vega"));
+}
+
+// The guarantee that matters most: no finite gamma may appear at the kink, in
+// the artifact any more than in the engine.
+TEST(PriceCommandTest, NeverEmitsAFiniteGammaAtTheKink) {
+    const auto result = run(kink_config());
+    ASSERT_TRUE(result.ok()) << result.error().describe();
+
+    const nlohmann::json& greeks = result.value()["result"]["greeks"];
+    EXPECT_FALSE(greeks.contains("gamma")) << "a finite gamma reached the artifact";
+    EXPECT_FALSE(greeks.contains("delta"));
+
+    // Omission alone is not enough: a consumer must be able to tell "undefined"
+    // from "not requested".
+    ASSERT_TRUE(greeks.contains("undefined"));
+    EXPECT_TRUE(greeks["undefined"].contains("gamma"));
+    EXPECT_TRUE(greeks["undefined"].contains("delta"));
+    EXPECT_FALSE(greeks["undefined"]["gamma"].get<std::string>().empty());
+}
+
+// An absent Greek must also surface where a reader skimming the output will see
+// it, not only in a nested field.
+TEST(PriceCommandTest, WarnsAboutEveryUndefinedGreekAtTheKink) {
+    const auto result = run(kink_config());
+    ASSERT_TRUE(result.ok()) << result.error().describe();
+
+    const nlohmann::json& warnings = result.value()["result"]["warnings"];
+    ASSERT_FALSE(warnings.empty());
+
+    const auto warned_about = [&](const std::string& name) {
+        for (const auto& warning : warnings) {
+            if (warning.get<std::string>().find(name) != std::string::npos) {
+                return true;
+            }
         }
-    }
-    EXPECT_TRUE(explained) << "Greeks vanished without explanation";
+        return false;
+    };
+
+    EXPECT_TRUE(warned_about("gamma")) << "gamma vanished without explanation";
+    EXPECT_TRUE(warned_about("delta")) << "delta vanished without explanation";
+}
+
+// The console rendering must not let an absent Greek read as a missing line.
+TEST(PriceCommandTest, ConsoleRenderingMarksUndefinedGreeks) {
+    const auto result = run(kink_config());
+    ASSERT_TRUE(result.ok()) << result.error().describe();
+
+    const std::string console = render_console(result.value());
+    EXPECT_NE(console.find("undefined"), std::string::npos)
+        << "console output hides the undefined Greeks\n"
+        << console;
 }
 
 // ---------------------------------------------------------------------------

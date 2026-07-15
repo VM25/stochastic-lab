@@ -177,22 +177,87 @@ Result<Greeks> BlackScholesAnalyticEngine::greeks(const MarketState& market,
 
     if (t.degenerate) {
         if (t.log_moneyness == 0.0) {
-            // F = K with no diffusion: the payoff has a kink exactly at the
-            // forward. Delta jumps between 0 and exp(-qT), and gamma is a Dirac
-            // mass. No finite number is the answer, so none is returned.
-            return Result<Greeks>::failure(
-                ErrorCode::InvalidArgument,
-                fmt::format("Greeks are undefined at the payoff kink: sigma*sqrt(T) = 0 and the "
-                            "forward equals the strike (F=K={}). Delta is discontinuous and gamma "
-                            "is unbounded there.",
-                            strike),
-                kContext);
+            // The zero-diffusion payoff kink: sigma*sqrt(T) = 0 with F = K.
+            //
+            // Existence is decided per Greek, not all at once. The value
+            // function V(S) = (S e^{-qT} - K e^{-rT})^+ has a corner in spot
+            // here, but it is perfectly smooth in some of the other variables,
+            // so refusing every Greek would discard real numbers while
+            // returning a finite gamma would invent one.
+            //
+            //   delta  undefined. One-sided derivatives are 0 and e^{-qT}; they
+            //          disagree, so no derivative exists. (The symmetric limit
+            //          0.5 e^{-qT} is a subgradient midpoint, not a derivative,
+            //          and is not reported as one.)
+            //   gamma  undefined. The second derivative is a Dirac mass at the
+            //          corner: unbounded, never finite.
+            //   vega   defined. Along F = K the price is
+            //              V(sigma) = D [2 N(sigma sqrt(T)/2) - 1],
+            //          whose derivative at sigma = 0 is D sqrt(T) phi(0). Since
+            //          sigma < 0 is outside the domain, that one-sided
+            //          derivative is the derivative. It is also exactly the
+            //          general vega formula evaluated at d1 = 0, and it
+            //          correctly gives 0 when T = 0.
+            //   theta  defined only when sigma = 0 and r = q. Then F = K forces
+            //          S = K and V vanishes identically in T, so theta = 0.
+            //          Otherwise undefined: with r != q the one-sided limits in
+            //          T disagree, and with sigma > 0, T = 0 the at-the-money
+            //          price behaves like sigma sqrt(T), whose T-derivative is
+            //          unbounded at expiry.
+            //   rho    defined only at T = 0, where V does not depend on r at
+            //          all, so rho = 0. For T > 0 the one-sided limits are 0 and
+            //          K T e^{-rT}, which differ.
+            g.vega = discounted_spot * norm_pdf(0.0) * std::sqrt(maturity);
+
+            g.mark_undefined(
+                "delta",
+                fmt::format("jump discontinuity at the zero-diffusion payoff kink (F = K = {}): "
+                            "the one-sided derivatives are 0 and {}, which disagree",
+                            strike,
+                            t.dividend_discount_factor));
+            g.mark_undefined(
+                "gamma",
+                fmt::format("unbounded at the zero-diffusion payoff kink (F = K = {}): the second "
+                            "derivative is a Dirac mass, so no finite value exists",
+                            strike));
+
+            if (model.volatility() == 0.0 && rate == dividend_yield) {
+                // F = K with r = q forces S = K, and the value is then
+                // identically zero for every maturity.
+                g.theta = 0.0;
+            } else if (model.volatility() == 0.0) {
+                g.mark_undefined(
+                    "theta",
+                    fmt::format("one-sided limits in maturity disagree at the zero-diffusion "
+                                "payoff kink because r ({}) != q ({})",
+                                rate,
+                                dividend_yield));
+            } else {
+                g.mark_undefined("theta",
+                                 "unbounded at expiry: the at-the-money price behaves like "
+                                 "sigma*sqrt(T), whose maturity derivative diverges as T -> 0");
+            }
+
+            if (maturity == 0.0) {
+                // At expiry the payoff does not involve the discount factor.
+                g.rho = 0.0;
+            } else {
+                g.mark_undefined(
+                    "rho",
+                    fmt::format("jump discontinuity at the zero-diffusion payoff kink: the "
+                                "one-sided derivatives in the rate are 0 and {}, which disagree",
+                                strike * maturity * t.discount_factor));
+            }
+
+            return Result<Greeks>::success(std::move(g));
         }
 
         // Away from the kink the limits are the general formulas with
         // N(d1), N(d2) -> 0 or 1 and phi(d1) -> 0. They are written out rather
         // than obtained by substitution because gamma and theta's time-decay term
-        // both evaluate to 0/0 in that substitution.
+        // both evaluate to 0/0 in that substitution. All five exist: the value
+        // function is locally affine in spot, and flat in volatility to
+        // exponentially small order.
         const bool call_in_the_money = (t.log_moneyness > 0.0);
 
         g.gamma = 0.0;
@@ -215,7 +280,7 @@ Result<Greeks> BlackScholesAnalyticEngine::greeks(const MarketState& market,
                 break;
         }
 
-        return Result<Greeks>::success(g);
+        return Result<Greeks>::success(std::move(g));
     }
 
     const double pdf_d1 = norm_pdf(t.d1);
@@ -257,8 +322,12 @@ Result<Greeks> BlackScholesAnalyticEngine::greeks(const MarketState& market,
         }
     }
 
-    if (!std::isfinite(g.delta) || !std::isfinite(g.gamma) || !std::isfinite(g.vega) ||
-        !std::isfinite(g.theta) || !std::isfinite(g.rho)) {
+    // Away from the degenerate branch every Greek is defined, so a non-finite
+    // value here is a numerical failure rather than a point where the derivative
+    // does not exist. The two are kept apart deliberately: the degenerate branch
+    // reports "no value exists", this reports "the computation broke".
+    if (!std::isfinite(*g.delta) || !std::isfinite(*g.gamma) || !std::isfinite(*g.vega) ||
+        !std::isfinite(*g.theta) || !std::isfinite(*g.rho)) {
         return Result<Greeks>::failure(
             ErrorCode::NonFiniteValue,
             fmt::format("a Greek is not finite (spot={}, strike={}, maturity={}, volatility={})",

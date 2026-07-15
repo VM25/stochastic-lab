@@ -130,6 +130,7 @@ protected:
 
         const auto computed = BlackScholesAnalyticEngine::greeks(*market_, *option_, *model_);
         ASSERT_TRUE(computed.ok()) << computed.error().describe();
+        ASSERT_TRUE(computed.value().all_defined());
         greeks_ = computed.value();
     }
 
@@ -141,29 +142,29 @@ protected:
 
 TEST_F(HullChapter19Test, Delta) {
     // Hull section 19.4: delta = 0.522.
-    EXPECT_NEAR(greeks_.delta, 0.522, 0.0005);
+    EXPECT_NEAR(*greeks_.delta, 0.522, 0.0005);
 }
 
 TEST_F(HullChapter19Test, Gamma) {
     // Hull section 19.6: gamma = 0.066.
-    EXPECT_NEAR(greeks_.gamma, 0.066, 0.0005);
+    EXPECT_NEAR(*greeks_.gamma, 0.066, 0.0005);
 }
 
 TEST_F(HullChapter19Test, Vega) {
     // Hull section 19.7: vega = 12.1, per unit of volatility (a move from 0.20
     // to 1.20). Hull states the per-1% figure as 0.121; this engine reports the
     // derivative itself, so the two differ by the documented factor of 100.
-    EXPECT_NEAR(greeks_.vega, 12.1, 0.05);
+    EXPECT_NEAR(*greeks_.vega, 12.1, 0.05);
 }
 
 TEST_F(HullChapter19Test, Theta) {
     // Hull section 19.5: theta = -4.31 per year.
-    EXPECT_NEAR(greeks_.theta, -4.31, 0.005);
+    EXPECT_NEAR(*greeks_.theta, -4.31, 0.005);
 }
 
 TEST_F(HullChapter19Test, Rho) {
     // Hull section 19.8: rho = 8.91, per unit of rate.
-    EXPECT_NEAR(greeks_.rho, 8.91, 0.005);
+    EXPECT_NEAR(*greeks_.rho, 8.91, 0.005);
 }
 
 // Hull quotes N(d1) = 0.5216 for this example. d1 is the input every Greek above

@@ -105,16 +105,22 @@ Result<nlohmann::json> run_price(const ConfigDocument& config, const Options& op
     if (want_greeks.value()) {
         auto greeks =
             BlackScholesAnalyticEngine::greeks(market.value(), option.value(), model.value());
-        if (greeks) {
-            result.greeks = greeks.value();
-        } else {
-            // Greeks can be undefined where the price is exact -- the degenerate
-            // payoff kink. That does not invalidate the price, so the run
-            // succeeds, but the reason is surfaced rather than the field
-            // silently going missing.
-            result.add_warning(fmt::format("Greeks were requested but are not available: {}",
-                                           greeks.error().message));
+        if (!greeks) {
+            // A failure here means the computation broke, not that a derivative
+            // does not exist -- the engine reports non-existence per Greek. That
+            // is serious enough to fail the run rather than warn.
+            return Result<nlohmann::json>::failure(std::move(greeks).error());
         }
+
+        // Individual Greeks can fail to exist where the price is still exact, at
+        // the degenerate payoff kink. That does not invalidate the price, so the
+        // run succeeds; each missing Greek is raised as a warning so its absence
+        // is visible to a reader who only skims the top of the output.
+        for (const UndefinedGreek& entry : greeks.value().undefined) {
+            result.add_warning(fmt::format("{} is undefined here: {}", entry.name, entry.reason));
+        }
+
+        result.greeks = std::move(greeks).value();
     }
 
     // --- Result document ----------------------------------------------------

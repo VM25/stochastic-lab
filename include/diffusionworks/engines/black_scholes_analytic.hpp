@@ -46,9 +46,13 @@ struct BlackScholesTerms {
 /// Degenerate limits (sigma*sqrt(T) = 0) are handled explicitly rather than by
 /// evaluating the formula and hoping. The option is then worth the discounted
 /// intrinsic value of its forward, which is well defined and returned with a
-/// warning. The single exception is the payoff kink, F = K, where gamma diverges
-/// and delta jumps; there the price is still exact (zero) but the sensitivities
-/// do not exist, and greeks() reports a failure rather than a number.
+/// warning.
+///
+/// At the payoff kink (F = K in that limit) the price is still exact -- zero --
+/// but the sensitivities part company: delta jumps, gamma carries a Dirac mass,
+/// while vega remains a well-defined one-sided derivative. Existence is
+/// therefore decided per Greek rather than all at once, and each absent one
+/// carries its reason. See greeks().
 class BlackScholesAnalyticEngine {
 public:
     /// Computes the shared intermediate terms.
@@ -73,9 +77,20 @@ public:
     /// See Greeks for units; they are per unit of the underlying variable, not
     /// per volatility point or per basis point.
     ///
-    /// Fails with InvalidArgument at the degenerate payoff kink (sigma*sqrt(T) = 0
-    /// and F = K), where gamma is unbounded and delta is discontinuous. Returning
-    /// any finite number there would be a fabrication.
+    /// Succeeds for every valid input. A Greek that does not exist at the
+    /// requested point is absent from the result with a recorded reason, rather
+    /// than failing the whole request or being filled with a plausible number.
+    /// This arises only at the zero-diffusion payoff kink (sigma*sqrt(T) = 0 and
+    /// F = K), where:
+    ///
+    ///   - delta and gamma never exist (a jump, and a Dirac mass);
+    ///   - vega always exists (a one-sided derivative in sigma >= 0);
+    ///   - theta exists only when sigma = 0 and r = q;
+    ///   - rho exists only at T = 0.
+    ///
+    /// Fails only with NonFiniteValue, which signals a broken computation rather
+    /// than a derivative that does not exist. The two are different claims and
+    /// are reported differently.
     [[nodiscard]] static Result<Greeks>
     greeks(const MarketState& market, const EuropeanOption& option, const BlackScholesModel& model);
 };

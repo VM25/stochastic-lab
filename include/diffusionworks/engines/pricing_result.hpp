@@ -23,6 +23,16 @@ struct ConfidenceInterval {
     [[nodiscard]] bool contains(double x) const noexcept { return x >= lower && x <= upper; }
 };
 
+/// A sensitivity that does not exist at the requested point, and why.
+struct UndefinedGreek {
+    /// One of "delta", "gamma", "vega", "theta", "rho".
+    std::string name;
+
+    /// Why no value exists: a jump discontinuity, an unbounded derivative, or a
+    /// point where one-sided limits disagree.
+    std::string reason;
+};
+
 /// First- and second-order sensitivities.
 ///
 /// Units, stated explicitly because the alternative is a silent factor-of-100
@@ -37,12 +47,33 @@ struct ConfidenceInterval {
 ///
 /// Per-unit is the derivative as written in the specification. Scaling happens
 /// at presentation, never in the engine.
+///
+/// Each Greek is optional because existence is per-Greek, not all-or-nothing.
+/// At the zero-diffusion payoff kink the value function is not differentiable in
+/// spot, so delta jumps and gamma carries a Dirac mass -- yet vega remains a
+/// perfectly well-defined one-sided derivative there. Reporting "no Greeks"
+/// would discard a real number; reporting a finite gamma would invent one.
+///
+/// An absent Greek always has a matching entry in `undefined` explaining it, so
+/// a missing value is never silent.
 struct Greeks {
-    double delta{};
-    double gamma{};
-    double vega{};
-    double theta{};
-    double rho{};
+    std::optional<double> delta;
+    std::optional<double> gamma;
+    std::optional<double> vega;
+    std::optional<double> theta;
+    std::optional<double> rho;
+
+    /// Reasons for every absent Greek. Empty when all five are defined.
+    std::vector<UndefinedGreek> undefined;
+
+    [[nodiscard]] bool all_defined() const noexcept {
+        return delta.has_value() && gamma.has_value() && vega.has_value() && theta.has_value() &&
+               rho.has_value();
+    }
+
+    void mark_undefined(std::string name, std::string reason) {
+        undefined.push_back(UndefinedGreek{std::move(name), std::move(reason)});
+    }
 };
 
 /// A named diagnostic emitted alongside a result.
