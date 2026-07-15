@@ -1,0 +1,54 @@
+# Build directories
+build/
+out/
+cmake-build-*/
+_deps/
+
+# CMake artifacts
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+cmake_install.cmake
+compile_commands.json
+Testing/
+
+# Compiler and linker artifacts
+*.o
+*.obj
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.gcda
+*.gcno
+*.gcov
+*.profraw
+*.profdata
+*.dSYM/
+
+# OS state
+.DS_Store
+Thumbs.db
+
+# Editor and IDE state
+.vscode/
+.idea/
+.cache/
+*.swp
+*.swo
+*~
+
+# Python analysis tooling
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Local scratch
+scratch/
+tmp/
+
+# Generated results are committed selectively; local unpublished runs are not.
+results/local/
