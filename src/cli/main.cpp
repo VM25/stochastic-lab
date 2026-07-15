@@ -4,14 +4,18 @@
 #include <diffusionworks/core/result.hpp>
 
 #include "options.hpp"
+#include "output.hpp"
+#include "price_command.hpp"
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
+#include <nlohmann/json.hpp>
 
 #include <cstdio>
 #include <exception>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 namespace dw = diffusionworks;
@@ -19,30 +23,78 @@ namespace cli = diffusionworks::cli;
 
 namespace {
 
-/// Runs one command.
+/// Runs one command and returns its result document.
 ///
-/// Phase 0 delivers the CLI shell: argument parsing, configuration loading, and
-/// error reporting are real; the numerical work is not yet wired in. Each
-/// command therefore loads and validates its configuration (so a malformed file
-/// fails explicitly, per the Phase 0 exit gate) and then reports
-/// ErrorCode::NotImplemented.
-///
-/// NotImplemented is deliberate and temporary. It is a declared failure state,
-/// not a plausible number: the alternative -- returning 0.0 until the engine
-/// lands -- is exactly the failure mode FAILURE-MODES section 16 prohibits.
-/// Every command is wired to its engine in a later phase.
-[[nodiscard]] dw::Status run_command(const cli::Options& options) {
-    if (options.config.has_value()) {
-        auto document = dw::load_config_file(*options.config);
-        if (!document) {
-            return dw::Status::failure(std::move(document).error());
-        }
+/// Commands not yet wired to an engine report ErrorCode::NotImplemented. That is
+/// deliberate and temporary: a declared failure state, not a plausible number.
+/// Returning 0.0 until the engine lands is exactly the failure mode
+/// FAILURE-MODES section 16 prohibits. Each command sheds this branch in its own
+/// phase.
+[[nodiscard]] dw::Result<nlohmann::json> run_command(const cli::Options& options) {
+    if (!options.config.has_value()) {
+        return dw::Result<nlohmann::json>::failure(
+            dw::ErrorCode::InvalidArgument,
+            fmt::format("command '{}' requires --config; a run is defined by a stored "
+                        "configuration so that it can be reproduced",
+                        cli::to_string(options.command)),
+            "cli");
     }
 
-    return dw::Status::failure(dw::ErrorCode::NotImplemented,
-                               fmt::format("command '{}' is not yet implemented in this build",
-                                           cli::to_string(options.command)),
-                               "cli");
+    auto config = dw::load_config_file(*options.config);
+    if (!config) {
+        return dw::Result<nlohmann::json>::failure(std::move(config).error());
+    }
+
+    switch (options.command) {
+        case cli::CommandKind::Price:
+            return cli::run_price(config.value(), options);
+        case cli::CommandKind::Simulate:
+        case cli::CommandKind::Validate:
+        case cli::CommandKind::Experiment:
+        case cli::CommandKind::Calibrate:
+        case cli::CommandKind::Benchmark:
+            break;
+    }
+
+    return dw::Result<nlohmann::json>::failure(
+        dw::ErrorCode::NotImplemented,
+        fmt::format("command '{}' is not yet implemented in this build",
+                    cli::to_string(options.command)),
+        "cli");
+}
+
+/// Emits a result document in the requested format.
+[[nodiscard]] dw::Status emit(const nlohmann::json& document, const cli::Options& options) {
+    const cli::OutputFormat format = options.format.value_or(cli::OutputFormat::Console);
+
+    if (format == cli::OutputFormat::Csv) {
+        return dw::Status::failure(
+            dw::ErrorCode::UnsupportedCombination,
+            "--format csv is not supported for a single valuation, which is not tabular. Use "
+            "console or json.",
+            "cli");
+    }
+
+    if (options.output.has_value()) {
+        // A file destination always receives JSON: the artifact is the
+        // machine-readable record, and the console rendering is a view of it.
+        // Not const: it is returned by value on the failure path, and const
+        // would force a copy where a move would do.
+        dw::Status written = cli::write_document(*options.output, document);
+        if (!written) {
+            return written;
+        }
+        fmt::print(stdout, "wrote {}\n", options.output->string());
+        return dw::Status::success();
+    }
+
+    if (format == cli::OutputFormat::Json) {
+        fmt::print(stdout, "{}\n", document.dump(2));
+    } else {
+        fmt::print(stdout, "{}", cli::render_console(document));
+    }
+
+    return dw::Status::success();
 }
 
 }  // namespace
@@ -79,9 +131,15 @@ int main(int argc, char** argv) {
             return cli::to_int(cli::ExitCode::Success);
         }
 
-        const dw::Status status = run_command(options);
-        if (!status) {
-            fmt::print(stderr, "error: {}\n", status.error().describe());
+        auto document = run_command(options);
+        if (!document) {
+            fmt::print(stderr, "error: {}\n", document.error().describe());
+            return cli::to_int(cli::ExitCode::RuntimeFailure);
+        }
+
+        const dw::Status emitted = emit(document.value(), options);
+        if (!emitted) {
+            fmt::print(stderr, "error: {}\n", emitted.error().describe());
             return cli::to_int(cli::ExitCode::RuntimeFailure);
         }
 

@@ -2,9 +2,28 @@
 # Static analysis configuration for DiffusionWorks.
 #
 # Scope rationale: this project is numerical code. Checks that fight readable
-# mathematics (magic numbers in closed-form expressions, short symbol names that
-# mirror the published equations) are disabled deliberately and documented here
-# rather than suppressed ad hoc at each call site.
+# mathematics are disabled deliberately and documented here rather than
+# suppressed ad hoc at each call site:
+#
+#   *-magic-numbers, readability-identifier-length
+#       Closed-form expressions contain literal constants and single-letter
+#       symbols (d1, d2, S, K, T) precisely because they mirror the published
+#       equations in docs/MATHEMATICAL-SPEC.MD. Renaming them to satisfy a
+#       linter would break that correspondence, which is the property the
+#       project is meant to preserve.
+#
+#   readability-math-missing-parentheses
+#       Would rewrite the Black-Scholes formula
+#           S*exp(-q*T)*N(d1) - K*exp(-r*T)*N(d2)
+#       as
+#           (S*exp(-q*T)*N(d1)) - (K*exp(-r*T)*N(d2))
+#       The precedence it guards against is standard arithmetic, and every such
+#       expression here is checked against published reference values. The
+#       parentheses would only move the code further from the specification it
+#       transcribes.
+#
+# Everything switched off below has a reason of this kind. Correctness checks
+# (bugprone-*, clang-analyzer-*, cert-*) stay on.
 
 Checks: >
   -*,
@@ -27,7 +46,8 @@ Checks: >
   -modernize-use-trailing-return-type,
   -readability-magic-numbers,
   -readability-identifier-length,
-  -readability-function-cognitive-complexity
+  -readability-function-cognitive-complexity,
+  -readability-math-missing-parentheses
 
 WarningsAsErrors: ''
 HeaderFilterRegex: 'include/diffusionworks/.*'
