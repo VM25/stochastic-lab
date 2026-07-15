@@ -1,0 +1,222 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Dependencies are fetched by CMake FetchContent; cache the download stamp
+  # directory so CI does not re-clone them on every run.
+  CPM_SOURCE_CACHE: ${{ github.workspace }}/.deps-cache
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Build and test across the supported compilers.
+  #
+  # TECHNICAL-DESIGN section 23 requires clean-environment builds on both GCC and
+  # Clang. Debug and Release are both exercised because they differ in assertion
+  # behaviour and optimisation, and numerical code can pass one and fail the
+  # other.
+  # ---------------------------------------------------------------------------
+  build-and-test:
+    name: ${{ matrix.compiler }} / ${{ matrix.preset }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+        preset: [debug, release]
+        include:
+          - compiler: gcc
+            cc: gcc-13
+            cxx: g++-13
+          - compiler: clang
+            cc: clang-18
+            cxx: clang++-18
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # A shallow clone still yields a full commit hash, which is what the
+          # build metadata records.
+          fetch-depth: 1
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ${{ matrix.cxx }}
+
+      - name: Configure
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: cmake --preset ${{ matrix.preset }}
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Test
+        run: ctest --preset ${{ matrix.preset }}
+
+      - name: Verify CLI rejects a malformed configuration
+        run: |
+          set -euo pipefail
+          BIN=build/${{ matrix.preset }}/src/diffusionworks
+
+          # A malformed configuration must fail explicitly with a nonzero exit
+          # code rather than fall back to defaults.
+          printf '{not json' > /tmp/malformed.json
+          if $BIN price --config /tmp/malformed.json; then
+            echo "FAIL: malformed configuration was accepted"
+            exit 1
+          fi
+
+          # An unsupported schema version must be rejected, not reinterpreted.
+          printf '{"schema_version": 999}' > /tmp/badversion.json
+          if $BIN price --config /tmp/badversion.json; then
+            echo "FAIL: unsupported schema_version was accepted"
+            exit 1
+          fi
+
+          # Usage errors and runtime failures must be distinguishable.
+          $BIN bogus-command > /dev/null 2>&1 && rc=0 || rc=$?
+          if [ "$rc" -ne 2 ]; then
+            echo "FAIL: unknown command exited $rc, expected 2"
+            exit 1
+          fi
+
+          $BIN --help > /dev/null
+          echo "OK: configuration and exit-code contracts hold"
+
+  # ---------------------------------------------------------------------------
+  # AddressSanitizer + UndefinedBehaviorSanitizer.
+  # ---------------------------------------------------------------------------
+  sanitize:
+    name: sanitize (asan+ubsan)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang-18
+
+      - name: Configure
+        env:
+          CC: clang-18
+          CXX: clang++-18
+        run: cmake --preset sanitize
+
+      - name: Build
+        run: cmake --build --preset sanitize
+
+      - name: Test
+        env:
+          # halt_on_error keeps a sanitizer report from being buried under
+          # subsequent output; ASan and UBSan otherwise continue past the first
+          # finding.
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --preset sanitize
+
+  # ---------------------------------------------------------------------------
+  # ThreadSanitizer.
+  #
+  # Runs only the tests labelled `concurrency`. There are none until Phase 12
+  # introduces multithreading, so this job is allowed to report "no tests" until
+  # then rather than fail on an empty selection.
+  # ---------------------------------------------------------------------------
+  thread-sanitize:
+    name: sanitize (tsan)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang-18
+
+      - name: Configure
+        env:
+          CC: clang-18
+          CXX: clang++-18
+        run: cmake --preset tsan
+
+      - name: Build
+        run: cmake --build --preset tsan
+
+      - name: Test concurrency paths
+        env:
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+        run: |
+          set -euo pipefail
+          if ctest --preset tsan --show-only=json-v1 | grep -q '"name"'; then
+            ctest --preset tsan
+          else
+            echo "No concurrency-labelled tests yet (multithreading lands in Phase 12)."
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Formatting.
+  # ---------------------------------------------------------------------------
+  format:
+    name: clang-format
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pinned via pip rather than apt. clang-format's output changes between
+      # major versions, so an unpinned tool makes formatting depend on whichever
+      # version the runner happens to ship. The pip package is the same build on
+      # every platform, which lets a developer on macOS and CI on Linux agree.
+      - name: Install clang-format
+        run: pip install 'clang-format==20.1.7'
+
+      - name: Check formatting
+        run: |
+          set -euo pipefail
+          find include src tests benchmarks -type f \
+            \( -name '*.hpp' -o -name '*.cpp' \) \
+            -exec clang-format --dry-run --Werror --style=file {} +
+          echo "OK: formatting is clean"
+
+  # ---------------------------------------------------------------------------
+  # Static analysis.
+  # ---------------------------------------------------------------------------
+  static-analysis:
+    name: clang-tidy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang-18 clang-tidy-18
+
+      - name: Configure
+        env:
+          CC: clang-18
+          CXX: clang++-18
+        run: cmake --preset debug
+
+      - name: Generate compilation database
+        run: cmake --build --preset debug --target dw_git_info
+
+      - name: Run clang-tidy on project sources
+        run: |
+          set -euo pipefail
+          # Analyse only first-party translation units. Fetched dependencies are
+          # compiled into the same database but are not this project's code.
+          files=$(find src -type f -name '*.cpp')
+          clang-tidy-18 -p build/debug --warnings-as-errors='*' $files
+          echo "OK: static analysis is clean"
