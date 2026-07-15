@@ -11,8 +11,13 @@ add_library(diffusionworks::core ALIAS diffusionworks_core)
 
 target_sources(
     diffusionworks_core
-    PRIVATE core/build_info.cpp
-            core/config.cpp)
+    PRIVATE config/domain_parsers.cpp
+            core/build_info.cpp
+            core/config.cpp
+            engines/black_scholes_analytic.cpp
+            instruments/european_option.cpp
+            market/market_state.cpp
+            models/black_scholes.cpp)
 
 target_include_directories(
     diffusionworks_core
@@ -55,7 +60,9 @@ add_executable(diffusionworks)
 target_sources(
     diffusionworks
     PRIVATE cli/main.cpp
-            cli/options.cpp)
+            cli/options.cpp
+            cli/output.cpp
+            cli/price_command.cpp)
 
 target_link_libraries(
     diffusionworks
@@ -79,7 +86,11 @@ set_target_properties(
 # ---------------------------------------------------------------------------
 
 if(DW_BUILD_TESTS)
-    add_library(diffusionworks_cli_lib STATIC cli/options.cpp)
+    add_library(
+        diffusionworks_cli_lib STATIC
+        cli/options.cpp
+        cli/output.cpp
+        cli/price_command.cpp)
     add_library(diffusionworks::cli_lib ALIAS diffusionworks_cli_lib)
 
     target_include_directories(diffusionworks_cli_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/cli)
