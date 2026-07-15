@@ -17,7 +17,10 @@ target_sources(
             engines/black_scholes_analytic.cpp
             instruments/european_option.cpp
             market/market_state.cpp
-            models/black_scholes.cpp)
+            models/black_scholes.cpp
+            statistics/distributions.cpp
+            statistics/multi_seed.cpp
+            statistics/online_moments.cpp)
 
 target_include_directories(
     diffusionworks_core
