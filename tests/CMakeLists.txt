@@ -36,6 +36,12 @@ function(add_dw_test target_name)
         target_link_libraries(${target_name} PRIVATE diffusionworks::core)
     endif()
 
+    # Reference fixtures (data/references/) are read from the source tree rather
+    # than copied into the build directory, so a regenerated reference takes
+    # effect without a rebuild and there is only ever one copy to audit.
+    target_compile_definitions(${target_name}
+                               PRIVATE DW_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/data")
+
     set_target_properties(
         ${target_name}
         PROPERTIES CXX_STANDARD 20
@@ -80,6 +86,7 @@ add_dw_test(
     dw_test_engines
     LABEL unit
     SOURCES engines/black_scholes_reference_test.cpp
+            engines/black_scholes_high_precision_test.cpp
             engines/black_scholes_invariants_test.cpp
             engines/black_scholes_greeks_test.cpp)
 
@@ -91,3 +98,22 @@ add_dw_test(
     SOURCES cli/options_test.cpp
             cli/price_command_test.cpp
     LIBS diffusionworks::cli_lib)
+
+# --- External cross-validation ----------------------------------------------
+#
+# QuantLib is a validation-only reference (ADR-003). It links into this target
+# and nowhere else: not the core library, not the CLI, not any published result.
+# The target exists only when DW_ENABLE_QUANTLIB=ON, so a clean checkout builds
+# and tests fully without QuantLib installed.
+
+if(DW_ENABLE_QUANTLIB)
+    # core is named explicitly: add_dw_test only adds it by default when LIBS is
+    # empty, and QuantLib::QuantLib does not carry it.
+    add_dw_test(
+        dw_test_quantlib
+        LABEL validation
+        SOURCES validation/quantlib_cross_validation_test.cpp
+        LIBS diffusionworks::core QuantLib::QuantLib)
+
+    message(STATUS "QuantLib cross-validation target enabled: dw_test_quantlib")
+endif()

@@ -1,0 +1,600 @@
+{
+  "schema_version": 1,
+  "description": "High-precision Black-Scholes reference prices and Greeks for validating the DiffusionWorks analytic engine.",
+  "provenance": {
+    "generator": "python/generate_bs_references.py",
+    "method": "mpmath at 50 decimal digits. Greeks are numerical derivatives of the price at that precision, not evaluations of closed-form Greek formulas, so they are independent of the C++ engine's Greek algebra.",
+    "mpmath_working_digits": 50,
+    "differentiation_step": "0.000000000000001",
+    "reported_significant_digits": 25,
+    "generated_utc": "2026-07-15T17:42:24Z",
+    "git_commit": "f943d91bf88045185dc2743eab86ae820777ce23"
+  },
+  "conventions": {
+    "d1": "[log(S/K) + (r - q + sigma^2/2) T] / (sigma sqrt(T))",
+    "d2": "d1 - sigma sqrt(T)",
+    "delta": "dV/dS, per unit of spot",
+    "gamma": "d2V/dS2, per unit of spot squared",
+    "vega": "dV/dsigma, per unit of volatility (not per volatility point)",
+    "theta": "dV/dt, per year of calendar time (= -dV/dT)",
+    "rho": "dV/dr, per unit of rate (not per basis point)"
+  },
+  "cases": [
+    {
+      "scenario": "at_the_money",
+      "option_type": "call",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "10.45058357218556734600152",
+      "greeks": {
+        "delta": "0.6368306511756190733062623",
+        "gamma": "0.01876201734584689284075477",
+        "vega": "37.52403469169378776451190",
+        "theta": "-6.414027546438196131732479",
+        "rho": "53.23248154537633998462471"
+      }
+    },
+    {
+      "scenario": "at_the_money",
+      "option_type": "put",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "5.573526022256967991124851",
+      "greeks": {
+        "delta": "-0.3631693488243809266937377",
+        "gamma": "0.01876201734584689284075477",
+        "vega": "37.52403469169378776451190",
+        "theta": "-1.657880423934625835457110",
+        "rho": "-41.89046090469506066049862"
+      }
+    },
+    {
+      "scenario": "in_the_money",
+      "option_type": "call",
+      "market": {
+        "spot": 130.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "35.44027066738999984166406",
+      "greeks": {
+        "delta": "0.9517256971674827240396055",
+        "gamma": "0.003857021116524121537515119",
+        "vega": "13.03673137385153152048507",
+        "theta": "-5.717876635604291183628654",
+        "rho": "88.28406996438275428348465"
+      }
+    },
+    {
+      "scenario": "in_the_money",
+      "option_type": "put",
+      "market": {
+        "spot": 130.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "0.5632131174614004867873940",
+      "greeks": {
+        "delta": "-0.04827430283251727596039451",
+        "gamma": "0.003857021116524121537515119",
+        "vega": "13.03673137385153152048507",
+        "theta": "-0.9617295131007208873532852",
+        "rho": "-6.838872485688646361638681"
+      }
+    },
+    {
+      "scenario": "out_of_the_money",
+      "option_type": "call",
+      "market": {
+        "spot": 70.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "0.4414482102153677114336687",
+      "greeks": {
+        "delta": "0.07587538949186759254041013",
+        "gamma": "0.01020091959535530795294033",
+        "vega": "9.996901203448202348821022",
+        "theta": "-1.243181573055588492212295",
+        "rho": "4.869829054215363766395041"
+      }
+    },
+    {
+      "scenario": "out_of_the_money",
+      "option_type": "put",
+      "market": {
+        "spot": 70.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "25.56439066028676835655700",
+      "greeks": {
+        "delta": "-0.9241246105081324074595899",
+        "gamma": "0.01020091959535530795294033",
+        "vega": "9.996901203448202348821022",
+        "theta": "3.512965549447981804063074",
+        "rho": "-90.25311339585603687872829"
+      }
+    },
+    {
+      "scenario": "with_dividend",
+      "option_type": "call",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.03
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "8.652528553942715304485949",
+      "greeks": {
+        "delta": "0.5621399977897841594303288",
+        "gamma": "0.01897428178976286307542503",
+        "vega": "37.94856357952572825741851",
+        "theta": "-4.486509925835005784454734",
+        "rho": "47.56147122503570063854693"
+      }
+    },
+    {
+      "scenario": "with_dividend",
+      "option_type": "put",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.03
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "6.730917649163298148615346",
+      "greeks": {
+        "delta": "-0.4083055357587240185796105",
+        "gamma": "0.01897428178976286307542503",
+        "vega": "37.94856357952572825741851",
+        "theta": "-2.641699403976959914468086",
+        "rho": "-47.56147122503570000657640"
+      }
+    },
+    {
+      "scenario": "low_volatility",
+      "option_type": "call",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.05
+      },
+      "price": "5.283268987649913911504765",
+      "greeks": {
+        "delta": "0.8473184061668896489531156",
+        "gamma": "0.04718454173537450294999847",
+        "vega": "23.59227086768725278463335",
+        "theta": "-4.562235353144134122061110",
+        "rho": "79.44857162903905098380679"
+      }
+    },
+    {
+      "scenario": "low_volatility",
+      "option_type": "put",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.05
+      },
+      "price": "0.4062114377213145566280947",
+      "greeks": {
+        "delta": "-0.1526815938331103510468844",
+        "gamma": "0.04718454173537450294999847",
+        "vega": "23.59227086768725278463335",
+        "theta": "0.1939117693594361742142587",
+        "rho": "-15.67437082103234966131654"
+      }
+    },
+    {
+      "scenario": "high_volatility",
+      "option_type": "call",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.6
+      },
+      "price": "25.52320566560950356590539",
+      "greeks": {
+        "delta": "0.6492636865167811722626029",
+        "gamma": "0.006178033156406423062375939",
+        "vega": "37.06819893843853700245670",
+        "theta": "-13.09061783083499148158082",
+        "rho": "39.40316298606861366035490"
+      }
+    },
+    {
+      "scenario": "high_volatility",
+      "option_type": "put",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.6
+      },
+      "price": "20.64614811568090421102872",
+      "greeks": {
+        "delta": "-0.3507363134832188277373971",
+        "gamma": "0.006178033156406423062375939",
+        "vega": "37.06819893843853700245670",
+        "theta": "-8.334470708331421185305455",
+        "rho": "-55.71977946400278698476843"
+      }
+    },
+    {
+      "scenario": "short_dated",
+      "option_type": "call",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 0.08
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "2.457180130268220134344914",
+      "greeks": {
+        "delta": "0.5394288598854453727108632",
+        "gamma": "0.07017897707939223939841815",
+        "vega": "11.22863633270275916080438",
+        "theta": "-16.61008070879226543770857",
+        "rho": "4.118856468662105456680237"
+      }
+    },
+    {
+      "scenario": "short_dated",
+      "option_type": "put",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 0.08
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "2.057979064667367339166300",
+      "greeks": {
+        "delta": "-0.4605711401145546272891368",
+        "gamma": "0.07017897707939223939841815",
+        "vega": "11.22863633270275916080438",
+        "theta": "-11.63004076207230780101975",
+        "rho": "-3.849207446089826485574125"
+      }
+    },
+    {
+      "scenario": "long_dated",
+      "option_type": "call",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 10.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "45.19297367898936748228895",
+      "greeks": {
+        "delta": "0.8658091863536196100181944",
+        "gamma": "0.003418807909118246370358819",
+        "vega": "68.37615818236493120281564",
+        "theta": "-2.753158829642279140835697",
+        "rho": "413.8794495637259351953050"
+      }
+    },
+    {
+      "scenario": "long_dated",
+      "option_type": "put",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 10.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "5.846039650252708159208142",
+      "greeks": {
+        "delta": "-0.1341908136463803899818056",
+        "gamma": "0.003418807909118246370358819",
+        "vega": "68.37615818236493120281564",
+        "theta": "0.2794944689208880613563382",
+        "rho": "-192.6512101489074715738870"
+      }
+    },
+    {
+      "scenario": "negative_rate",
+      "option_type": "call",
+      "market": {
+        "spot": 100.0,
+        "rate": -0.01,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "7.513058243602442361649283",
+      "greeks": {
+        "delta": "0.5199388058383724644993195",
+        "gamma": "0.01992219570473819886221237",
+        "vega": "39.84439140947639993623277",
+        "theta": "-3.539630917545292164661823",
+        "rho": "44.48082234023480408828267"
+      }
+    },
+    {
+      "scenario": "negative_rate",
+      "option_type": "put",
+      "market": {
+        "spot": 100.0,
+        "rate": -0.01,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "8.518074952019248136891721",
+      "greeks": {
+        "delta": "-0.4800611941616275355006805",
+        "gamma": "0.01992219570473819886221237",
+        "vega": "39.84439140947639993623277",
+        "theta": "-4.549681084629460243440140",
+        "rho": "-56.52419436818200168695977"
+      }
+    },
+    {
+      "scenario": "deep_out_of_the_money",
+      "option_type": "call",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.0,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 200.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "0.001886218176150038833438746",
+      "greeks": {
+        "delta": "0.0003816987985820234704588772",
+        "gamma": "0.00006918268866369957961593391",
+        "vega": "0.1383653773273991669126892",
+        "theta": "-0.01383653773273991745935106",
+        "rho": "0.03628366168205230821244897"
+      }
+    },
+    {
+      "scenario": "deep_out_of_the_money",
+      "option_type": "put",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.0,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 200.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "100.0018862181761500388334",
+      "greeks": {
+        "delta": "-0.9996183012014179765295411",
+        "gamma": "0.00006918268866369957961593391",
+        "vega": "0.1383653773273991669126892",
+        "theta": "-0.01383653773273991745935106",
+        "rho": "-199.9637163383179476917876"
+      }
+    },
+    {
+      "scenario": "deep_in_the_money",
+      "option_type": "call",
+      "market": {
+        "spot": 200.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "104.8777242343237125666036",
+      "greeks": {
+        "delta": "0.9999321111667005759733422",
+        "gamma": "0.000006874179772990099341971902",
+        "vega": "0.05499343818392079778852428",
+        "theta": "-4.760934243769212475467036",
+        "rho": "95.10869799901640262806486"
+      }
+    },
+    {
+      "scenario": "deep_in_the_money",
+      "option_type": "put",
+      "market": {
+        "spot": 200.0,
+        "rate": 0.05,
+        "dividend_yield": 0.0
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 1.0
+      },
+      "model": {
+        "volatility": 0.2
+      },
+      "price": "0.0006666843951132117269178977",
+      "greeks": {
+        "delta": "-0.00006788883329942402665776180",
+        "gamma": "0.000006874179772990099341971902",
+        "vega": "0.05499343818392079778852428",
+        "theta": "-0.004787121265642179191667528",
+        "rho": "-0.01424445105499801705847026"
+      }
+    },
+    {
+      "scenario": "high_dividend",
+      "option_type": "call",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.02,
+        "dividend_yield": 0.08
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 2.0
+      },
+      "model": {
+        "volatility": 0.25
+      },
+      "price": "8.003983596966379207929832",
+      "greeks": {
+        "delta": "0.3710260365225799866394734",
+        "gamma": "0.009489086327876534420247151",
+        "vega": "47.44543163938267210123576",
+        "theta": "-0.5791035863866094526582849",
+        "rho": "58.19724011058323891203501"
+      }
+    },
+    {
+      "scenario": "high_dividend",
+      "option_type": "put",
+      "market": {
+        "spot": 100.0,
+        "rate": 0.02,
+        "dividend_yield": 0.08
+      },
+      "instrument": {
+        "strike": 100.0,
+        "maturity": 2.0
+      },
+      "model": {
+        "volatility": 0.25
+      },
+      "price": "18.86854861557756651003531",
+      "greeks": {
+        "delta": "-0.4811177524436313489786647",
+        "gamma": "0.009489086327876534420247151",
+        "vega": "47.44543163938267210123576",
+        "theta": "-5.474675019811653822234556",
+        "rho": "-133.9606477198814028158035"
+      }
+    }
+  ]
+}
