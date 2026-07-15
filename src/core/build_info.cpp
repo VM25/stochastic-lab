@@ -28,16 +28,26 @@ std::string current_utc_timestamp() {
     const auto now = std::chrono::system_clock::now();
     const std::time_t as_time_t = std::chrono::system_clock::to_time_t(now);
 
+    // A failed conversion leaves `utc` unpopulated. Formatting it anyway would
+    // stamp the artifact with a timestamp built from an unset tm, so the failure
+    // is surfaced instead.
     std::tm utc{};
 #if defined(_WIN32)
-    gmtime_s(&utc, &as_time_t);
+    if (gmtime_s(&utc, &as_time_t) != 0) {
+        return "unknown";
+    }
 #else
-    gmtime_r(&as_time_t, &utc);
+    if (::gmtime_r(&as_time_t, &utc) == nullptr) {
+        return "unknown";
+    }
 #endif
 
     std::array<char, 32> buffer{};
     const std::size_t written =
         std::strftime(buffer.data(), buffer.size(), "%Y-%m-%dT%H:%M:%SZ", &utc);
+    if (written == 0) {
+        return "unknown";
+    }
     return {buffer.data(), written};
 }
 
@@ -118,17 +128,17 @@ struct OsDescription {
 
 OsDescription detect_os() {
 #if defined(_WIN32)
-    return {"Windows", "unknown"};
+    return {.name = "Windows", .version = "unknown"};
 #else
     struct utsname info{};
     if (::uname(&info) != 0) {
-        return {"unknown", "unknown"};
+        return {.name = "unknown", .version = "unknown"};
     }
     // utsname exposes fixed-size char arrays. The casts make the decay to
     // const char* explicit rather than implicit; the fields are NUL-terminated
     // by POSIX, so constructing a string from them is well defined.
-    return {std::string(static_cast<const char*>(info.sysname)),
-            std::string(static_cast<const char*>(info.release))};
+    return {.name = std::string(static_cast<const char*>(info.sysname)),
+            .version = std::string(static_cast<const char*>(info.release))};
 #endif
 }
 

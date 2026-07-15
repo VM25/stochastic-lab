@@ -475,9 +475,10 @@ Result<ConfigDocument> load_config_file(const std::filesystem::path& path) {
             kContext);
     }
 
-    // NOLINTNEXTLINE(misc-const-correctness): every member used below happens to
-    // be const-qualified, but the stream is being consumed. Declaring it const
-    // would compile while telling the reader the opposite of what the code does.
+    // Every member used below happens to be const-qualified, but the stream is
+    // being consumed. Declaring it const would compile while telling the reader
+    // the opposite of what the code does.
+    // NOLINTNEXTLINE(misc-const-correctness)
     std::ifstream stream(path, std::ios::binary);
     if (!stream) {
         return Result<ConfigDocument>::failure(
