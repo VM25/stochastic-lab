@@ -4,6 +4,8 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <limits>
+#include <numbers>
 #include <vector>
 
 namespace diffusionworks {
@@ -237,7 +239,7 @@ TEST(BlackScholesLimitsTest, DegenerateCasesWarnButSucceed) {
 // The one place the closed form has no answer. Delta jumps by exp(-qT) across
 // the kink and gamma is a Dirac mass, so any finite number returned here would
 // be an invention.
-TEST(BlackScholesLimitsTest, GreeksFailAtTheDegeneratePayoffKink) {
+TEST(BlackScholesLimitsTest, PriceIsExactAtTheDegeneratePayoffKinkWhereGreeksAreNot) {
     // r = q makes the forward equal spot, so F = K = 100 exactly.
     const auto market = MarketState::create(100.0, 0.05, 0.05).value();
     const auto option = EuropeanOption::create(OptionType::Call, 100.0, 1.0).value();
@@ -247,14 +249,21 @@ TEST(BlackScholesLimitsTest, GreeksFailAtTheDegeneratePayoffKink) {
     ASSERT_TRUE(t.degenerate);
     ASSERT_DOUBLE_EQ(t.log_moneyness, 0.0) << "test setup must place the forward exactly at strike";
 
-    const auto greeks = BlackScholesAnalyticEngine::greeks(market, option, model);
-    ASSERT_FALSE(greeks.ok()) << "Greeks must not be invented at the kink";
-    EXPECT_EQ(greeks.error().code, ErrorCode::InvalidArgument);
-
-    // The price itself is still exact there: max(0, 0) = 0.
+    // The price is exact there: max(0, 0) = 0.
     const auto priced = BlackScholesAnalyticEngine::price(market, option, model);
     ASSERT_TRUE(priced.ok());
     EXPECT_DOUBLE_EQ(priced.value().value, 0.0);
+
+    // The Greek request succeeds, because existence is per Greek: gamma is a
+    // Dirac mass and must never be invented, while vega is a genuine one-sided
+    // derivative and must not be discarded. See black_scholes_greeks_test.cpp
+    // for the full classification.
+    const auto greeks = BlackScholesAnalyticEngine::greeks(market, option, model);
+    ASSERT_TRUE(greeks.ok()) << greeks.error().describe();
+    EXPECT_FALSE(greeks.value().gamma.has_value()) << "gamma must never be invented at the kink";
+    EXPECT_FALSE(greeks.value().delta.has_value());
+    EXPECT_TRUE(greeks.value().vega.has_value());
+    EXPECT_FALSE(greeks.value().undefined.empty()) << "absent Greeks must carry reasons";
 }
 
 // A resolvable tail must stay strictly positive. Here d2 ~ -3.57, so N(d2) is
@@ -268,28 +277,108 @@ TEST(BlackScholesLimitsTest, DeepOutOfTheMoneyCallIsSmallButPositive) {
     EXPECT_TRUE(std::isfinite(value));
 }
 
-// Far enough out, the honest answer is zero.
-//
-// At K = 1000 with sigma*sqrt(T) ~ 0.032, d1 ~ -72.6 and the tail probability is
-// around 1e-1150 -- some 800 orders of magnitude below the smallest positive
-// double. Underflow to exactly zero is not a defect but the correctly rounded
-// result: no double represents that number. What matters is that the underflow
-// is graceful. The value must be exactly zero rather than negative (which
-// cancellation could produce and which the engine rejects) or NaN.
-TEST(BlackScholesLimitsTest, UnrepresentablyDeepOutOfTheMoneyCallUnderflowsToZero) {
-    const double value = price(OptionType::Call, 100.0, 1000.0, 0.05, 0.0, 0.1, 0.1);
+/// A rigorous upper bound on log(call price), computed entirely in the log domain.
+///
+/// From the Mills ratio inequality N(-x) < phi(x)/x for x > 0, and dropping the
+/// (non-negative) subtracted strike term:
+///
+///     C = S e^{-qT} N(d1) - K e^{-rT} N(d2) <= S e^{-qT} N(d1)
+///                                           <  S e^{-qT} phi(|d1|)/|d1|
+///
+/// Taking logs gives a bound that never evaluates N itself, so it stays exact
+/// where N(d1) underflows to zero:
+///
+///     log C < log S - qT - d1^2/2 - log(sqrt(2 pi)) - log|d1|
+///
+/// Valid only for d1 < 0, which is the case of interest.
+[[nodiscard]] double log_upper_bound_on_call_price(double spot,
+                                                   double strike,
+                                                   double rate,
+                                                   double dividend_yield,
+                                                   double volatility,
+                                                   double maturity) {
+    const double total_vol = volatility * std::sqrt(maturity);
+    const double d1 = (std::log(spot / strike) +
+                       (rate - dividend_yield + 0.5 * volatility * volatility) * maturity) /
+                      total_vol;
+    EXPECT_LT(d1, 0.0) << "the bound requires a negative d1";
 
+    const double abs_d1 = std::abs(d1);
+    return std::log(spot) - dividend_yield * maturity - 0.5 * d1 * d1 -
+           0.5 * std::log(2.0 * std::numbers::pi) - std::log(abs_d1);
+}
+
+// Far enough out, zero is the correct answer -- established by a log-domain
+// bound, not by parity.
+//
+// Parity alone cannot settle this. It constrains only C - P, so a call tail lost
+// to underflow together with a compensating error in the put would satisfy it
+// exactly. The question "is the true price below what a double can represent?"
+// has to be answered without computing the price in double at all.
+//
+// The Mills ratio gives a rigorous upper bound on log(C) that never evaluates N,
+// so it remains exact precisely where N(d1) underflows. If that bound falls below
+// log(denorm_min), no double represents the true value and zero is the correctly
+// rounded result rather than a lost computation.
+TEST(BlackScholesLimitsTest, UnrepresentablyDeepOutOfTheMoneyCallUnderflowsToZero) {
+    constexpr double kSpot = 100.0;
+    constexpr double kStrike = 1000.0;
+    constexpr double kRate = 0.05;
+    constexpr double kDividendYield = 0.0;
+    constexpr double kVolatility = 0.1;
+    constexpr double kMaturity = 0.1;
+
+    const double log_bound = log_upper_bound_on_call_price(
+        kSpot, kStrike, kRate, kDividendYield, kVolatility, kMaturity);
+    const double log_smallest_double = std::log(std::numeric_limits<double>::denorm_min());
+
+    // The bound lands near -2639 in natural logs (about 1e-1146), while the
+    // smallest positive subnormal double is near -744 (about 4.9e-324). The true
+    // price is some 800 orders of magnitude below anything double can hold.
+    EXPECT_LT(log_bound, log_smallest_double)
+        << "this test only establishes graceful underflow if the true price is provably "
+           "unrepresentable\n  log(upper bound on C) = "
+        << log_bound << "\n  log(denorm_min)       = " << log_smallest_double;
+
+    // Given that, zero is the correctly rounded result. What the engine owes is
+    // that the underflow is graceful: exactly zero, never negative (which
+    // cancellation could produce, and which the engine rejects outright) and
+    // never NaN.
+    const double value =
+        price(OptionType::Call, kSpot, kStrike, kRate, kDividendYield, kVolatility, kMaturity);
     EXPECT_TRUE(std::isfinite(value));
     EXPECT_GE(value, 0.0) << "underflow must not produce a negative price";
     EXPECT_DOUBLE_EQ(value, 0.0);
 
-    // The matching put is worth its full discounted strike less the spot, and
-    // that side stays perfectly well conditioned. Parity therefore still holds
-    // exactly, which is what confirms the zero is a genuine limit rather than a
-    // lost computation.
+    // Documented double-precision limitation: for moneyness this extreme the
+    // engine cannot distinguish a genuinely worthless option from one worth
+    // 1e-1146. Both are zero in double. Resolving them would require a
+    // log-domain or extended-precision pricer, which Version 1.0 does not
+    // provide and does not claim to.
+}
+
+// The representable boundary, approached from the side where the price still
+// exists. This pins where the engine stops resolving, so the limitation above is
+// a measured statement rather than a vague one.
+TEST(BlackScholesLimitsTest, PriceRemainsResolvableUntilTheRepresentableBoundary) {
+    // Chosen so d1 ~ -20 and the price is ~1e-86: far into the tail, still a
+    // normal double, and exactly zero under a cancelling CDF.
+    const double value = price(OptionType::Call, 100.0, 300.0, 0.0, 0.0, 0.05, 1.0);
+
+    EXPECT_GT(value, 0.0) << "the tail collapsed while still representable";
+    EXPECT_LT(value, 1e-50);
+    EXPECT_TRUE(std::isfinite(value));
+}
+
+// The put side of the same unrepresentable case stays perfectly well conditioned:
+// it is worth its full discounted strike less the spot. This is a supporting
+// observation, not the proof -- it confirms the pair behaves sensibly once the
+// log-domain bound has established what the call's true value is.
+TEST(BlackScholesLimitsTest, PutSideOfAnUnrepresentableCallRemainsExact) {
     const double put = price(OptionType::Put, 100.0, 1000.0, 0.05, 0.0, 0.1, 0.1);
-    const double expected_put = 1000.0 * std::exp(-0.05 * 0.1) - 100.0;
-    EXPECT_NEAR(put, expected_put, 1e-10);
+    const double expected = 1000.0 * std::exp(-0.05 * 0.1) - 100.0;
+
+    EXPECT_NEAR(put, expected, 1e-10);
 }
 
 TEST(BlackScholesLimitsTest, DeepInTheMoneyCallApproachesForwardIntrinsic) {
