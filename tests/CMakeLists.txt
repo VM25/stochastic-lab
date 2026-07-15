@@ -71,6 +71,32 @@ add_dw_test(
     LABEL unit
     SOURCES numerics/normal_test.cpp)
 
+# --- Randomness -------------------------------------------------------------
+#
+# The statistical tests here draw millions of samples so that their acceptance
+# bounds sit far above the sampling noise. A flaky stochastic test is a
+# test-design failure (TESTING-STRATEGY section 6), so they are labelled
+# `statistical` and kept out of the fast developer loop.
+
+add_dw_test(
+    dw_test_random
+    LABEL unit
+    SOURCES random/philox_test.cpp)
+
+add_dw_test(
+    dw_test_random_stream
+    LABEL statistical
+    SOURCES random/random_stream_test.cpp)
+
+# --- Statistics -------------------------------------------------------------
+
+add_dw_test(
+    dw_test_statistics
+    LABEL unit
+    SOURCES statistics/distributions_test.cpp
+            statistics/online_moments_test.cpp
+            statistics/multi_seed_test.cpp)
+
 # --- Domain types -----------------------------------------------------------
 
 add_dw_test(
