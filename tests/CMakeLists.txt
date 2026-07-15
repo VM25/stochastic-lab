@@ -57,3 +57,11 @@ add_dw_test(
             core/error_test.cpp
             core/config_test.cpp
             core/build_info_test.cpp)
+
+# --- CLI --------------------------------------------------------------------
+
+add_dw_test(
+    dw_test_cli
+    LABEL cli
+    SOURCES cli/options_test.cpp
+    LIBS diffusionworks::cli_lib)

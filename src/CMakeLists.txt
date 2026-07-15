@@ -42,3 +42,57 @@ set_target_properties(
                CXX_STANDARD_REQUIRED ON
                CXX_EXTENSIONS OFF
                POSITION_INDEPENDENT_CODE ON)
+
+# ---------------------------------------------------------------------------
+# diffusionworks: the CLI
+#
+# ADR-004 makes the CLI the authoritative interface. It contains argument
+# parsing and rendering only; no pricing logic lives here.
+# ---------------------------------------------------------------------------
+
+add_executable(diffusionworks)
+
+target_sources(
+    diffusionworks
+    PRIVATE cli/main.cpp
+            cli/options.cpp)
+
+target_link_libraries(
+    diffusionworks
+    PRIVATE diffusionworks::core
+            dw::warnings
+            dw::sanitizers)
+
+set_target_properties(
+    diffusionworks
+    PROPERTIES CXX_STANDARD 20
+               CXX_STANDARD_REQUIRED ON
+               CXX_EXTENSIONS OFF)
+
+# ---------------------------------------------------------------------------
+# diffusionworks_cli_lib: CLI internals exposed for testing
+#
+# TESTING-STRATEGY section 10 requires tests for argument parsing, help text, and
+# exit codes. Those live in cli/options.cpp, which the executable compiles
+# directly; this object library lets the test target reuse the same translation
+# unit without duplicating it or making main() testable.
+# ---------------------------------------------------------------------------
+
+if(DW_BUILD_TESTS)
+    add_library(diffusionworks_cli_lib STATIC cli/options.cpp)
+    add_library(diffusionworks::cli_lib ALIAS diffusionworks_cli_lib)
+
+    target_include_directories(diffusionworks_cli_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/cli)
+
+    target_link_libraries(
+        diffusionworks_cli_lib
+        PUBLIC diffusionworks::core
+        PRIVATE dw::warnings
+                dw::sanitizers)
+
+    set_target_properties(
+        diffusionworks_cli_lib
+        PROPERTIES CXX_STANDARD 20
+                   CXX_STANDARD_REQUIRED ON
+                   CXX_EXTENSIONS OFF)
+endif()
