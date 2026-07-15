@@ -219,7 +219,7 @@ Result<Options> parse_arguments(const std::vector<std::string_view>& args) {
                                 value.value()),
                     kContext);
             }
-            options.format = *format;
+            options.format = format;
         } else {
             return Result<Options>::failure(ErrorCode::InvalidArgument,
                                             fmt::format("unknown option '{}' for command '{}'",

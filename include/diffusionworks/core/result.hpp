@@ -113,7 +113,7 @@ public:
 
     Result(Error error) : error_(std::move(error)), has_error_(true) {}  // NOLINT
 
-    [[nodiscard]] static Result success() { return Result(); }
+    [[nodiscard]] static Result success() { return {}; }
 
     [[nodiscard]] static Result failure(Error error) { return Result(std::move(error)); }
 
@@ -135,7 +135,7 @@ public:
     }
 
 private:
-    Error error_{};
+    Error error_;
     bool has_error_{false};
 };
 

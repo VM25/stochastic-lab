@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <ostream>
 #include <stdexcept>
 #include <string>
@@ -15,7 +16,7 @@ namespace diffusionworks {
 /// (explicit result states). This enum names the second class. Every code here
 /// describes a condition the engine anticipates and must report rather than
 /// convert into a zero, a NaN, or a plausible-looking value.
-enum class ErrorCode {
+enum class ErrorCode : std::uint8_t {
     /// Caller supplied a value outside the domain of the operation.
     InvalidArgument,
 

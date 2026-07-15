@@ -201,7 +201,13 @@ jobs:
       - name: Install toolchain
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build clang-18 clang-tidy-18
+          sudo apt-get install -y ninja-build clang-18
+
+      # Pinned for the same reason as clang-format: check behaviour and
+      # diagnostics change between major versions, so an unpinned tool makes the
+      # analysis depend on the runner image.
+      - name: Install clang-tidy
+        run: pip install 'clang-tidy==20.1.0'
 
       - name: Configure
         env:
@@ -217,6 +223,6 @@ jobs:
           set -euo pipefail
           # Analyse only first-party translation units. Fetched dependencies are
           # compiled into the same database but are not this project's code.
-          files=$(find src -type f -name '*.cpp')
-          clang-tidy-18 -p build/debug --warnings-as-errors='*' $files
+          find src -type f -name '*.cpp' \
+            -exec clang-tidy -p build/debug --warnings-as-errors='*' {} +
           echo "OK: static analysis is clean"

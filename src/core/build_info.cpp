@@ -38,7 +38,7 @@ std::string current_utc_timestamp() {
     std::array<char, 32> buffer{};
     const std::size_t written =
         std::strftime(buffer.data(), buffer.size(), "%Y-%m-%dT%H:%M:%SZ", &utc);
-    return std::string(buffer.data(), written);
+    return {buffer.data(), written};
 }
 
 std::string read_hostname() {
@@ -52,7 +52,7 @@ std::string read_hostname() {
 #else
     std::array<char, 256> buffer{};
     if (::gethostname(buffer.data(), buffer.size() - 1) == 0) {
-        return std::string(buffer.data());
+        return {buffer.data()};
     }
     return "unknown";
 #endif
@@ -93,8 +93,8 @@ std::string detect_cpu_brand() {
             continue;
         }
         const std::string key = line.substr(0, colon);
-        if (key.rfind("model name", 0) == 0 || key.rfind("Hardware", 0) == 0) {
-            std::string value = line.substr(colon + 1);
+        if (key.starts_with("model name") || key.starts_with("Hardware")) {
+            const std::string value = line.substr(colon + 1);
             const auto first = value.find_first_not_of(" \t");
             if (first == std::string::npos) {
                 continue;
@@ -124,7 +124,11 @@ OsDescription detect_os() {
     if (::uname(&info) != 0) {
         return {"unknown", "unknown"};
     }
-    return {std::string(info.sysname), std::string(info.release)};
+    // utsname exposes fixed-size char arrays. The casts make the decay to
+    // const char* explicit rather than implicit; the fields are NUL-terminated
+    // by POSIX, so constructing a string from them is well defined.
+    return {std::string(static_cast<const char*>(info.sysname)),
+            std::string(static_cast<const char*>(info.release))};
 #endif
 }
 
