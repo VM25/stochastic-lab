@@ -166,6 +166,105 @@ jobs:
           fi
 
   # ---------------------------------------------------------------------------
+  # External cross-validation against QuantLib.
+  #
+  # Separate from the main matrix because QuantLib is an optional reference
+  # (ADR-003): it links into one test target and nothing else, and a clean
+  # checkout must build and test fully without it. Running it here keeps the
+  # comparison honest evidence rather than a claim, without putting a heavy
+  # dependency on every build.
+  # ---------------------------------------------------------------------------
+  quantlib-cross-validation:
+    name: validate (quantlib)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain and QuantLib
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build clang-18 libquantlib0-dev libboost-dev
+
+      - name: Configure with QuantLib enabled
+        env:
+          CC: clang-18
+          CXX: clang++-18
+        run: |
+          cmake -S . -B build/quantlib -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DDW_BUILD_TESTS=ON \
+            -DDW_ENABLE_QUANTLIB=ON
+
+      # Discovery downgrades itself to a warning when QuantLib is absent, so a
+      # broken install would otherwise silently skip the cross-validation and
+      # report success. Fail loudly instead.
+      - name: Verify QuantLib was actually found
+        run: |
+          set -euo pipefail
+          if ! grep -q "DW_ENABLE_QUANTLIB:BOOL=ON" build/quantlib/CMakeCache.txt; then
+            echo "FAIL: QuantLib discovery downgraded itself; the cross-validation would be skipped"
+            exit 1
+          fi
+          echo "OK: QuantLib discovered"
+
+      - name: Build cross-validation
+        run: cmake --build build/quantlib --target dw_test_quantlib
+
+      - name: Run cross-validation
+        run: ctest --test-dir build/quantlib -L validation --output-on-failure
+
+  # ---------------------------------------------------------------------------
+  # High-precision reference fixture.
+  #
+  # The committed fixture must match what the generator produces, or the
+  # "independent oracle" is really a snapshot of whatever the engine happened to
+  # agree with when it was written.
+  # ---------------------------------------------------------------------------
+  reference-fixture:
+    name: verify reference fixture
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Pinned to the version the committed fixture was generated with. mpmath is
+      # deterministic, but a version bump could change how mp.diff chooses its
+      # steps and shift the last digits, which would read as a spurious failure.
+      - name: Install mpmath
+        run: pip install 'mpmath==1.4.1'
+
+      - name: Regenerate and compare
+        run: |
+          set -euo pipefail
+          python3 python/generate_bs_references.py > /tmp/regenerated.json
+
+          # provenance carries a timestamp and commit, which differ by design;
+          # the numbers must not.
+          python3 - <<'EOF'
+          import json, sys
+
+          with open("data/references/black_scholes.json") as f:
+              committed = json.load(f)
+          with open("/tmp/regenerated.json") as f:
+              regenerated = json.load(f)
+
+          if committed["cases"] != regenerated["cases"]:
+              print("FAIL: committed reference values do not match the generator output")
+              for a, b in zip(committed["cases"], regenerated["cases"]):
+                  if a != b:
+                      print(f"  first mismatch: {a['scenario']} {a['option_type']}")
+                      print(f"    committed   : {a}")
+                      print(f"    regenerated : {b}")
+                      break
+              sys.exit(1)
+
+          print(f"OK: {len(committed['cases'])} reference cases reproduce exactly")
+          EOF
+
+  # ---------------------------------------------------------------------------
   # Formatting.
   # ---------------------------------------------------------------------------
   format:

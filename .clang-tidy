@@ -22,8 +22,15 @@
 #       parentheses would only move the code further from the specification it
 #       transcribes.
 #
-# Everything switched off below has a reason of this kind. Correctness checks
-# (bugprone-*, clang-analyzer-*, cert-*) stay on.
+# Everything switched off below is of that kind: a readability or style rule that
+# would degrade the correspondence between the code and the mathematics.
+#
+# No correctness or safety check is disabled. bugprone-*, clang-analyzer-*,
+# cert-*, and the cppcoreguidelines-pro-* bounds and cast checks all stay on, and
+# have caught real defects (an unchecked gmtime_r return, an optional
+# round-tripped through a dereference). Where one of them is genuinely wrong at a
+# single site, it is suppressed there with its reason at the call site, not
+# switched off globally -- there is exactly one such suppression in the project.
 
 Checks: >
   -*,
@@ -39,8 +46,6 @@ Checks: >
   -bugprone-easily-swappable-parameters,
   -cppcoreguidelines-avoid-magic-numbers,
   -cppcoreguidelines-non-private-member-variables-in-classes,
-  -cppcoreguidelines-pro-bounds-pointer-arithmetic,
-  -cppcoreguidelines-pro-type-reinterpret-cast,
   -misc-non-private-member-variables-in-classes,
   -misc-include-cleaner,
   -modernize-use-trailing-return-type,

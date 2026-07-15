@@ -82,13 +82,90 @@ endif()
 # the core library or the CLI; only dedicated cross-validation targets use it.
 
 if(DW_ENABLE_QUANTLIB)
-    find_package(QuantLib QUIET)
+    # Discovery has to cope with two packagings. QuantLib built with CMake
+    # installs QuantLibConfig.cmake, but Homebrew's bottle ships neither a CMake
+    # config nor a pkg-config file -- only the legacy quantlib-config script. So
+    # try the config package first and fall back to locating the header and
+    # library directly.
+    find_package(QuantLib QUIET CONFIG)
+
     if(NOT QuantLib_FOUND)
+        set(_dw_quantlib_hints "")
+        find_program(DW_BREW_EXECUTABLE brew)
+        if(DW_BREW_EXECUTABLE)
+            execute_process(
+                COMMAND "${DW_BREW_EXECUTABLE}" --prefix quantlib
+                OUTPUT_VARIABLE _dw_brew_quantlib_prefix
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET
+                RESULT_VARIABLE _dw_brew_result)
+            if(_dw_brew_result EQUAL 0 AND _dw_brew_quantlib_prefix)
+                list(APPEND _dw_quantlib_hints "${_dw_brew_quantlib_prefix}")
+            endif()
+        endif()
+
+        find_path(
+            DW_QUANTLIB_INCLUDE_DIR ql/quantlib.hpp
+            HINTS ${_dw_quantlib_hints}
+            PATH_SUFFIXES include)
+
+        find_library(
+            DW_QUANTLIB_LIBRARY
+            NAMES QuantLib
+            HINTS ${_dw_quantlib_hints}
+            PATH_SUFFIXES lib)
+
+        # ql/qldefines.hpp includes boost/config.hpp, so QuantLib's headers do
+        # not stand alone even when its shared_ptr maps to std::shared_ptr.
+        # A CMake config package would carry this dependency; discovered by
+        # hand, it has to be supplied here.
+        set(_dw_boost_hints "")
+        if(DW_BREW_EXECUTABLE)
+            execute_process(
+                COMMAND "${DW_BREW_EXECUTABLE}" --prefix boost
+                OUTPUT_VARIABLE _dw_brew_boost_prefix
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+                ERROR_QUIET
+                RESULT_VARIABLE _dw_brew_boost_result)
+            if(_dw_brew_boost_result EQUAL 0 AND _dw_brew_boost_prefix)
+                list(APPEND _dw_boost_hints "${_dw_brew_boost_prefix}")
+            endif()
+        endif()
+
+        find_path(
+            DW_BOOST_INCLUDE_DIR boost/config.hpp
+            HINTS ${_dw_boost_hints}
+            PATH_SUFFIXES include)
+
+        if(DW_QUANTLIB_INCLUDE_DIR AND DW_QUANTLIB_LIBRARY AND DW_BOOST_INCLUDE_DIR)
+            add_library(QuantLib::QuantLib UNKNOWN IMPORTED)
+            set_target_properties(
+                QuantLib::QuantLib
+                PROPERTIES IMPORTED_LOCATION "${DW_QUANTLIB_LIBRARY}"
+                           # SYSTEM so QuantLib's and Boost's headers are not
+                           # compiled under this project's -Werror settings.
+                           INTERFACE_SYSTEM_INCLUDE_DIRECTORIES
+                           "${DW_QUANTLIB_INCLUDE_DIR};${DW_BOOST_INCLUDE_DIR}"
+                           INTERFACE_INCLUDE_DIRECTORIES
+                           "${DW_QUANTLIB_INCLUDE_DIR};${DW_BOOST_INCLUDE_DIR}")
+            set(QuantLib_FOUND TRUE)
+            message(STATUS "QuantLib found via direct discovery: ${DW_QUANTLIB_LIBRARY}")
+            message(STATUS "  Boost headers: ${DW_BOOST_INCLUDE_DIR}")
+        elseif(DW_QUANTLIB_INCLUDE_DIR AND DW_QUANTLIB_LIBRARY AND NOT DW_BOOST_INCLUDE_DIR)
+            message(WARNING "QuantLib was found but its Boost headers were not; "
+                            "install Boost or set DW_BOOST_INCLUDE_DIR.")
+        endif()
+    else()
+        message(STATUS "QuantLib found via CMake config package")
+    endif()
+
+    if(NOT QuantLib_FOUND)
+        # A warning rather than an error: QuantLib is an optional reference, and
+        # a clean checkout must build and test fully without it.
         message(WARNING
                 "DW_ENABLE_QUANTLIB=ON but QuantLib was not found. "
-                "External cross-validation targets will be skipped.")
+                "External cross-validation targets will be skipped. "
+                "Install with: brew install quantlib | apt-get install libquantlib0-dev")
         set(DW_ENABLE_QUANTLIB OFF CACHE BOOL "" FORCE)
-    else()
-        message(STATUS "QuantLib found: external validation targets enabled")
     endif()
 endif()

@@ -13,6 +13,7 @@
 
 #include <cstdio>
 #include <exception>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -101,10 +102,16 @@ namespace {
 
 int main(int argc, char** argv) {
     try {
+        // argv is a raw pointer-and-count pair; wrapping it in a span makes the
+        // bound explicit and keeps the indexing checked, rather than reaching
+        // through the pointer directly.
+        const std::span<char*> raw_arguments(argv, static_cast<std::size_t>(argc));
+
         std::vector<std::string_view> args;
-        args.reserve(static_cast<std::size_t>(argc > 1 ? argc - 1 : 0));
-        for (int i = 1; i < argc; ++i) {
-            args.emplace_back(argv[i]);
+        args.reserve(raw_arguments.empty() ? 0 : raw_arguments.size() - 1);
+        // Skip argv[0], the program name.
+        for (char* argument : raw_arguments.subspan(1)) {
+            args.emplace_back(argument);
         }
 
         if (args.empty()) {
