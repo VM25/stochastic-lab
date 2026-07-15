@@ -55,4 +55,5 @@ add_dw_test(
     LABEL unit
     SOURCES core/result_test.cpp
             core/error_test.cpp
+            core/config_test.cpp
             core/build_info_test.cpp)

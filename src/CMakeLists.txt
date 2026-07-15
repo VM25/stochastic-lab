@@ -11,7 +11,8 @@ add_library(diffusionworks::core ALIAS diffusionworks_core)
 
 target_sources(
     diffusionworks_core
-    PRIVATE core/build_info.cpp)
+    PRIVATE core/build_info.cpp
+            core/config.cpp)
 
 target_include_directories(
     diffusionworks_core
