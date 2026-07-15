@@ -58,10 +58,36 @@ add_dw_test(
             core/config_test.cpp
             core/build_info_test.cpp)
 
+# --- Numerics ---------------------------------------------------------------
+
+add_dw_test(
+    dw_test_numerics
+    LABEL unit
+    SOURCES numerics/normal_test.cpp)
+
+# --- Domain types -----------------------------------------------------------
+
+add_dw_test(
+    dw_test_domain
+    LABEL unit
+    SOURCES market/market_state_test.cpp
+            instruments/european_option_test.cpp
+            models/black_scholes_test.cpp)
+
+# --- Pricing engines --------------------------------------------------------
+
+add_dw_test(
+    dw_test_engines
+    LABEL unit
+    SOURCES engines/black_scholes_reference_test.cpp
+            engines/black_scholes_invariants_test.cpp
+            engines/black_scholes_greeks_test.cpp)
+
 # --- CLI --------------------------------------------------------------------
 
 add_dw_test(
     dw_test_cli
     LABEL cli
     SOURCES cli/options_test.cpp
+            cli/price_command_test.cpp
     LIBS diffusionworks::cli_lib)
