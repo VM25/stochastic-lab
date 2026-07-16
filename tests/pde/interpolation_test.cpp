@@ -216,6 +216,12 @@ TEST(InterpolationTest, ErrorApproachesSecondOrderInSpacingOnSmoothData) {
                                std::log(spacings[i - 1] / spacings[i]));
     }
 
+    // The premise for everything below: a sweep with no adjacent pairs has no
+    // local orders, and the assertions would pass vacuously. Stated rather than
+    // assumed -- and it also gives GCC's -O2 range analysis, which loses the sweep
+    // length through the loop above, the fact it needs to accept .back().
+    ASSERT_GE(local_orders.size(), 2U);
+
     for (std::size_t i = 1; i < local_orders.size(); ++i) {
         EXPECT_GT(local_orders[i], local_orders[i - 1])
             << "the local order must improve monotonically as the spacing refines; at index " << i

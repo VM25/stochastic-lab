@@ -11,6 +11,30 @@
 namespace diffusionworks {
 namespace {
 
+/// Which corner entry a diagonal leaves unused.
+enum class Corner { First, Last };
+
+/// A diagonal filled with `value`, with its unused corner entry zeroed.
+///
+/// The zeroing is cosmetic -- lower[0] and upper[n-1] multiply nothing, and
+/// IgnoresTheUnusedCornerEntries pins that the solver never reads them -- but it is
+/// what a caller would write, so the tests do too.
+///
+/// The emptiness guard is here rather than at each call site because this is where
+/// it is natural: a function taking a size cannot assume it is positive. It also
+/// happens to give GCC what it needs. At -O2 GCC's value-range propagation loses
+/// the size through an initializer-list loop, cannot prove the vector is non-empty,
+/// and reports the corner write as -Wnull-dereference -- a false positive, since
+/// every size in these tests is a positive literal, but not one worth arguing with
+/// when the guard belongs here anyway.
+std::vector<double> corner_zeroed(std::size_t n, double value, Corner corner) {
+    std::vector<double> v(n, value);
+    if (!v.empty()) {
+        (corner == Corner::First ? v.front() : v.back()) = 0.0;
+    }
+    return v;
+}
+
 /// Builds a system from its diagonals and a *known* solution, by computing the
 /// right-hand side that solution implies.
 ///
@@ -414,11 +438,9 @@ TEST(TridiagonalTest, ResidualRejectsAMismatchedSolutionLength) {
 // rows. The residual must stay at rounding level rather than growing with n.
 TEST(TridiagonalTest, StaysAccurateOnALargeDominantSystem) {
     for (const std::size_t n : {50U, 500U, 5000U}) {
-        std::vector<double> lower(n, -1.0);
-        std::vector<double> diagonal(n, 2.0 + 1e-6);  // barely dominant
-        std::vector<double> upper(n, -1.0);
-        lower[0] = 0.0;
-        upper[n - 1] = 0.0;
+        const std::vector<double> lower = corner_zeroed(n, -1.0, Corner::First);
+        const std::vector<double> diagonal(n, 2.0 + 1e-6);  // barely dominant
+        const std::vector<double> upper = corner_zeroed(n, -1.0, Corner::Last);
 
         std::vector<double> expected(n);
         for (std::size_t i = 0; i < n; ++i) {
