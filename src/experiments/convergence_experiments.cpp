@@ -655,9 +655,12 @@ Result<ExperimentRecord> run_strong_convergence(const ConvergenceExperimentConfi
         record.limitations.push_back(d);
     }
     record.limitations.emplace_back(
-        "Only the terminal value is compared. A pathwise supremum error would be the stronger "
-        "statement and is not measured here; it is what a barrier payoff would be sensitive to "
-        "(EXP-09).");
+        "Only the terminal value is compared, so what is established is convergence of S_T rather "
+        "than of the path. The stronger statement -- a supremum error, sup_t |S_t^dt - S_t^exact| "
+        "-- is not measured by this experiment and no experiment in the catalog measures it. That "
+        "gap matters for any payoff reading the path between grid points rather than only its "
+        "endpoint; EXP-07 quantifies the pricing consequence for barriers, as discrete-monitoring "
+        "bias, but that is the bias in the price and not the scheme's supremum error.");
     record.limitations.emplace_back(
         "Levels are not coupled to one another: each grid draws its own Brownian path, so the "
         "error estimates across levels are independent rather than nested. This costs precision "

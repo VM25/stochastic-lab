@@ -222,9 +222,13 @@ difference is >100× smaller than the same difference across independent seeds.
 - **GBM only.** Both strong orders are theoretical results under globally Lipschitz
   coefficients. GBM satisfies that; Heston's square-root diffusion does not. Nothing
   here transfers to the Heston arm of EXP-04, which is completed in Phase 14.
-- **Terminal values only.** A pathwise supremum error would be the stronger
-  statement and is not measured. It is what a barrier payoff is sensitive to
-  (EXP-09).
+- **Terminal values only.** What is established is convergence of `S_T`, not of the
+  path. The stronger statement — a supremum error, `sup_t |S_t^Δ − S_t^exact|` — is
+  not measured here, and **no experiment in the catalog measures it**. The gap
+  matters for any payoff that reads the path between grid points rather than only
+  its endpoint. EXP-07 quantifies the pricing consequence for barriers, as
+  discrete-monitoring bias, but that is a bias in the price and not the scheme's
+  supremum error; the two are related and not interchangeable.
 - **Rates, not constants.** Two methods can share an order and differ by orders of
   magnitude in the error at any fixed resolution. That comparison belongs to EXP-05.
 - **Levels are independent, not nested.** Each level draws its own paths, which is
