@@ -1,10 +1,13 @@
+#include <diffusionworks/engines/barrier_analytic.hpp>
 #include <diffusionworks/engines/black_scholes_analytic.hpp>
 
 #include <gtest/gtest.h>
 
 #include <cmath>
 #include <ql/exercise.hpp>
+#include <ql/instruments/barrieroption.hpp>
 #include <ql/instruments/vanillaoption.hpp>
+#include <ql/pricingengines/barrier/analyticbarrierengine.hpp>
 #include <ql/pricingengines/vanilla/analyticeuropeanengine.hpp>
 #include <ql/processes/blackscholesprocess.hpp>
 #include <ql/quotes/simplequote.hpp>
@@ -259,6 +262,110 @@ TEST(QuantLibCrossValidationTest, BothEnginesSeeTheSameMaturity) {
 
         EXPECT_DOUBLE_EQ(quantlib_maturity, year_fraction(s.days))
             << s.name << ": the two engines disagree about T, so the comparison is void";
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Barrier options
+//
+// The value this adds over the mpmath fixture: Reiner-Rubinstein is a set of
+// formulae with branches, and a transcription that picks the wrong branch is
+// still a formula that produces plausible numbers. QuantLib's implementation was
+// written independently from the same literature, so agreement is evidence that
+// both read the branch structure the same way -- and the *conventions* the same
+// way, which is the part a high-precision oracle cannot check.
+//
+// The convention at issue here is monitoring. QuantLib's AnalyticBarrierEngine
+// prices continuous monitoring, and so does BarrierAnalyticEngine, so the two are
+// comparable. Handing it a discretely monitored contract would compare different
+// things.
+// ---------------------------------------------------------------------------
+
+TEST(QuantLibCrossValidation, BarrierCallsAgreeWithQuantLib) {
+    struct BarrierScenario {
+        std::string name;
+        double spot;
+        double strike;
+        double barrier;
+        double rate;
+        double dividend_yield;
+        double volatility;
+        QuantLib::Natural days;
+    };
+
+    const std::vector<BarrierScenario> cases{
+        {"down_out_atm", 100.0, 100.0, 90.0, 0.05, 0.00, 0.20, 365},
+        {"down_out_near_barrier", 92.0, 100.0, 90.0, 0.05, 0.00, 0.20, 365},
+        {"down_out_far_barrier", 100.0, 100.0, 70.0, 0.05, 0.00, 0.20, 365},
+        {"down_out_with_dividend", 100.0, 100.0, 80.0, 0.05, 0.03, 0.25, 365},
+        {"down_out_long_dated", 110.0, 100.0, 85.0, 0.03, 0.00, 0.20, 730},
+        {"down_out_high_vol", 100.0, 100.0, 75.0, 0.05, 0.00, 0.45, 365},
+    };
+
+    for (const auto& c : cases) {
+        for (const auto barrier_type : {BarrierType::DownAndOut, BarrierType::DownAndIn}) {
+            const double maturity = static_cast<double>(c.days) / static_cast<double>(kDaysPerYear);
+
+            const auto market = MarketState::create(c.spot, c.rate, c.dividend_yield).value();
+            const auto model = BlackScholesModel::create(c.volatility).value();
+            const auto option = BarrierOption::create(OptionType::Call,
+                                                      barrier_type,
+                                                      c.strike,
+                                                      c.barrier,
+                                                      maturity,
+                                                      MonitoringConvention::Continuous,
+                                                      std::nullopt)
+                                    .value();
+
+            const auto ours = BarrierAnalyticEngine::price(market, option, model);
+            ASSERT_TRUE(ours.ok()) << c.name << ": " << ours.error().describe();
+
+            // --- QuantLib ---
+            const QuantLib::Date today(1, QuantLib::January, 2026);
+            QuantLib::Settings::instance().evaluationDate() = today;
+            const QuantLib::DayCounter day_counter = QuantLib::Actual365Fixed();
+            const QuantLib::Calendar calendar = QuantLib::NullCalendar();
+            const QuantLib::Date expiry = today + c.days;
+
+            const auto spot_quote = QuantLib::ext::make_shared<QuantLib::SimpleQuote>(c.spot);
+            const QuantLib::Handle<QuantLib::YieldTermStructure> rate_curve(
+                QuantLib::ext::make_shared<QuantLib::FlatForward>(today, c.rate, day_counter));
+            const QuantLib::Handle<QuantLib::YieldTermStructure> dividend_curve(
+                QuantLib::ext::make_shared<QuantLib::FlatForward>(
+                    today, c.dividend_yield, day_counter));
+            const QuantLib::Handle<QuantLib::BlackVolTermStructure> vol_surface(
+                QuantLib::ext::make_shared<QuantLib::BlackConstantVol>(
+                    today, calendar, c.volatility, day_counter));
+
+            const auto process = QuantLib::ext::make_shared<QuantLib::BlackScholesMertonProcess>(
+                QuantLib::Handle<QuantLib::Quote>(spot_quote),
+                dividend_curve,
+                rate_curve,
+                vol_surface);
+
+            const auto payoff = QuantLib::ext::make_shared<QuantLib::PlainVanillaPayoff>(
+                QuantLib::Option::Call, c.strike);
+            const auto exercise = QuantLib::ext::make_shared<QuantLib::EuropeanExercise>(expiry);
+
+            QuantLib::BarrierOption ql_option(barrier_type == BarrierType::DownAndOut
+                                                  ? QuantLib::Barrier::DownOut
+                                                  : QuantLib::Barrier::DownIn,
+                                              c.barrier,
+                                              0.0,  // no rebate
+                                              payoff,
+                                              exercise);
+            ql_option.setPricingEngine(
+                QuantLib::ext::make_shared<QuantLib::AnalyticBarrierEngine>(process));
+
+            const double theirs = ql_option.NPV();
+
+            // Absolute and relative together: a near-barrier knock-out is worth
+            // almost nothing, where a relative tolerance is meaningless, while an
+            // in-the-money one is worth tens, where an absolute one is too loose.
+            EXPECT_NEAR(ours.value().value, theirs, 1e-9 + 1e-10 * std::abs(theirs))
+                << c.name << " / " << to_string(barrier_type) << ": ours " << ours.value().value
+                << " vs QuantLib " << theirs;
+        }
     }
 }
 

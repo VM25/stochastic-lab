@@ -153,6 +153,11 @@ add_dw_test(
     SOURCES engines/monte_carlo_engine_test.cpp)
 
 add_dw_test(
+    dw_test_barrier
+    LABEL unit
+    SOURCES engines/barrier_analytic_test.cpp)
+
+add_dw_test(
     dw_test_finite_difference
     LABEL unit
     SOURCES engines/finite_difference_test.cpp)

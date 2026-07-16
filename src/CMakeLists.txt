@@ -23,7 +23,9 @@ target_sources(
             experiments/experiment.cpp
             experiments/pde_experiments.cpp
             experiments/scheme_moments.cpp
+            engines/barrier_analytic.cpp
             instruments/asian_option.cpp
+            instruments/barrier_option.cpp
             instruments/european_option.cpp
             market/market_state.cpp
             models/black_scholes.cpp
