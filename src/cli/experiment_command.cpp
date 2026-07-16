@@ -1,5 +1,6 @@
 #include "experiment_command.hpp"
 
+#include <diffusionworks/experiments/barrier_experiments.hpp>
 #include <diffusionworks/experiments/convergence_experiments.hpp>
 #include <diffusionworks/experiments/pde_experiments.hpp>
 
@@ -329,6 +330,153 @@ Result<PdeExperimentConfig> parse_pde_config(const ConfigNode& root) {
     return Result<PdeExperimentConfig>::success(std::move(config));
 }
 
+/// Parses the `barrier` block for EXP-07.
+///
+/// Same contract as the blocks above: absent means the documented defaults, which
+/// are what the published record was produced from, and an unknown key is a
+/// rejection rather than a silently ignored typo.
+Result<BarrierExperimentConfig> parse_barrier_config(const ConfigNode& root) {
+    BarrierExperimentConfig config;
+
+    if (!root.contains("barrier")) {
+        return Result<BarrierExperimentConfig>::success(config);
+    }
+
+    auto node = root.object("barrier");
+    if (!node) {
+        return Result<BarrierExperimentConfig>::failure(std::move(node).error());
+    }
+
+    const Status unknown = node.value().reject_unknown_keys({"spot",
+                                                             "strike",
+                                                             "rate",
+                                                             "dividend_yield",
+                                                             "volatility",
+                                                             "maturity",
+                                                             "barriers",
+                                                             "monitoring_counts",
+                                                             "paths",
+                                                             "seed_count",
+                                                             "master_seed",
+                                                             "volatilities"});
+    if (!unknown) {
+        return Result<BarrierExperimentConfig>::failure(unknown.error());
+    }
+
+    std::optional<Error> first_error;
+    const auto read_number = [&](const char* key, double fallback) -> double {
+        auto v = node.value().number_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_integer = [&](const char* key, std::int64_t fallback) -> std::int64_t {
+        auto v = node.value().integer_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_doubles = [&](const char* key, std::vector<double> fallback) {
+        if (!node.value().contains(key)) {
+            return fallback;
+        }
+        auto array = node.value().array(key);
+        if (!array) {
+            if (!first_error.has_value()) {
+                first_error = array.error();
+            }
+            return fallback;
+        }
+        std::vector<double> out;
+        for (std::size_t i = 0; i < array.value().size(); ++i) {
+            auto v = array.value().number_at(i);
+            if (!v) {
+                if (!first_error.has_value()) {
+                    first_error = v.error();
+                }
+                return fallback;
+            }
+            out.push_back(v.value());
+        }
+        return out;
+    };
+
+    config.spot = read_number("spot", config.spot);
+    config.strike = read_number("strike", config.strike);
+    config.rate = read_number("rate", config.rate);
+    config.dividend_yield = read_number("dividend_yield", config.dividend_yield);
+    config.volatility = read_number("volatility", config.volatility);
+    config.maturity = read_number("maturity", config.maturity);
+
+    const std::int64_t paths = read_integer("paths", config.paths);
+    const std::int64_t seed_count =
+        read_integer("seed_count", static_cast<std::int64_t>(config.seed_count));
+    const std::int64_t master_seed =
+        read_integer("master_seed", static_cast<std::int64_t>(config.master_seed));
+
+    config.barriers = read_doubles("barriers", config.barriers);
+    config.volatilities = read_doubles("volatilities", config.volatilities);
+
+    const std::vector<double> monitoring = read_doubles("monitoring_counts", {});
+    if (!monitoring.empty()) {
+        std::vector<std::int64_t> counts;
+        counts.reserve(monitoring.size());
+        for (const double v : monitoring) {
+            counts.push_back(static_cast<std::int64_t>(v));
+        }
+        config.monitoring_counts = std::move(counts);
+    }
+
+    if (first_error.has_value()) {
+        return Result<BarrierExperimentConfig>::failure(*first_error);
+    }
+
+    if (paths < 2 || seed_count < 2 || master_seed < 0) {
+        return Result<BarrierExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "paths must be at least 2; seed_count at least 2, since a bias measured from one seed "
+            "cannot be told from a lucky draw, which is the question this experiment exists to "
+            "settle; and master_seed non-negative",
+            kContext);
+    }
+    config.paths = paths;
+    config.seed_count = static_cast<std::uint64_t>(seed_count);
+    config.master_seed = static_cast<std::uint64_t>(master_seed);
+
+    if (config.barriers.empty() || config.volatilities.empty()) {
+        return Result<BarrierExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "barriers and volatilities must each be non-empty",
+            kContext);
+    }
+    if (config.monitoring_counts.size() < 3) {
+        return Result<BarrierExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            fmt::format("barrier.monitoring_counts needs at least 3 frequencies to fit the bias "
+                        "order, got {}",
+                        config.monitoring_counts.size()),
+            kContext);
+    }
+    for (const std::int64_t m : config.monitoring_counts) {
+        if (m < 1) {
+            return Result<BarrierExperimentConfig>::failure(
+                ErrorCode::InvalidArgument,
+                fmt::format("barrier.monitoring_counts entries must be at least 1, got {}", m),
+                kContext);
+        }
+    }
+
+    return Result<BarrierExperimentConfig>::success(std::move(config));
+}
+
 nlohmann::json table_to_json(const CsvTable& table) {
     return nlohmann::json{{"headers", table.headers}, {"rows", table.rows}};
 }
@@ -361,7 +509,7 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
     Result<ExperimentRecord> record = Result<ExperimentRecord>::failure(
         ErrorCode::NotImplemented,
         fmt::format("experiment '{}' is not implemented in this build. Implemented: EXP-01, "
-                    "EXP-02, EXP-03, EXP-04, EXP-06.",
+                    "EXP-02, EXP-03, EXP-04, EXP-06, EXP-07.",
                     id),
         kContext);
 
@@ -381,6 +529,16 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
             return Result<nlohmann::json>::failure(std::move(pde).error());
         }
         record = run_pde_stability_and_convergence(pde.value());
+    } else if (id == "EXP-07") {
+        auto barrier = parse_barrier_config(config.root());
+        if (!barrier) {
+            return Result<nlohmann::json>::failure(std::move(barrier).error());
+        }
+        BarrierExperimentConfig barrier_config = std::move(barrier).value();
+        if (options.seed.has_value()) {
+            barrier_config.master_seed = *options.seed;
+        }
+        record = run_barrier_monitoring_bias(barrier_config);
     }
 
     if (!record) {

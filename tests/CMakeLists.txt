@@ -157,6 +157,15 @@ add_dw_test(
     LABEL unit
     SOURCES engines/barrier_analytic_test.cpp)
 
+# The barrier simulation suite prices at 200k paths to resolve the monitoring bias
+# against its own sampling noise, so it is labelled statistical rather than unit:
+# asserting the bias exists at all requires enough paths to see it.
+
+add_dw_test(
+    dw_test_barrier_monte_carlo
+    LABEL statistical
+    SOURCES engines/barrier_monte_carlo_test.cpp)
+
 add_dw_test(
     dw_test_finite_difference
     LABEL unit

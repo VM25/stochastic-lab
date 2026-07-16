@@ -40,10 +40,43 @@ constexpr const char* kTinyConfig = R"({
   }
 })";
 
-ConfigDocument tiny_config() {
-    auto parsed = parse_config(kTinyConfig, "test.json");
+/// The barrier block, cut to the smallest shape that still runs.
+///
+/// Two barriers, three frequencies, and a few hundred paths measure nothing about
+/// the physics -- EXP-07's published record needs the full configuration and takes
+/// minutes. This exercises the wiring. The bias itself is measured in
+/// tests/engines/barrier_monte_carlo_test.cpp against its own acceptance rules.
+constexpr const char* kTinyBarrierConfig = R"({
+  "schema_version": 1,
+  "command": "experiment",
+  "barrier": {
+    "spot": 100.0,
+    "strike": 100.0,
+    "rate": 0.05,
+    "dividend_yield": 0.0,
+    "volatility": 0.20,
+    "maturity": 1.0,
+    "barriers": [90.0],
+    "monitoring_counts": [4, 8, 16],
+    "paths": 400,
+    "seed_count": 3,
+    "master_seed": 20260716,
+    "volatilities": [0.2]
+  }
+})";
+
+ConfigDocument config_from(const char* text) {
+    auto parsed = parse_config(text, "test.json");
     EXPECT_TRUE(parsed.ok()) << parsed.error().describe();
     return parsed.value();
+}
+
+ConfigDocument tiny_config() {
+    return config_from(kTinyConfig);
+}
+
+ConfigDocument tiny_barrier_config() {
+    return config_from(kTinyBarrierConfig);
 }
 
 Options options_for(const std::string& id) {
@@ -149,6 +182,68 @@ TEST(ExperimentCommandTest, EveryImplementedExperimentProducesARecord) {
                     status == "inconclusive")
             << id << " reported an unknown status: " << status;
     }
+}
+
+TEST(ExperimentCommandTest, BarrierMonitoringBiasProducesARecord) {
+    const auto document = run_experiment(tiny_barrier_config(), options_for("EXP-07"));
+    ASSERT_TRUE(document.ok()) << document.error().describe();
+    EXPECT_EQ(document.value().at("id"), "EXP-07");
+
+    // At 400 paths the bias cannot clear its own noise, so "inconclusive" is the
+    // honest outcome here and the record must say so rather than claim a pass. That
+    // it *can* say so is the point: an experiment that only ever passes is not
+    // evidence of anything.
+    const std::string status = document.value().at("status");
+    EXPECT_TRUE(status == "pass" || status == "fail" || status == "warning" ||
+                status == "inconclusive")
+        << "unknown status: " << status;
+
+    const auto& arms = document.value().at("results").at("arms");
+    // One arm per (barrier, convention) pair: one barrier, two conventions.
+    ASSERT_EQ(arms.size(), 2U);
+    EXPECT_EQ(arms.at(0).at("convention"), "discrete");
+    EXPECT_EQ(arms.at(1).at("convention"), "brownian_bridge");
+    EXPECT_EQ(arms.at(0).at("levels").size(), 3U);
+}
+
+// Every bias here is a difference of two numbers, one of which carries sampling
+// error. One seed cannot tell a real bias from a lucky draw -- which is the entire
+// question for the bridge arm -- so a single-seed configuration must be refused
+// rather than run and reported.
+TEST(ExperimentCommandTest, BarrierExperimentRejectsASingleSeed) {
+    const auto document =
+        run_experiment(config_from(R"({"schema_version": 1, "command": "experiment",
+                        "barrier": {"seed_count": 1}})"),
+                       options_for("EXP-07"));
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidArgument);
+}
+
+// Fewer than three frequencies cannot carry an order with an uncertainty, and a
+// slope from two points would report a zero standard error for a rate it has not
+// earned.
+TEST(ExperimentCommandTest, BarrierExperimentRejectsTooFewMonitoringFrequencies) {
+    const auto document =
+        run_experiment(config_from(R"({"schema_version": 1, "command": "experiment",
+                        "barrier": {"monitoring_counts": [10, 20]}})"),
+                       options_for("EXP-07"));
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidArgument);
+}
+
+// A typo in the barrier block must fail loudly rather than leave a default in place
+// and produce a plausible study of a contract nobody asked about.
+TEST(ExperimentCommandTest, BarrierExperimentRejectsAnUnknownKey) {
+    const auto document =
+        run_experiment(config_from(R"({"schema_version": 1, "command": "experiment",
+                        "barrier": {"volatilty": 0.3}})"),
+                       options_for("EXP-07"));
+    ASSERT_FALSE(document.ok());
+    // InvalidConfiguration rather than InvalidArgument, matching the convergence
+    // block: the document parsed fine and was rejected on meaning.
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidConfiguration);
+    EXPECT_NE(document.error().describe().find("volatilty"), std::string::npos)
+        << document.error().describe();
 }
 
 // Regression: EXP-01's sweep levels must not share paths.

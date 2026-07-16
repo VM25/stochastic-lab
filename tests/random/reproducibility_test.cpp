@@ -193,6 +193,7 @@ TEST_F(ReproducibilityTierTest, MaximumCoordinatesAreAddressable) {
 TEST(StreamCoordinatesTest, PurposeIdentifiersAreFrozen) {
     EXPECT_EQ(static_cast<std::uint64_t>(StreamPurpose::AssetShock), 0U);
     EXPECT_EQ(static_cast<std::uint64_t>(StreamPurpose::VarianceShock), 1U);
+    EXPECT_EQ(static_cast<std::uint64_t>(StreamPurpose::BarrierBridge), 2U);
     EXPECT_EQ(static_cast<std::uint64_t>(StreamPurpose::Diagnostic), 1000U);
 }
 
@@ -220,7 +221,10 @@ TEST(StreamCoordinatesTest, DistinctCoordinatesGiveDistinctDraws) {
 
     for (const std::uint64_t seed : {std::uint64_t{0}, std::uint64_t{1}, std::uint64_t{12345}}) {
         for (const StreamPurpose purpose :
-             {StreamPurpose::AssetShock, StreamPurpose::VarianceShock, StreamPurpose::Diagnostic}) {
+             {StreamPurpose::AssetShock,
+              StreamPurpose::VarianceShock,
+              StreamPurpose::BarrierBridge,
+              StreamPurpose::Diagnostic}) {
             for (std::uint64_t path = 0; path < 8; ++path) {
                 RandomStream stream(seed, purpose, path);
                 for (std::uint64_t position = 0; position < 8; ++position) {

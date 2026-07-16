@@ -14,16 +14,18 @@ target_sources(
     PRIVATE config/domain_parsers.cpp
             core/build_info.cpp
             core/config.cpp
+            engines/barrier_analytic.cpp
+            engines/barrier_monte_carlo.cpp
             engines/black_scholes_analytic.cpp
             engines/finite_difference_engine.cpp
             engines/geometric_asian_analytic.cpp
             engines/monte_carlo_engine.cpp
+            experiments/barrier_experiments.cpp
             experiments/convergence.cpp
             experiments/convergence_experiments.cpp
             experiments/experiment.cpp
             experiments/pde_experiments.cpp
             experiments/scheme_moments.cpp
-            engines/barrier_analytic.cpp
             instruments/asian_option.cpp
             instruments/barrier_option.cpp
             instruments/european_option.cpp

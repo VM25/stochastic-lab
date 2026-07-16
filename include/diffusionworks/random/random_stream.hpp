@@ -29,6 +29,18 @@ enum class StreamPurpose : std::uint64_t {
     /// Shocks driving the variance process (Heston).
     VarianceShock = 1,
 
+    /// Uniforms deciding whether a Brownian bridge crossed a barrier between two
+    /// observations.
+    ///
+    /// Its own stream, not a continuation of AssetShock. The bridge's crossing
+    /// probability is a *function of* the asset shocks that produced the two
+    /// endpoints, so drawing its uniform from the same stream would test a
+    /// path's excursion against a number derived from that same path. The
+    /// dependence would be invisible in any single price and would corrupt the
+    /// correction exactly where it matters -- near the barrier, where the
+    /// probability is neither 0 nor 1.
+    BarrierBridge = 2,
+
     /// Draws used by tests and diagnostics, kept away from pricing streams.
     Diagnostic = 1000,
 };
