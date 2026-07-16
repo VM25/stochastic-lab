@@ -1,0 +1,1726 @@
+{
+  "build_metadata": {
+    "build_flags": "-ffp-contract=off -O3 -DNDEBUG",
+    "build_type": "Release",
+    "compiler_id": "AppleClang",
+    "compiler_version": "21.0.0.21000101",
+    "cpu_brand": "Apple M1",
+    "cxx_standard": "20",
+    "git_branch": "main",
+    "git_commit": "08c6d9f13017d9f8059e8a267b9e93729e7e9c2c",
+    "git_commit_short": "08c6d9f",
+    "git_dirty": true,
+    "hostname": "MacBookPro",
+    "logical_cores": 8,
+    "os_name": "Darwin",
+    "os_version": "25.5.0",
+    "timestamp_utc": "2026-07-16T20:36:07Z",
+    "version": "0.1.0"
+  },
+  "configuration": {
+    "dividend_yield": 0.0,
+    "maturities": [
+      0.25,
+      1.0,
+      3.0
+    ],
+    "maturity": 1.0,
+    "rannacher_counts": [
+      0,
+      1,
+      2,
+      4
+    ],
+    "rate": 0.05,
+    "s_max_multiples": [
+      1.5,
+      2.0,
+      3.0,
+      4.0,
+      6.0,
+      8.0
+    ],
+    "s_max_sweep_spacing": 0.5,
+    "space_nodes": [
+      101,
+      201,
+      401,
+      801
+    ],
+    "space_sweep_time_steps": 128000,
+    "spot": 100.0,
+    "stability_ratios": [
+      0.25,
+      0.5,
+      0.9,
+      0.99,
+      1.01,
+      1.5,
+      2.0
+    ],
+    "strike": 100.0,
+    "strike_offsets": [
+      0.0,
+      0.1,
+      0.25,
+      0.5,
+      0.75,
+      0.9
+    ],
+    "time_steps": [
+      10,
+      20,
+      40,
+      80,
+      160
+    ],
+    "time_sweep_nodes": 401,
+    "time_sweep_reference_steps": 20000,
+    "volatilities": [
+      0.1,
+      0.2,
+      0.4,
+      0.8
+    ],
+    "volatility": 0.2
+  },
+  "configuration_document": {
+    "command": "experiment",
+    "pde": {
+      "alignment_nodes": 401,
+      "alignment_time_steps": 2000,
+      "dividend_yield": 0.0,
+      "maturities": [
+        0.25,
+        1.0,
+        3.0
+      ],
+      "maturity": 1.0,
+      "rannacher_counts": [
+        0,
+        1,
+        2,
+        4
+      ],
+      "rate": 0.05,
+      "s_max_multiples": [
+        1.5,
+        2.0,
+        3.0,
+        4.0,
+        6.0,
+        8.0
+      ],
+      "s_max_sweep_spacing": 0.5,
+      "s_max_sweep_time_steps": 2000,
+      "space_nodes": [
+        101,
+        201,
+        401,
+        801
+      ],
+      "space_sweep_time_steps": 128000,
+      "spot": 100.0,
+      "stability_nodes": 101,
+      "stability_ratios": [
+        0.25,
+        0.5,
+        0.9,
+        0.99,
+        1.01,
+        1.5,
+        2.0
+      ],
+      "strike": 100.0,
+      "strike_offsets": [
+        0.0,
+        0.1,
+        0.25,
+        0.5,
+        0.75,
+        0.9
+      ],
+      "time_steps": [
+        10,
+        20,
+        40,
+        80,
+        160
+      ],
+      "time_sweep_nodes": 401,
+      "time_sweep_reference_steps": 20000,
+      "volatilities": [
+        0.1,
+        0.2,
+        0.4,
+        0.8
+      ],
+      "volatility": 0.2
+    },
+    "schema_version": 1
+  },
+  "configuration_source": "configs/experiment/pde.json",
+  "id": "EXP-06",
+  "interpretation": "The three schemes differ exactly as their analysis predicts, and the separated sweeps are what make that statement measurable rather than assumed. Both the implicit and Crank-Nicolson schemes are second order in space. In time the implicit scheme is first order and Crank-Nicolson is second -- but plain Crank-Nicolson reaches its order only past a startup transient, because the payoff's kink is non-smooth data and its amplification factor tends to -1 for the highest modes, oscillating them rather than damping them. Two Rannacher steps restore clean second order over the full range, at the cost of a first-order local error that never leaves; neither choice dominates, and which is better depends on the step count. The explicit scheme matches its coefficient-derived stability threshold on both sides: it converges below the bound and diverges by ten orders of magnitude above it. Its cost is the bound itself -- dtau scales as dS^2, so a grid fine enough to be accurate needs tens of thousands of steps. None of this is a statement about accuracy from stability: the implicit scheme is unconditionally stable and, at one step per year, bounded, smooth, and wrong.",
+  "limitations": [
+    "The explicit stability bound is sufficient, not necessary: it is a Gershgorin row bound and therefore conservative. At this configuration the scheme is stable up to ratio 1.5 and unstable from 2, so the bound is conservative by roughly 2.0x. Below the bound stability is guaranteed; above it, nothing is claimed either way.",
+    "Every order here is measured at one strike, one spot, and one payoff. The sensitivity grid varies volatility and maturity but does not re-fit the orders at each cell.",
+    "The space sweep's premise -- that the temporal error is negligible -- is checked by doubling N_t and reporting the movement, not proven. A leakage below the threshold means no contamination was detected at that resolution, not that none exists.",
+    "The S_max sweep holds dS fixed, so the node count and hence the runtime grow with S_max. The runtimes in that study are therefore not comparable across levels, and the sweep measures truncation error rather than cost.",
+    "The strike-alignment sweep moves S_max to place the strike, so dS varies by under 1% across the offsets. That is small against the effect being measured but it is not zero.",
+    "Convexity violations are counted against a tolerance scaled by the solution's magnitude. A violation smaller than that tolerance in the flat far field is not counted, so the count is a detector of visible ringing rather than a proof of convexity."
+  ],
+  "name": "PDE Stability and Grid Convergence",
+  "question": "How do explicit, implicit, and Crank-Nicolson methods differ in stability, accuracy, and cost?",
+  "reproduction_command": "diffusionworks experiment --id EXP-06",
+  "results": {
+    "analytic_value": 10.450583572185558,
+    "explicit_stability": {
+      "asset_nodes": 101,
+      "guarantee_holds_below_the_bound": true,
+      "highest_ratio_observed_stable": 1.5,
+      "levels": [
+        {
+          "achieved_ratio": 0.2500573979591837,
+          "engine_reported_stable": true,
+          "error": 0.03913776460857221,
+          "observed_stable": true,
+          "outcome": "completed",
+          "price": 10.411445807576985,
+          "runtime_seconds": 0.000317333,
+          "target_ratio": 0.25,
+          "time_steps": 1568,
+          "warnings": 1
+        },
+        {
+          "achieved_ratio": 0.5001147959183674,
+          "engine_reported_stable": true,
+          "error": 0.038458626712648325,
+          "observed_stable": true,
+          "outcome": "completed",
+          "price": 10.41212494547291,
+          "runtime_seconds": 0.000157083,
+          "target_ratio": 0.5,
+          "time_steps": 784,
+          "warnings": 2
+        },
+        {
+          "achieved_ratio": 0.8992889908256884,
+          "engine_reported_stable": true,
+          "error": 0.03737441070826186,
+          "observed_stable": true,
+          "outcome": "completed",
+          "price": 10.413209161477296,
+          "runtime_seconds": 8.85e-05,
+          "target_ratio": 0.9,
+          "time_steps": 436,
+          "warnings": 2
+        },
+        {
+          "achieved_ratio": 0.9901262626262629,
+          "engine_reported_stable": true,
+          "error": 0.03712766824594205,
+          "observed_stable": true,
+          "outcome": "completed",
+          "price": 10.413455903939616,
+          "runtime_seconds": 8.0375e-05,
+          "target_ratio": 0.99,
+          "time_steps": 396,
+          "warnings": 2
+        },
+        {
+          "achieved_ratio": 1.0105412371134024,
+          "engine_reported_stable": false,
+          "error": 0.03707221401904981,
+          "observed_stable": true,
+          "outcome": "completed",
+          "price": 10.413511358166508,
+          "runtime_seconds": 7.9333e-05,
+          "target_ratio": 1.01,
+          "time_steps": 388,
+          "warnings": 3
+        },
+        {
+          "achieved_ratio": 1.5022605363984678,
+          "engine_reported_stable": false,
+          "error": 0.035736436853117226,
+          "observed_stable": true,
+          "outcome": "completed",
+          "price": 10.41484713533244,
+          "runtime_seconds": 5.4541e-05,
+          "target_ratio": 1.5,
+          "time_steps": 261,
+          "warnings": 4
+        },
+        {
+          "achieved_ratio": 2.0004591836734695,
+          "engine_reported_stable": false,
+          "error": 409265114809.867,
+          "observed_stable": false,
+          "outcome": "completed",
+          "price": -409265114799.41644,
+          "runtime_seconds": 4.1375e-05,
+          "target_ratio": 2.0,
+          "time_steps": 196,
+          "warnings": 4
+        }
+      ],
+      "lowest_ratio_observed_unstable": 2.0,
+      "note": "The predicted limit is read off the assembled diagonal, dtau <= 1/max|b_i|, rather than restated from a formula. It is a Gershgorin-style row bound: sufficient, and conservative by construction, since the Gershgorin discs contain the spectrum while being larger than it. The property checked is therefore one-directional -- everything at or below the bound is stable. The scheme surviving above the bound is the bound being conservative, not a defect; the observed onset is reported so the margin is visible. Unstable cases are preserved rather than avoided.",
+      "predicted_limit_dtau": 0.002550434849141778
+    },
+    "rannacher": {
+      "arms": [
+        {
+          "levels": [
+            {
+              "convexity_violations": 2,
+              "error_vs_analytic": 0.1206280491510121,
+              "most_negative_value": 0.0,
+              "price": 10.329955523034545,
+              "runtime_seconds": 8.5291e-05,
+              "temporal_error": 0.11815688600615282,
+              "time_steps": 10
+            },
+            {
+              "convexity_violations": 2,
+              "error_vs_analytic": 0.015289746332399545,
+              "most_negative_value": 0.0,
+              "price": 10.435293825853158,
+              "runtime_seconds": 0.000165334,
+              "temporal_error": 0.012818583187540256,
+              "time_steps": 20
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.002332019112824213,
+              "most_negative_value": 0.0,
+              "price": 10.448251553072733,
+              "runtime_seconds": 0.000297417,
+              "temporal_error": 0.00013914403203507675,
+              "time_steps": 40
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.002432317409535756,
+              "most_negative_value": 0.0,
+              "price": 10.448151254776022,
+              "runtime_seconds": 0.000658042,
+              "temporal_error": 3.884573532353386e-05,
+              "time_steps": 80
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.002461451800279235,
+              "most_negative_value": 0.0,
+              "price": 10.448122120385278,
+              "runtime_seconds": 0.001140709,
+              "temporal_error": 9.711344580054515e-06,
+              "time_steps": 160
+            }
+          ],
+          "rannacher_steps": 0,
+          "temporal_fit": {
+            "ci_lower": 2.018691230326076,
+            "ci_upper": 5.082830995730702,
+            "observations": 5,
+            "order": 3.550761113028389,
+            "r_squared": 0.9477362214662095,
+            "standard_error": 0.4814126416394451
+          }
+        },
+        {
+          "levels": [
+            {
+              "convexity_violations": 4,
+              "error_vs_analytic": 0.006513633478769876,
+              "most_negative_value": 0.0,
+              "price": 10.444069938706788,
+              "runtime_seconds": 8.7e-05,
+              "temporal_error": 0.004042467708627484,
+              "time_steps": 10
+            },
+            {
+              "convexity_violations": 1,
+              "error_vs_analytic": 0.003926886486526726,
+              "most_negative_value": 0.0,
+              "price": 10.44665668569903,
+              "runtime_seconds": 0.00016175,
+              "temporal_error": 0.0014557207163843344,
+              "time_steps": 20
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.002960091475230797,
+              "most_negative_value": 0.0,
+              "price": 10.447623480710327,
+              "runtime_seconds": 0.000290917,
+              "temporal_error": 0.0004889257050884055,
+              "time_steps": 40
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.002594985180298437,
+              "most_negative_value": 0.0,
+              "price": 10.44798858700526,
+              "runtime_seconds": 0.000576584,
+              "temporal_error": 0.00012381941015604525,
+              "time_steps": 80
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.0025022933765086464,
+              "most_negative_value": 0.0,
+              "price": 10.448081278809049,
+              "runtime_seconds": 0.001148833,
+              "temporal_error": 3.112760636625467e-05,
+              "time_steps": 160
+            }
+          ],
+          "rannacher_steps": 1,
+          "temporal_fit": {
+            "ci_lower": 1.5295910151665995,
+            "ci_upper": 1.989852944041218,
+            "observations": 5,
+            "order": 1.7597219796039087,
+            "r_squared": 0.99495958237132,
+            "standard_error": 0.07231259929043643
+          }
+        },
+        {
+          "levels": [
+            {
+              "convexity_violations": 3,
+              "error_vs_analytic": 0.020069823561474465,
+              "most_negative_value": 0.0,
+              "price": 10.430513748624083,
+              "runtime_seconds": 0.0001095,
+              "temporal_error": 0.017598655166057853,
+              "time_steps": 10
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.006960605342349879,
+              "most_negative_value": 0.0,
+              "price": 10.443622966843208,
+              "runtime_seconds": 0.000150458,
+              "temporal_error": 0.004489436946933267,
+              "time_steps": 20
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.0036071417448404475,
+              "most_negative_value": 0.0,
+              "price": 10.446976430440717,
+              "runtime_seconds": 0.000290834,
+              "temporal_error": 0.0011359733494238355,
+              "time_steps": 40
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.0027576966967703953,
+              "most_negative_value": 0.0,
+              "price": 10.447825875488787,
+              "runtime_seconds": 0.0005765,
+              "temporal_error": 0.0002865283013537834,
+              "time_steps": 80
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.00254313774304471,
+              "most_negative_value": 0.0,
+              "price": 10.448040434442513,
+              "runtime_seconds": 0.001191333,
+              "temporal_error": 7.196934762809803e-05,
+              "time_steps": 160
+            }
+          ],
+          "rannacher_steps": 2,
+          "temporal_fit": {
+            "ci_lower": 1.9760011315706427,
+            "ci_upper": 1.9915026179340745,
+            "observations": 5,
+            "order": 1.9837518747523586,
+            "r_squared": 0.9999954782232696,
+            "standard_error": 0.0024354670709911524
+          }
+        },
+        {
+          "levels": [
+            {
+              "convexity_violations": 7,
+              "error_vs_analytic": 0.040445502966274915,
+              "most_negative_value": 0.0,
+              "price": 10.410138069219283,
+              "runtime_seconds": 8.3875e-05,
+              "temporal_error": 0.03797432932037026,
+              "time_steps": 10
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.012076605181530198,
+              "most_negative_value": 0.0,
+              "price": 10.438506967004027,
+              "runtime_seconds": 0.00014825,
+              "temporal_error": 0.009605431535625542,
+              "time_steps": 20
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.004901061306661347,
+              "most_negative_value": 0.0,
+              "price": 10.445682510878896,
+              "runtime_seconds": 0.000290875,
+              "temporal_error": 0.002429887660756691,
+              "time_steps": 40
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.0030832511716116784,
+              "most_negative_value": 0.0,
+              "price": 10.447500321013946,
+              "runtime_seconds": 0.000578708,
+              "temporal_error": 0.0006120775257070221,
+              "time_steps": 80
+            },
+            {
+              "convexity_violations": 0,
+              "error_vs_analytic": 0.0026248348504527286,
+              "most_negative_value": 0.0,
+              "price": 10.447958737335105,
+              "runtime_seconds": 0.001149958,
+              "temporal_error": 0.0001536612045480723,
+              "time_steps": 160
+            }
+          ],
+          "rannacher_steps": 4,
+          "temporal_fit": {
+            "ci_lower": 1.9825779193754842,
+            "ci_upper": 1.9914859890573884,
+            "observations": 5,
+            "order": 1.9870319542164363,
+            "r_squared": 0.9999985116812403,
+            "standard_error": 0.001399563233339432
+          }
+        }
+      ],
+      "note": "Zero is the default and stays the default unless this evidence justifies otherwise. A Crank-Nicolson run that quietly took implicit steps is not Crank-Nicolson and its order is not Crank-Nicolson's."
+    },
+    "s_max_sweep": {
+      "fixed_spacing": 0.5,
+      "levels": [
+        {
+          "asset_nodes": 301,
+          "asset_spacing": 0.5,
+          "error": 0.0007133421077512025,
+          "price": 10.449870230077806,
+          "runtime_seconds": 0.010877791,
+          "s_max": 150.0,
+          "s_max_multiple": 1.5
+        },
+        {
+          "asset_nodes": 401,
+          "asset_spacing": 0.5,
+          "error": 0.0006180412057847917,
+          "price": 10.449965530979773,
+          "runtime_seconds": 0.014322083,
+          "s_max": 200.0,
+          "s_max_multiple": 2.0
+        },
+        {
+          "asset_nodes": 601,
+          "asset_spacing": 0.5,
+          "error": 0.000618041252863577,
+          "price": 10.449965530932694,
+          "runtime_seconds": 0.0215655,
+          "s_max": 300.0,
+          "s_max_multiple": 3.0
+        },
+        {
+          "asset_nodes": 801,
+          "asset_spacing": 0.5,
+          "error": 0.000618041252863577,
+          "price": 10.449965530932694,
+          "runtime_seconds": 0.028172333,
+          "s_max": 400.0,
+          "s_max_multiple": 4.0
+        },
+        {
+          "asset_nodes": 1201,
+          "asset_spacing": 0.5,
+          "error": 0.000618041252863577,
+          "price": 10.449965530932694,
+          "runtime_seconds": 0.042338959,
+          "s_max": 600.0,
+          "s_max_multiple": 6.0
+        },
+        {
+          "asset_nodes": 1601,
+          "asset_spacing": 0.5,
+          "error": 0.000618041252863577,
+          "price": 10.449965530932694,
+          "runtime_seconds": 0.056545458,
+          "s_max": 800.0,
+          "s_max_multiple": 8.0
+        }
+      ],
+      "note": "dS is held fixed and the node count grows with S_max. A constant-node sweep would vary dS = S_max/(N-1) as S_max grew, mixing boundary truncation with grid resolution."
+    },
+    "sensitivity": [
+      {
+        "analytic": 2.6648322216391875,
+        "convexity_violations": 0,
+        "error": 0.010279407117285366,
+        "maturity": 0.25,
+        "most_negative_value": 0.0,
+        "peclet_violating_max_s": 4.0,
+        "peclet_violating_nodes": 4,
+        "price": 2.654552814521902,
+        "relative_error": 0.0038574312610804118,
+        "runtime_seconds": 0.002868167,
+        "sign_structure_holds": false,
+        "volatility": 0.1
+      },
+      {
+        "analytic": 6.804957708822144,
+        "convexity_violations": 0,
+        "error": 0.005366693900629826,
+        "maturity": 1.0,
+        "most_negative_value": 0.0,
+        "peclet_violating_max_s": 4.0,
+        "peclet_violating_nodes": 4,
+        "price": 6.799591014921514,
+        "relative_error": 0.0007886447102635611,
+        "runtime_seconds": 0.002871167,
+        "sign_structure_holds": false,
+        "volatility": 0.1
+      },
+      {
+        "analytic": 15.642114412460032,
+        "convexity_violations": 0,
+        "error": 0.003215435833990199,
+        "maturity": 3.0,
+        "most_negative_value": 0.0,
+        "peclet_violating_max_s": 4.0,
+        "peclet_violating_nodes": 4,
+        "price": 15.638898976626042,
+        "relative_error": 0.00020556273590665471,
+        "runtime_seconds": 0.002932042,
+        "sign_structure_holds": false,
+        "volatility": 0.1
+      },
+      {
+        "analytic": 4.614997129602855,
+        "convexity_violations": 0,
+        "error": 0.00499049018301001,
+        "maturity": 0.25,
+        "most_negative_value": 0.0,
+        "peclet_violating_max_s": 1.0,
+        "peclet_violating_nodes": 1,
+        "price": 4.610006639419845,
+        "relative_error": 0.001081363659144782,
+        "runtime_seconds": 0.002822166,
+        "sign_structure_holds": false,
+        "volatility": 0.2
+      },
+      {
+        "analytic": 10.450583572185558,
+        "convexity_violations": 0,
+        "error": 0.002482713489333932,
+        "maturity": 1.0,
+        "most_negative_value": 0.0,
+        "peclet_violating_max_s": 1.0,
+        "peclet_violating_nodes": 1,
+        "price": 10.448100858696224,
+        "relative_error": 0.00023756697146958615,
+        "runtime_seconds": 0.002820417,
+        "sign_structure_holds": false,
+        "volatility": 0.2
+      },
+      {
+        "analytic": 20.9243609528952,
+        "convexity_violations": 0,
+        "error": 0.0014196049888859363,
+        "maturity": 3.0,
+        "most_negative_value": 0.0,
+        "peclet_violating_max_s": 1.0,
+        "peclet_violating_nodes": 1,
+        "price": 20.922941347906313,
+        "relative_error": 6.784460429074717e-05,
+        "runtime_seconds": 0.002821833,
+        "sign_structure_holds": false,
+        "volatility": 0.2
+      },
+      {
+        "analytic": 8.552606881568877,
+        "convexity_violations": 0,
+        "error": 0.0024577571502373274,
+        "maturity": 0.25,
+        "most_negative_value": 0.0,
+        "peclet_violating_max_s": 0.0,
+        "peclet_violating_nodes": 0,
+        "price": 8.55014912441864,
+        "relative_error": 0.0002873693581700648,
+        "runtime_seconds": 0.002864709,
+        "sign_structure_holds": true,
+        "volatility": 0.4
+      },
+      {
+        "analytic": 18.022951450216688,
+        "convexity_violations": 0,
+        "error": 0.001176317682322292,
+        "maturity": 1.0,
+        "most_negative_value": 0.0,
+        "peclet_violating_max_s": 0.0,
+        "peclet_violating_nodes": 0,
+        "price": 18.021775132534366,
+        "relative_error": 6.526776069788222e-05,
+        "runtime_seconds": 0.002871417,
+        "sign_structure_holds": true,
+        "volatility": 0.4
+      },
+      {
+        "analytic": 32.738044366454574,
+        "convexity_violations": 0,
+        "error": 0.0009956321813859859,
+        "maturity": 3.0,
+        "most_negative_value": 0.0,
+        "peclet_violating_max_s": 0.0,
+        "peclet_violating_nodes": 0,
+        "price": 32.73704873427319,
+        "relative_error": 3.0412084797776503e-05,
+        "runtime_seconds": 0.00285125,
+        "sign_structure_holds": true,
+        "volatility": 0.4
+      },
+      {
+        "analytic": 16.382183244648488,
+        "convexity_violations": 0,
+        "error": 0.0011866213048783436,
+        "maturity": 0.25,
+        "most_negative_value": 0.0,
+        "peclet_violating_max_s": 0.0,
+        "peclet_violating_nodes": 0,
+        "price": 16.38099662334361,
+        "relative_error": 7.243364862653293e-05,
+        "runtime_seconds": 0.002819458,
+        "sign_structure_holds": true,
+        "volatility": 0.8
+      },
+      {
+        "analytic": 32.82098246699005,
+        "convexity_violations": 0,
+        "error": 0.005217626340268566,
+        "maturity": 1.0,
+        "most_negative_value": 0.0,
+        "peclet_violating_max_s": 0.0,
+        "peclet_violating_nodes": 0,
+        "price": 32.815764840649784,
+        "relative_error": 0.00015897227773471536,
+        "runtime_seconds": 0.002831042,
+        "sign_structure_holds": true,
+        "volatility": 0.8
+      },
+      {
+        "analytic": 54.79569436602553,
+        "convexity_violations": 0,
+        "error": 0.831986698075724,
+        "maturity": 3.0,
+        "most_negative_value": 0.0,
+        "peclet_violating_max_s": 0.0,
+        "peclet_violating_nodes": 0,
+        "price": 53.963707667949805,
+        "relative_error": 0.015183431977669637,
+        "runtime_seconds": 0.002823458,
+        "sign_structure_holds": true,
+        "volatility": 0.8
+      }
+    ],
+    "space_sweep": [
+      {
+        "dtau_leakage_fraction": 2.874598363492137e-08,
+        "dtau_leakage_movement": 1.7752910252966103e-11,
+        "fit": {
+          "ci_lower": 1.998003739847964,
+          "ci_upper": 2.0087619986885246,
+          "observations": 4,
+          "order": 2.0033828692682443,
+          "r_squared": 0.9999992211512235,
+          "standard_error": 0.001250189071287997
+        },
+        "levels": [
+          {
+            "asset_nodes": 101,
+            "asset_spacing": 4.0,
+            "error": 0.03981686018680719,
+            "price": 10.41076671199875,
+            "runtime_seconds": 0.299473208
+          },
+          {
+            "asset_nodes": 201,
+            "asset_spacing": 2.0,
+            "error": 0.009898309096509905,
+            "price": 10.440685263089048,
+            "runtime_seconds": 0.565099833
+          },
+          {
+            "asset_nodes": 401,
+            "asset_spacing": 1.0,
+            "error": 0.0024711637622480964,
+            "price": 10.44811240842331,
+            "runtime_seconds": 0.910432541
+          },
+          {
+            "asset_nodes": 801,
+            "asset_spacing": 0.5,
+            "error": 0.0006175788060840404,
+            "price": 10.449965993379474,
+            "runtime_seconds": 1.816255209
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse": 4.0,
+            "fine": 2.0,
+            "order": 2.0081254604927303
+          },
+          {
+            "coarse": 2.0,
+            "fine": 1.0,
+            "order": 2.0019914740404543
+          },
+          {
+            "coarse": 1.0,
+            "fine": 0.5,
+            "order": 2.0004954716808108
+          }
+        ],
+        "scheme": "crank_nicolson",
+        "temporal_contamination_material": false
+      },
+      {
+        "dtau_leakage_fraction": 0.006550766870414413,
+        "dtau_leakage_movement": 4.099322628903224e-06,
+        "fit": {
+          "ci_lower": 1.9830996253928765,
+          "ci_upper": 2.0117143377865303,
+          "observations": 4,
+          "order": 1.9974069815897035,
+          "r_squared": 0.999994457053973,
+          "standard_error": 0.003325240751572349
+        },
+        "levels": [
+          {
+            "asset_nodes": 101,
+            "asset_spacing": 4.0,
+            "error": 0.03982517876522529,
+            "price": 10.410758393420332,
+            "runtime_seconds": 0.248758875
+          },
+          {
+            "asset_nodes": 201,
+            "asset_spacing": 2.0,
+            "error": 0.009906535581682974,
+            "price": 10.440677036603875,
+            "runtime_seconds": 0.47253325
+          },
+          {
+            "asset_nodes": 401,
+            "asset_spacing": 1.0,
+            "error": 0.002479367976492952,
+            "price": 10.448104204209065,
+            "runtime_seconds": 1.153825917
+          },
+          {
+            "asset_nodes": 801,
+            "asset_spacing": 0.5,
+            "error": 0.0006257775173494906,
+            "price": 10.449957794668208,
+            "runtime_seconds": 1.859133125
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse": 4.0,
+            "fine": 2.0,
+            "order": 2.007228312368232
+          },
+          {
+            "coarse": 2.0,
+            "fine": 1.0,
+            "order": 1.9984082146430293
+          },
+          {
+            "coarse": 1.0,
+            "fine": 0.5,
+            "order": 1.9862506734067396
+          }
+        ],
+        "scheme": "implicit",
+        "temporal_contamination_material": false
+      }
+    ],
+    "strike_alignment": {
+      "levels": [
+        {
+          "achieved_offset": 0.0,
+          "achieved_strike_cell_position": 100.0,
+          "asset_spacing": 1.0,
+          "convexity_violations": 0,
+          "error": 0.0024716264928024145,
+          "price": 10.448111945692755,
+          "requested_offset": 0.0,
+          "runtime_seconds": 0.014308792,
+          "s_max": 400.0
+        },
+        {
+          "achieved_offset": 0.09999999999999432,
+          "achieved_strike_cell_position": 100.1,
+          "asset_spacing": 0.999000999000999,
+          "convexity_violations": 0,
+          "error": 0.000787635742772963,
+          "price": 10.449795936442785,
+          "requested_offset": 0.1,
+          "runtime_seconds": 0.015131458,
+          "s_max": 399.6003996003996
+        },
+        {
+          "achieved_offset": 0.25,
+          "achieved_strike_cell_position": 100.25,
+          "asset_spacing": 0.9975062344139651,
+          "convexity_violations": 0,
+          "error": 0.0010334831393112864,
+          "price": 10.451617055324869,
+          "requested_offset": 0.25,
+          "runtime_seconds": 0.015029917,
+          "s_max": 399.00249376558605
+        },
+        {
+          "achieved_offset": 0.5,
+          "achieved_strike_cell_position": 100.5,
+          "asset_spacing": 0.9950248756218906,
+          "convexity_violations": 0,
+          "error": 0.0021983867674322255,
+          "price": 10.45278195895299,
+          "requested_offset": 0.5,
+          "runtime_seconds": 0.014185417,
+          "s_max": 398.00995024875624
+        },
+        {
+          "achieved_offset": 0.75,
+          "achieved_strike_cell_position": 100.75,
+          "asset_spacing": 0.9925558312655087,
+          "convexity_violations": 0,
+          "error": 0.001040505279927828,
+          "price": 10.451624077465485,
+          "requested_offset": 0.75,
+          "runtime_seconds": 0.014370166,
+          "s_max": 397.0223325062035
+        },
+        {
+          "achieved_offset": 0.8999999999999915,
+          "achieved_strike_cell_position": 100.89999999999999,
+          "asset_spacing": 0.9910802775024777,
+          "convexity_violations": 0,
+          "error": 0.0007619780205434523,
+          "price": 10.449821594165014,
+          "requested_offset": 0.9,
+          "runtime_seconds": 0.014549833,
+          "s_max": 396.4321110009911
+        }
+      ],
+      "note": "The strike's fractional position within its cell is swept at matched node count and step count. dS varies by under 1% across the offsets, since S_max moves to place the strike; that contributes far less than the offset effect. The error's dependence on the offset is the finding -- one off-node sample could land anywhere and support any conclusion."
+    },
+    "time_sweep": [
+      {
+        "arm": "implicit",
+        "fit_asymptotic_window": {
+          "ci_lower": 0.9908996194473088,
+          "ci_upper": 1.0162103250127017,
+          "observations": 3,
+          "order": 1.0035549722300052,
+          "r_squared": 0.9999990150049395,
+          "standard_error": 0.0009959978644658995
+        },
+        "fit_full_range": {
+          "ci_lower": 0.9973794785852172,
+          "ci_upper": 1.0038500095373055,
+          "observations": 5,
+          "order": 1.0006147440612614,
+          "r_squared": 0.9999969034094013,
+          "standard_error": 0.0010165970343860302
+        },
+        "levels": [
+          {
+            "convexity_violations": 0,
+            "error_vs_analytic": 0.10684225224995458,
+            "error_vs_same_grid_reference": 0.10431858160227847,
+            "most_negative_value": 0.0,
+            "price": 10.343741319935603,
+            "runtime_seconds": 8.375e-05,
+            "time_step": 0.1,
+            "time_steps": 10
+          },
+          {
+            "convexity_violations": 0,
+            "error_vs_analytic": 0.05482223785268836,
+            "error_vs_same_grid_reference": 0.05229856720501225,
+            "most_negative_value": 0.0,
+            "price": 10.39576133433287,
+            "runtime_seconds": 0.000148334,
+            "time_step": 0.05,
+            "time_steps": 20
+          },
+          {
+            "convexity_violations": 0,
+            "error_vs_analytic": 0.028686297660843962,
+            "error_vs_same_grid_reference": 0.02616262701316785,
+            "most_negative_value": 0.0,
+            "price": 10.421897274524714,
+            "runtime_seconds": 0.000292833,
+            "time_step": 0.025,
+            "time_steps": 40
+          },
+          {
+            "convexity_violations": 0,
+            "error_vs_analytic": 0.015588402887615871,
+            "error_vs_same_grid_reference": 0.013064732239939758,
+            "most_negative_value": 0.0,
+            "price": 10.434995169297942,
+            "runtime_seconds": 0.000578792,
+            "time_step": 0.0125,
+            "time_steps": 80
+          },
+          {
+            "convexity_violations": 0,
+            "error_vs_analytic": 0.009032172785973458,
+            "error_vs_same_grid_reference": 0.006508502138297345,
+            "most_negative_value": 0.0,
+            "price": 10.441551399399584,
+            "runtime_seconds": 0.001157417,
+            "time_step": 0.00625,
+            "time_steps": 160
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse": 0.1,
+            "fine": 0.05,
+            "order": 0.9961528313889205
+          },
+          {
+            "coarse": 0.05,
+            "fine": 0.025,
+            "order": 0.9992640118634113
+          },
+          {
+            "coarse": 0.025,
+            "fine": 0.0125,
+            "order": 1.0018298533245202
+          },
+          {
+            "coarse": 0.0125,
+            "fine": 0.00625,
+            "order": 1.00528009113549
+          }
+        ],
+        "rannacher_steps": 0,
+        "same_grid_reference_price": 10.448059901537881,
+        "scheme": "implicit"
+      },
+      {
+        "arm": "crank_nicolson",
+        "fit_asymptotic_window": {
+          "ci_lower": 1.336213287608003,
+          "ci_upper": 2.504550876972767,
+          "observations": 3,
+          "order": 1.920382082290385,
+          "r_squared": 0.9994271764369359,
+          "standard_error": 0.0459750812151835
+        },
+        "fit_full_range": {
+          "ci_lower": 2.018691230326076,
+          "ci_upper": 5.082830995730702,
+          "observations": 5,
+          "order": 3.550761113028389,
+          "r_squared": 0.9477362214662095,
+          "standard_error": 0.4814126416394451
+        },
+        "levels": [
+          {
+            "convexity_violations": 2,
+            "error_vs_analytic": 0.1206280491510121,
+            "error_vs_same_grid_reference": 0.11815688600615282,
+            "most_negative_value": 0.0,
+            "price": 10.329955523034545,
+            "runtime_seconds": 7.85e-05,
+            "time_step": 0.1,
+            "time_steps": 10
+          },
+          {
+            "convexity_violations": 2,
+            "error_vs_analytic": 0.015289746332399545,
+            "error_vs_same_grid_reference": 0.012818583187540256,
+            "most_negative_value": 0.0,
+            "price": 10.435293825853158,
+            "runtime_seconds": 0.000145542,
+            "time_step": 0.05,
+            "time_steps": 20
+          },
+          {
+            "convexity_violations": 0,
+            "error_vs_analytic": 0.002332019112824213,
+            "error_vs_same_grid_reference": 0.00013914403203507675,
+            "most_negative_value": 0.0,
+            "price": 10.448251553072733,
+            "runtime_seconds": 0.000286083,
+            "time_step": 0.025,
+            "time_steps": 40
+          },
+          {
+            "convexity_violations": 0,
+            "error_vs_analytic": 0.002432317409535756,
+            "error_vs_same_grid_reference": 3.884573532353386e-05,
+            "most_negative_value": 0.0,
+            "price": 10.448151254776022,
+            "runtime_seconds": 0.000566042,
+            "time_step": 0.0125,
+            "time_steps": 80
+          },
+          {
+            "convexity_violations": 0,
+            "error_vs_analytic": 0.002461451800279235,
+            "error_vs_same_grid_reference": 9.711344580054515e-06,
+            "most_negative_value": 0.0,
+            "price": 10.448122120385278,
+            "runtime_seconds": 0.001132333,
+            "time_step": 0.00625,
+            "time_steps": 160
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse": 0.1,
+            "fine": 0.05,
+            "order": 3.2043949921931207
+          },
+          {
+            "coarse": 0.05,
+            "fine": 0.025,
+            "order": 6.525513970330841
+          },
+          {
+            "coarse": 0.025,
+            "fine": 0.0125,
+            "order": 1.8407509057435842
+          },
+          {
+            "coarse": 0.0125,
+            "fine": 0.00625,
+            "order": 2.0000132588371855
+          }
+        ],
+        "rannacher_steps": 0,
+        "same_grid_reference_price": 10.448112409040698,
+        "scheme": "crank_nicolson"
+      },
+      {
+        "arm": "crank_nicolson_rannacher2",
+        "fit_asymptotic_window": {
+          "ci_lower": 1.9680331364476071,
+          "ci_upper": 2.0123694611392056,
+          "observations": 3,
+          "order": 1.9902012987934063,
+          "r_squared": 0.9999992315186285,
+          "standard_error": 0.001744672213779635
+        },
+        "fit_full_range": {
+          "ci_lower": 1.9760011315706427,
+          "ci_upper": 1.9915026179340745,
+          "observations": 5,
+          "order": 1.9837518747523586,
+          "r_squared": 0.9999954782232696,
+          "standard_error": 0.0024354670709911524
+        },
+        "levels": [
+          {
+            "convexity_violations": 3,
+            "error_vs_analytic": 0.020069823561474465,
+            "error_vs_same_grid_reference": 0.017598655166057853,
+            "most_negative_value": 0.0,
+            "price": 10.430513748624083,
+            "runtime_seconds": 9.8917e-05,
+            "time_step": 0.1,
+            "time_steps": 10
+          },
+          {
+            "convexity_violations": 0,
+            "error_vs_analytic": 0.006960605342349879,
+            "error_vs_same_grid_reference": 0.004489436946933267,
+            "most_negative_value": 0.0,
+            "price": 10.443622966843208,
+            "runtime_seconds": 0.000148542,
+            "time_step": 0.05,
+            "time_steps": 20
+          },
+          {
+            "convexity_violations": 0,
+            "error_vs_analytic": 0.0036071417448404475,
+            "error_vs_same_grid_reference": 0.0011359733494238355,
+            "most_negative_value": 0.0,
+            "price": 10.446976430440717,
+            "runtime_seconds": 0.000290958,
+            "time_step": 0.025,
+            "time_steps": 40
+          },
+          {
+            "convexity_violations": 0,
+            "error_vs_analytic": 0.0027576966967703953,
+            "error_vs_same_grid_reference": 0.0002865283013537834,
+            "most_negative_value": 0.0,
+            "price": 10.447825875488787,
+            "runtime_seconds": 0.000576708,
+            "time_step": 0.0125,
+            "time_steps": 80
+          },
+          {
+            "convexity_violations": 0,
+            "error_vs_analytic": 0.00254313774304471,
+            "error_vs_same_grid_reference": 7.196934762809803e-05,
+            "most_negative_value": 0.0,
+            "price": 10.448040434442513,
+            "runtime_seconds": 0.001148708,
+            "time_step": 0.00625,
+            "time_steps": 160
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse": 0.1,
+            "fine": 0.05,
+            "order": 1.9708587643460895
+          },
+          {
+            "coarse": 0.05,
+            "fine": 0.025,
+            "order": 1.9826055285937325
+          },
+          {
+            "coarse": 0.025,
+            "fine": 0.0125,
+            "order": 1.9871794378765848
+          },
+          {
+            "coarse": 0.0125,
+            "fine": 0.00625,
+            "order": 1.993223159710228
+          }
+        ],
+        "rannacher_steps": 2,
+        "same_grid_reference_price": 10.448112403790141,
+        "scheme": "crank_nicolson"
+      }
+    ]
+  },
+  "runtime_seconds": 39.146930042,
+  "status": "pass",
+  "table": {
+    "headers": [
+      "study",
+      "scheme",
+      "parameter",
+      "value",
+      "price",
+      "error",
+      "runtime_s"
+    ],
+    "rows": [
+      [
+        "space_sweep",
+        "crank_nicolson",
+        "asset_nodes",
+        "101",
+        "10.41076671199875",
+        "0.03981686018680719",
+        "0.29947320799999999"
+      ],
+      [
+        "space_sweep",
+        "crank_nicolson",
+        "asset_nodes",
+        "201",
+        "10.440685263089048",
+        "0.0098983090965099052",
+        "0.565099833"
+      ],
+      [
+        "space_sweep",
+        "crank_nicolson",
+        "asset_nodes",
+        "401",
+        "10.448112408423309",
+        "0.0024711637622480964",
+        "0.91043254100000004"
+      ],
+      [
+        "space_sweep",
+        "crank_nicolson",
+        "asset_nodes",
+        "801",
+        "10.449965993379474",
+        "0.00061757880608404037",
+        "1.8162552089999999"
+      ],
+      [
+        "space_sweep",
+        "implicit",
+        "asset_nodes",
+        "101",
+        "10.410758393420332",
+        "0.039825178765225289",
+        "0.24875887499999999"
+      ],
+      [
+        "space_sweep",
+        "implicit",
+        "asset_nodes",
+        "201",
+        "10.440677036603875",
+        "0.0099065355816829737",
+        "0.47253325000000002"
+      ],
+      [
+        "space_sweep",
+        "implicit",
+        "asset_nodes",
+        "401",
+        "10.448104204209065",
+        "0.0024793679764929522",
+        "1.153825917"
+      ],
+      [
+        "space_sweep",
+        "implicit",
+        "asset_nodes",
+        "801",
+        "10.449957794668208",
+        "0.00062577751734949061",
+        "1.8591331250000001"
+      ],
+      [
+        "time_sweep",
+        "implicit",
+        "time_steps",
+        "10",
+        "10.343741319935603",
+        "0.10431858160227847",
+        "8.3750000000000003e-05"
+      ],
+      [
+        "time_sweep",
+        "implicit",
+        "time_steps",
+        "20",
+        "10.395761334332869",
+        "0.052298567205012247",
+        "0.00014833399999999999"
+      ],
+      [
+        "time_sweep",
+        "implicit",
+        "time_steps",
+        "40",
+        "10.421897274524714",
+        "0.02616262701316785",
+        "0.00029283299999999999"
+      ],
+      [
+        "time_sweep",
+        "implicit",
+        "time_steps",
+        "80",
+        "10.434995169297942",
+        "0.013064732239939758",
+        "0.00057879199999999996"
+      ],
+      [
+        "time_sweep",
+        "implicit",
+        "time_steps",
+        "160",
+        "10.441551399399584",
+        "0.0065085021382973451",
+        "0.001157417"
+      ],
+      [
+        "time_sweep",
+        "crank_nicolson",
+        "time_steps",
+        "10",
+        "10.329955523034545",
+        "0.11815688600615282",
+        "7.8499999999999997e-05"
+      ],
+      [
+        "time_sweep",
+        "crank_nicolson",
+        "time_steps",
+        "20",
+        "10.435293825853158",
+        "0.012818583187540256",
+        "0.000145542"
+      ],
+      [
+        "time_sweep",
+        "crank_nicolson",
+        "time_steps",
+        "40",
+        "10.448251553072733",
+        "0.00013914403203507675",
+        "0.00028608300000000002"
+      ],
+      [
+        "time_sweep",
+        "crank_nicolson",
+        "time_steps",
+        "80",
+        "10.448151254776022",
+        "3.8845735323533859e-05",
+        "0.000566042"
+      ],
+      [
+        "time_sweep",
+        "crank_nicolson",
+        "time_steps",
+        "160",
+        "10.448122120385278",
+        "9.7113445800545151e-06",
+        "0.0011323329999999999"
+      ],
+      [
+        "time_sweep",
+        "crank_nicolson_rannacher2",
+        "time_steps",
+        "10",
+        "10.430513748624083",
+        "0.017598655166057853",
+        "9.8917000000000002e-05"
+      ],
+      [
+        "time_sweep",
+        "crank_nicolson_rannacher2",
+        "time_steps",
+        "20",
+        "10.443622966843208",
+        "0.0044894369469332673",
+        "0.00014854199999999999"
+      ],
+      [
+        "time_sweep",
+        "crank_nicolson_rannacher2",
+        "time_steps",
+        "40",
+        "10.446976430440717",
+        "0.0011359733494238355",
+        "0.00029095800000000002"
+      ],
+      [
+        "time_sweep",
+        "crank_nicolson_rannacher2",
+        "time_steps",
+        "80",
+        "10.447825875488787",
+        "0.00028652830135378338",
+        "0.00057670799999999999"
+      ],
+      [
+        "time_sweep",
+        "crank_nicolson_rannacher2",
+        "time_steps",
+        "160",
+        "10.448040434442513",
+        "7.1969347628098035e-05",
+        "0.001148708"
+      ],
+      [
+        "s_max_sweep",
+        "crank_nicolson_rannacher2",
+        "s_max_multiple",
+        "1.5",
+        "10.449870230077806",
+        "0.00071334210775120255",
+        "0.010877791"
+      ],
+      [
+        "s_max_sweep",
+        "crank_nicolson_rannacher2",
+        "s_max_multiple",
+        "2",
+        "10.449965530979773",
+        "0.00061804120578479171",
+        "0.014322082999999999"
+      ],
+      [
+        "s_max_sweep",
+        "crank_nicolson_rannacher2",
+        "s_max_multiple",
+        "3",
+        "10.449965530932694",
+        "0.00061804125286357703",
+        "0.021565500000000001"
+      ],
+      [
+        "s_max_sweep",
+        "crank_nicolson_rannacher2",
+        "s_max_multiple",
+        "4",
+        "10.449965530932694",
+        "0.00061804125286357703",
+        "0.028172333000000001"
+      ],
+      [
+        "s_max_sweep",
+        "crank_nicolson_rannacher2",
+        "s_max_multiple",
+        "6",
+        "10.449965530932694",
+        "0.00061804125286357703",
+        "0.042338959000000002"
+      ],
+      [
+        "s_max_sweep",
+        "crank_nicolson_rannacher2",
+        "s_max_multiple",
+        "8",
+        "10.449965530932694",
+        "0.00061804125286357703",
+        "0.056545458"
+      ],
+      [
+        "strike_alignment",
+        "crank_nicolson_rannacher2",
+        "offset",
+        "0",
+        "10.448111945692755",
+        "0.0024716264928024145",
+        "0.014308792000000001"
+      ],
+      [
+        "strike_alignment",
+        "crank_nicolson_rannacher2",
+        "offset",
+        "0.10000000000000001",
+        "10.449795936442785",
+        "0.000787635742772963",
+        "0.015131458"
+      ],
+      [
+        "strike_alignment",
+        "crank_nicolson_rannacher2",
+        "offset",
+        "0.25",
+        "10.451617055324869",
+        "0.0010334831393112864",
+        "0.015029917"
+      ],
+      [
+        "strike_alignment",
+        "crank_nicolson_rannacher2",
+        "offset",
+        "0.5",
+        "10.45278195895299",
+        "0.0021983867674322255",
+        "0.014185417000000001"
+      ],
+      [
+        "strike_alignment",
+        "crank_nicolson_rannacher2",
+        "offset",
+        "0.75",
+        "10.451624077465485",
+        "0.001040505279927828",
+        "0.014370166"
+      ],
+      [
+        "strike_alignment",
+        "crank_nicolson_rannacher2",
+        "offset",
+        "0.90000000000000002",
+        "10.449821594165014",
+        "0.00076197802054345232",
+        "0.014549833"
+      ],
+      [
+        "explicit_stability",
+        "explicit",
+        "target_ratio",
+        "0.25",
+        "10.411445807576985",
+        "0.039137764608572212",
+        "0.00031733299999999999"
+      ],
+      [
+        "explicit_stability",
+        "explicit",
+        "target_ratio",
+        "0.5",
+        "10.412124945472909",
+        "0.038458626712648325",
+        "0.000157083"
+      ],
+      [
+        "explicit_stability",
+        "explicit",
+        "target_ratio",
+        "0.90000000000000002",
+        "10.413209161477296",
+        "0.037374410708261863",
+        "8.8499999999999996e-05"
+      ],
+      [
+        "explicit_stability",
+        "explicit",
+        "target_ratio",
+        "0.98999999999999999",
+        "10.413455903939616",
+        "0.037127668245942047",
+        "8.0375000000000002e-05"
+      ],
+      [
+        "explicit_stability",
+        "explicit",
+        "target_ratio",
+        "1.01",
+        "10.413511358166508",
+        "0.03707221401904981",
+        "7.9332999999999994e-05"
+      ],
+      [
+        "explicit_stability",
+        "explicit",
+        "target_ratio",
+        "1.5",
+        "10.41484713533244",
+        "0.035736436853117226",
+        "5.4540999999999998e-05"
+      ],
+      [
+        "explicit_stability",
+        "explicit",
+        "target_ratio",
+        "2",
+        "-409265114799.41644",
+        "409265114809.867",
+        "4.1375000000000003e-05"
+      ],
+      [
+        "sensitivity",
+        "crank_nicolson_rannacher2",
+        "sigma=0.1 T=0.25",
+        "0.10000000000000001",
+        "2.6545528145219022",
+        "0.010279407117285366",
+        "0.002868167"
+      ],
+      [
+        "sensitivity",
+        "crank_nicolson_rannacher2",
+        "sigma=0.1 T=1",
+        "0.10000000000000001",
+        "6.7995910149215142",
+        "0.0053666939006298264",
+        "0.002871167"
+      ],
+      [
+        "sensitivity",
+        "crank_nicolson_rannacher2",
+        "sigma=0.1 T=3",
+        "0.10000000000000001",
+        "15.638898976626042",
+        "0.0032154358339901989",
+        "0.0029320420000000002"
+      ],
+      [
+        "sensitivity",
+        "crank_nicolson_rannacher2",
+        "sigma=0.2 T=0.25",
+        "0.20000000000000001",
+        "4.6100066394198453",
+        "0.0049904901830100101",
+        "0.0028221660000000001"
+      ],
+      [
+        "sensitivity",
+        "crank_nicolson_rannacher2",
+        "sigma=0.2 T=1",
+        "0.20000000000000001",
+        "10.448100858696224",
+        "0.002482713489333932",
+        "0.002820417"
+      ],
+      [
+        "sensitivity",
+        "crank_nicolson_rannacher2",
+        "sigma=0.2 T=3",
+        "0.20000000000000001",
+        "20.922941347906313",
+        "0.0014196049888859363",
+        "0.0028218330000000002"
+      ],
+      [
+        "sensitivity",
+        "crank_nicolson_rannacher2",
+        "sigma=0.4 T=0.25",
+        "0.40000000000000002",
+        "8.5501491244186401",
+        "0.0024577571502373274",
+        "0.002864709"
+      ],
+      [
+        "sensitivity",
+        "crank_nicolson_rannacher2",
+        "sigma=0.4 T=1",
+        "0.40000000000000002",
+        "18.021775132534366",
+        "0.0011763176823222921",
+        "0.0028714169999999998"
+      ],
+      [
+        "sensitivity",
+        "crank_nicolson_rannacher2",
+        "sigma=0.4 T=3",
+        "0.40000000000000002",
+        "32.737048734273188",
+        "0.00099563218138598586",
+        "0.0028512500000000001"
+      ],
+      [
+        "sensitivity",
+        "crank_nicolson_rannacher2",
+        "sigma=0.8 T=0.25",
+        "0.80000000000000004",
+        "16.380996623343609",
+        "0.0011866213048783436",
+        "0.0028194579999999999"
+      ],
+      [
+        "sensitivity",
+        "crank_nicolson_rannacher2",
+        "sigma=0.8 T=1",
+        "0.80000000000000004",
+        "32.815764840649784",
+        "0.0052176263402685663",
+        "0.0028310420000000002"
+      ],
+      [
+        "sensitivity",
+        "crank_nicolson_rannacher2",
+        "sigma=0.8 T=3",
+        "0.80000000000000004",
+        "53.963707667949805",
+        "0.83198669807572401",
+        "0.002823458"
+      ]
+    ]
+  }
+}

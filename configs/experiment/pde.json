@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "command": "experiment",
+  "pde": {
+    "spot": 100.0,
+    "strike": 100.0,
+    "rate": 0.05,
+    "dividend_yield": 0.0,
+    "volatility": 0.20,
+    "maturity": 1.0,
+    "space_nodes": [101, 201, 401, 801],
+    "space_sweep_time_steps": 128000,
+    "time_sweep_nodes": 401,
+    "time_steps": [10, 20, 40, 80, 160],
+    "time_sweep_reference_steps": 20000,
+    "s_max_multiples": [1.5, 2.0, 3.0, 4.0, 6.0, 8.0],
+    "s_max_sweep_spacing": 0.5,
+    "s_max_sweep_time_steps": 2000,
+    "strike_offsets": [0.0, 0.1, 0.25, 0.5, 0.75, 0.9],
+    "alignment_nodes": 401,
+    "alignment_time_steps": 2000,
+    "rannacher_counts": [0, 1, 2, 4],
+    "stability_ratios": [0.25, 0.5, 0.9, 0.99, 1.01, 1.5, 2.0],
+    "stability_nodes": 101,
+    "volatilities": [0.1, 0.2, 0.4, 0.8],
+    "maturities": [0.25, 1.0, 3.0]
+  }
+}

@@ -118,8 +118,26 @@ struct OperatorDiagnostics {
 /// means the stability check and the operator can never disagree about what the
 /// scheme is doing.
 ///
-/// The bound is necessary, not sufficient: satisfying it does not make the answer
-/// accurate, only non-divergent.
+/// What this bound is
+/// ------------------
+/// **Sufficient, and conservative by construction.** max_i |b_i| is a
+/// Gershgorin-style row bound on the spectrum: the Gershgorin discs *contain* the
+/// eigenvalues but are strictly larger than the spectrum, so a limit built from
+/// them is smaller than the true one. Below this limit the iteration cannot
+/// diverge. Above it, it may or may not -- the bound makes no claim, and the
+/// scheme is observed to survive well past it.
+///
+/// Measured at S_0=K=100, r=0.05, sigma=0.2, T=1, N_S=101: the scheme is stable at
+/// every ratio up to 1.60 and diverges from 1.70, so the bound is conservative by
+/// roughly 1.65x here. EXP-06 reports the observed onset alongside the predicted
+/// limit rather than asserting they coincide.
+///
+/// Treating it as an exact characterisation -- "unstable above, stable below" --
+/// would be the same error as requiring diagonal dominance of the Thomas
+/// algorithm: mistaking a sufficient condition for a necessary one.
+///
+/// And it says nothing about accuracy. Satisfying it makes the iteration
+/// non-divergent, not correct.
 [[nodiscard]] Result<double> explicit_stability_limit(const OperatorCoefficients& coefficients);
 
 }  // namespace diffusionworks

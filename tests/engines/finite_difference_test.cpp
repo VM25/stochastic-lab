@@ -193,6 +193,68 @@ TEST(FiniteDifferenceTest, ReportsTheStabilityRatioAndWarnsWhenExceeded) {
     EXPECT_FALSE(*unstable.explicit_stable);
 }
 
+// Regression: the stability bound is sufficient, not necessary.
+//
+// EXP-06 initially asserted that predicted and observed stability coincide, and
+// failed: the scheme is stable at every ratio up to 1.60 and diverges from 1.70,
+// so the bound is conservative by roughly 1.65x. The bound was not wrong -- the
+// assertion was. max|b_i| is a Gershgorin-style row bound, and Gershgorin discs
+// contain the spectrum while being strictly larger than it, so a limit built from
+// them is smaller than the true one *by construction*.
+//
+// This is the same error as requiring diagonal dominance of the Thomas algorithm:
+// mistaking a sufficient condition for a necessary one. The property that must
+// hold is one-directional, and that is what this pins.
+TEST(FiniteDifferenceTest, StabilityBoundIsSufficientNotNecessary) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto model = BlackScholesModel::create(0.2).value();
+    const auto option = EuropeanOption::create(OptionType::Call, 100.0, 1.0).value();
+    const double exact = BlackScholesAnalyticEngine::price(market, option, model).value().value;
+
+    const auto price_at_ratio = [&](double ratio) {
+        // Calibrate the step count to the target ratio from a probe run.
+        PdeConfig probe;
+        probe.asset_nodes = 101;
+        probe.time_steps = 1000;
+        probe.scheme = PdeScheme::Explicit;
+        const auto s = FiniteDifferenceEngine::solve(market, option, model, probe);
+        EXPECT_TRUE(s.ok());
+        const double dtau_max = (1.0 / 1000.0) / s.value().diagnostics.explicit_stability_ratio;
+
+        PdeConfig config = probe;
+        config.time_steps = static_cast<std::int64_t>(std::llround(1.0 / (ratio * dtau_max)));
+        return FiniteDifferenceEngine::price(market, option, model, config);
+    };
+
+    // The guarantee: at or below the bound, stable. This is the only direction the
+    // bound claims, and the only one that must hold.
+    for (const double ratio : {0.25, 0.5, 0.9, 0.99}) {
+        const auto priced = price_at_ratio(ratio);
+        ASSERT_TRUE(priced.ok()) << "ratio " << ratio << " is within the bound and must not "
+                                 << "diverge: " << priced.error().describe();
+        EXPECT_LT(std::abs(priced.value().value - exact), 1.0)
+            << "ratio " << ratio << " is within the bound but the answer is far from the truth; "
+            << "the bound's guarantee is broken";
+    }
+
+    // Above the bound the scheme is observed to survive for a while. That is the
+    // bound being conservative, not a defect -- and asserting instability here
+    // would be asserting that a sufficient condition is necessary.
+    const auto just_above = price_at_ratio(1.5);
+    ASSERT_TRUE(just_above.ok());
+    EXPECT_LT(std::abs(just_above.value().value - exact), 1.0)
+        << "at ratio 1.5 the scheme is measured to be stable; if this now diverges the bound's "
+        << "conservatism has changed and the documented 1.65x margin is stale";
+
+    // Far enough above, it does diverge -- catastrophically.
+    const auto far_above = price_at_ratio(2.0);
+    if (far_above.ok()) {
+        EXPECT_GT(std::abs(far_above.value().value - exact), 1e3)
+            << "ratio 2.0 must diverge; it returned " << far_above.value().value;
+        EXPECT_TRUE(far_above.value().has_warnings());
+    }
+}
+
 // The implicit and Crank-Nicolson schemes have no stability bound to satisfy, so
 // reporting explicit_stable for them would claim they passed a test they never
 // took.

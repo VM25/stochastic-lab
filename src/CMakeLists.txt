@@ -21,6 +21,7 @@ target_sources(
             experiments/convergence.cpp
             experiments/convergence_experiments.cpp
             experiments/experiment.cpp
+            experiments/pde_experiments.cpp
             experiments/scheme_moments.cpp
             instruments/asian_option.cpp
             instruments/european_option.cpp

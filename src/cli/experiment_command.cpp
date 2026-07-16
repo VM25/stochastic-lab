@@ -1,6 +1,7 @@
 #include "experiment_command.hpp"
 
 #include <diffusionworks/experiments/convergence_experiments.hpp>
+#include <diffusionworks/experiments/pde_experiments.hpp>
 
 #include <fmt/format.h>
 
@@ -184,6 +185,151 @@ Result<ConvergenceExperimentConfig> parse_convergence_config(const ConfigNode& r
     return Result<ConvergenceExperimentConfig>::success(std::move(config));
 }
 
+/// Parses the `pde` block for EXP-06.
+///
+/// Absent means the documented defaults, which are the configuration EXP-06's
+/// published record was produced from. Unknown keys are rejected for the same
+/// reason as in the convergence block: a typo must fail rather than leave a
+/// default in place and produce a plausible study of something else.
+Result<PdeExperimentConfig> parse_pde_config(const ConfigNode& root) {
+    PdeExperimentConfig config;
+
+    if (!root.contains("pde")) {
+        return Result<PdeExperimentConfig>::success(config);
+    }
+
+    auto node = root.object("pde");
+    if (!node) {
+        return Result<PdeExperimentConfig>::failure(std::move(node).error());
+    }
+
+    const Status unknown = node.value().reject_unknown_keys({"spot",
+                                                             "strike",
+                                                             "rate",
+                                                             "dividend_yield",
+                                                             "volatility",
+                                                             "maturity",
+                                                             "space_nodes",
+                                                             "space_sweep_time_steps",
+                                                             "time_sweep_nodes",
+                                                             "time_steps",
+                                                             "time_sweep_reference_steps",
+                                                             "s_max_multiples",
+                                                             "s_max_sweep_spacing",
+                                                             "s_max_sweep_time_steps",
+                                                             "strike_offsets",
+                                                             "alignment_nodes",
+                                                             "alignment_time_steps",
+                                                             "rannacher_counts",
+                                                             "stability_ratios",
+                                                             "stability_nodes",
+                                                             "volatilities",
+                                                             "maturities"});
+    if (!unknown) {
+        return Result<PdeExperimentConfig>::failure(unknown.error());
+    }
+
+    std::optional<Error> first_error;
+    const auto read_number = [&](const char* key, double fallback) -> double {
+        auto v = node.value().number_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_integer = [&](const char* key, std::int64_t fallback) -> std::int64_t {
+        auto v = node.value().integer_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_doubles = [&](const char* key, std::vector<double> fallback) {
+        if (!node.value().contains(key)) {
+            return fallback;
+        }
+        auto array = node.value().array(key);
+        if (!array) {
+            if (!first_error.has_value()) {
+                first_error = array.error();
+            }
+            return fallback;
+        }
+        std::vector<double> out;
+        for (std::size_t i = 0; i < array.value().size(); ++i) {
+            auto v = array.value().number_at(i);
+            if (!v) {
+                if (!first_error.has_value()) {
+                    first_error = v.error();
+                }
+                return fallback;
+            }
+            out.push_back(v.value());
+        }
+        return out;
+    };
+    const auto read_integers = [&](const char* key, std::vector<std::int64_t> fallback) {
+        const std::vector<double> raw = read_doubles(key, {});
+        if (raw.empty()) {
+            return fallback;
+        }
+        std::vector<std::int64_t> out;
+        out.reserve(raw.size());
+        for (const double v : raw) {
+            out.push_back(static_cast<std::int64_t>(v));
+        }
+        return out;
+    };
+
+    config.spot = read_number("spot", config.spot);
+    config.strike = read_number("strike", config.strike);
+    config.rate = read_number("rate", config.rate);
+    config.dividend_yield = read_number("dividend_yield", config.dividend_yield);
+    config.volatility = read_number("volatility", config.volatility);
+    config.maturity = read_number("maturity", config.maturity);
+    config.s_max_sweep_spacing = read_number("s_max_sweep_spacing", config.s_max_sweep_spacing);
+
+    config.space_sweep_time_steps =
+        read_integer("space_sweep_time_steps", config.space_sweep_time_steps);
+    config.time_sweep_nodes = read_integer("time_sweep_nodes", config.time_sweep_nodes);
+    config.time_sweep_reference_steps =
+        read_integer("time_sweep_reference_steps", config.time_sweep_reference_steps);
+    config.s_max_sweep_time_steps =
+        read_integer("s_max_sweep_time_steps", config.s_max_sweep_time_steps);
+    config.alignment_nodes = read_integer("alignment_nodes", config.alignment_nodes);
+    config.alignment_time_steps =
+        read_integer("alignment_time_steps", config.alignment_time_steps);
+    config.stability_nodes = read_integer("stability_nodes", config.stability_nodes);
+
+    config.space_nodes = read_integers("space_nodes", config.space_nodes);
+    config.time_steps = read_integers("time_steps", config.time_steps);
+    config.rannacher_counts = read_integers("rannacher_counts", config.rannacher_counts);
+    config.s_max_multiples = read_doubles("s_max_multiples", config.s_max_multiples);
+    config.strike_offsets = read_doubles("strike_offsets", config.strike_offsets);
+    config.stability_ratios = read_doubles("stability_ratios", config.stability_ratios);
+    config.volatilities = read_doubles("volatilities", config.volatilities);
+    config.maturities = read_doubles("maturities", config.maturities);
+
+    if (first_error.has_value()) {
+        return Result<PdeExperimentConfig>::failure(*first_error);
+    }
+
+    if (config.space_nodes.size() < 3 || config.time_steps.size() < 3) {
+        return Result<PdeExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "space_nodes and time_steps each need at least 3 levels to determine an order",
+            kContext);
+    }
+
+    return Result<PdeExperimentConfig>::success(std::move(config));
+}
+
 nlohmann::json table_to_json(const CsvTable& table) {
     return nlohmann::json{{"headers", table.headers}, {"rows", table.rows}};
 }
@@ -216,7 +362,7 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
     Result<ExperimentRecord> record = Result<ExperimentRecord>::failure(
         ErrorCode::NotImplemented,
         fmt::format("experiment '{}' is not implemented in this build. Implemented: EXP-01, "
-                    "EXP-02, EXP-03, EXP-04.",
+                    "EXP-02, EXP-03, EXP-04, EXP-06.",
                     id),
         kContext);
 
@@ -228,6 +374,14 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
         record = run_weak_convergence(experiment_config);
     } else if (id == "EXP-04") {
         record = run_bias_variance_tradeoff(experiment_config);
+    } else if (id == "EXP-06") {
+        // EXP-06 is deterministic: it takes no seed and its configuration block is
+        // its own, so it does not share the convergence block above.
+        auto pde = parse_pde_config(config.root());
+        if (!pde) {
+            return Result<nlohmann::json>::failure(std::move(pde).error());
+        }
+        record = run_pde_stability_and_convergence(pde.value());
     }
 
     if (!record) {
