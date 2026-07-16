@@ -89,6 +89,13 @@ add_dw_test(
     LABEL statistical
     SOURCES random/random_stream_test.cpp)
 
+# --- Simulation -------------------------------------------------------------
+
+add_dw_test(
+    dw_test_simulation
+    LABEL statistical
+    SOURCES simulation/gbm_test.cpp)
+
 # --- Statistics -------------------------------------------------------------
 
 add_dw_test(
@@ -117,6 +124,15 @@ add_dw_test(
             engines/black_scholes_invariants_test.cpp
             engines/black_scholes_greeks_test.cpp)
 
+# The Monte Carlo suite runs hundreds of independent replications to measure
+# coverage and dispersion, so it is labelled statistical and kept out of the fast
+# developer loop.
+
+add_dw_test(
+    dw_test_monte_carlo
+    LABEL statistical
+    SOURCES engines/monte_carlo_engine_test.cpp)
+
 # --- CLI --------------------------------------------------------------------
 
 add_dw_test(
@@ -124,6 +140,7 @@ add_dw_test(
     LABEL cli
     SOURCES cli/options_test.cpp
             cli/price_command_test.cpp
+            cli/simulate_command_test.cpp
     LIBS diffusionworks::cli_lib)
 
 # --- External cross-validation ----------------------------------------------

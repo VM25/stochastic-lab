@@ -15,10 +15,15 @@ target_sources(
             core/build_info.cpp
             core/config.cpp
             engines/black_scholes_analytic.cpp
+            engines/monte_carlo_engine.cpp
+            instruments/asian_option.cpp
             instruments/european_option.cpp
             market/market_state.cpp
             models/black_scholes.cpp
             random/random_stream.cpp
+            simulation/gbm_path_generator.cpp
+            simulation/gbm_stepper.cpp
+            simulation/time_grid.cpp
             statistics/distributions.cpp
             statistics/multi_seed.cpp
             statistics/online_moments.cpp)
@@ -66,7 +71,8 @@ target_sources(
     PRIVATE cli/main.cpp
             cli/options.cpp
             cli/output.cpp
-            cli/price_command.cpp)
+            cli/price_command.cpp
+            cli/simulate_command.cpp)
 
 target_link_libraries(
     diffusionworks
@@ -94,7 +100,8 @@ if(DW_BUILD_TESTS)
         diffusionworks_cli_lib STATIC
         cli/options.cpp
         cli/output.cpp
-        cli/price_command.cpp)
+        cli/price_command.cpp
+        cli/simulate_command.cpp)
     add_library(diffusionworks::cli_lib ALIAS diffusionworks_cli_lib)
 
     target_include_directories(diffusionworks_cli_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/cli)
