@@ -7,14 +7,14 @@
     "cpu_brand": "Apple M1",
     "cxx_standard": "20",
     "git_branch": "main",
-    "git_commit": "584ec3b76f64d63050a94eceb22e5cb112e7ffea",
-    "git_commit_short": "584ec3b",
+    "git_commit": "19b6b30c08e268ad84c458751aed7eda73cfc623",
+    "git_commit_short": "19b6b30",
     "git_dirty": false,
     "hostname": "MacBookPro",
     "logical_cores": 8,
     "os_name": "Darwin",
     "os_version": "25.5.0",
-    "timestamp_utc": "2026-07-16T17:46:09Z",
+    "timestamp_utc": "2026-07-16T18:11:08Z",
     "version": "0.1.0"
   },
   "configuration": {
@@ -90,7 +90,7 @@
     "high_volatility / milstein: the full-range slope 0.9641 [0.9456, 0.9826] excludes the theoretical 1, while the asymptotic window gives 0.9884 [0.9713, 1.0056], which covers it. The coarse levels are pre-asymptotic; the local orders climb from 0.900 to 1.001 as the grid refines.",
     "long_maturity / euler_maruyama: the full-range slope 0.4969 [0.4945, 0.4993] excludes the theoretical 0.5, while the asymptotic window gives 0.4997 [0.4925, 0.5069], which covers it. The coarse levels are pre-asymptotic; the local orders climb from 0.493 to 0.505 as the grid refines.",
     "long_maturity / milstein: the full-range slope 0.9843 [0.9739, 0.9947] excludes the theoretical 1, while the asymptotic window gives 0.9956 [0.9826, 1.0087], which covers it. The coarse levels are pre-asymptotic; the local orders climb from 0.942 to 1.004 as the grid refines.",
-    "Only the terminal value is compared. A pathwise supremum error would be the stronger statement and is not measured here; it is what a barrier payoff would be sensitive to (EXP-09).",
+    "Only the terminal value is compared, so what is established is convergence of S_T rather than of the path. The stronger statement -- a supremum error, sup_t |S_t^dt - S_t^exact| -- is not measured by this experiment and no experiment in the catalog measures it. That gap matters for any payoff reading the path between grid points rather than only its endpoint; EXP-07 quantifies the pricing consequence for barriers, as discrete-monitoring bias, but that is the bias in the price and not the scheme's supremum error.",
     "Levels are not coupled to one another: each grid draws its own Brownian path, so the error estimates across levels are independent rather than nested. This costs precision in the fit, not correctness -- each level's error is a valid expectation on its own grid.",
     "GBM only. Both orders are theoretical results under global Lipschitz coefficients, which GBM satisfies and Heston's square-root diffusion does not; nothing here transfers to EXP-04's Heston arm."
   ],
@@ -923,7 +923,7 @@
       }
     ]
   },
-  "runtime_seconds": 84.014324542,
+  "runtime_seconds": 68.189610375,
   "status": "warning",
   "table": {
     "headers": [
