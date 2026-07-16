@@ -26,6 +26,7 @@ target_sources(
             market/market_state.cpp
             models/black_scholes.cpp
             numerics/tridiagonal.cpp
+            pde/asset_grid.cpp
             random/random_stream.cpp
             simulation/gbm_path_generator.cpp
             simulation/gbm_stepper.cpp

@@ -115,6 +115,13 @@ add_dw_test(
     SOURCES experiments/scheme_moments_test.cpp
             experiments/convergence_test.cpp)
 
+# --- PDE --------------------------------------------------------------------
+
+add_dw_test(
+    dw_test_pde
+    LABEL unit
+    SOURCES pde/asset_grid_test.cpp)
+
 # --- Domain types -----------------------------------------------------------
 
 add_dw_test(

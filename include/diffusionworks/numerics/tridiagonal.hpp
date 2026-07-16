@@ -30,34 +30,43 @@ struct TridiagonalSystem {
 
 /// What the elimination observed on its way through.
 ///
-/// Reported rather than enforced. The distinction matters: `diagonally_dominant`
-/// records whether the caller has a *theoretical guarantee*, while
-/// `smallest_pivot_ratio` records what actually happened. A caller can have the
-/// second without the first and be perfectly fine, which is why this solver
-/// declines to turn the first into a gate.
+/// Both fields are reported, neither is enforced, and **neither is a statement
+/// about the accuracy of the answer**. They describe the elimination, not the
+/// error. Accuracy depends on the conditioning of the matrix, which nothing here
+/// measures.
 struct TridiagonalDiagnostics {
     /// Whether the matrix is diagonally dominant.
     ///
-    /// Diagonal dominance is a **sufficient** condition for the Thomas algorithm
-    /// to be stable -- no pivot can vanish, and the growth factor is bounded. It
-    /// is **not necessary**. Symmetric positive-definite systems, M-matrices, and
-    /// a great many merely well-conditioned systems are solved accurately without
-    /// it. Refusing every non-dominant system would therefore reject problems the
-    /// algorithm handles correctly, and would state a falsehood about the
-    /// mathematics while doing so.
+    /// A **sufficient structural certificate**, and only that. Strict dominance
+    /// implies the matrix is non-singular (Levy-Desplanques), that no pivot can
+    /// vanish during an unpivoted elimination, and that the growth factor is
+    /// bounded -- so the algorithm is backward stable on it. Backward stability
+    /// means the computed answer is the exact answer to a *nearby* system. It does
+    /// **not** mean the answer is close to the true one: that additionally needs
+    /// the system to be well conditioned, and a weakly dominant, nearly singular
+    /// matrix is dominant and ill-conditioned at the same time.
     ///
-    /// So it is a diagnostic. True means the result carries a proof; false means
-    /// it does not, and the caller should read `smallest_pivot_ratio` and the
-    /// residual to judge what they have.
+    /// It is also **not necessary**. Symmetric positive-definite systems,
+    /// M-matrices, and many merely well-behaved systems are solved exactly without
+    /// it -- `SolvesANonDominantSystemThatIsNonethelessWellBehaved` is one.
+    ///
+    /// So: true means the elimination cannot break down, false means no such
+    /// certificate exists and the caller should look at the other evidence. It
+    /// never means "the answer is accurate", in either direction.
     bool diagonally_dominant{};
 
     /// The smallest |pivot| / row_scale seen during elimination.
     ///
-    /// This is the quantity that actually governs whether the solve is trustworthy,
-    /// which is why it is measured rather than inferred from dominance. A ratio near
-    /// 1 is healthy. A ratio near zero means the elimination nearly divided by
-    /// nothing, and the answer -- though finite, and though its residual may look
-    /// small -- can be arbitrarily far from the truth.
+    /// A **pivot-health diagnostic**, not a condition-number estimate and not a
+    /// proxy for one. It answers exactly one question: did the elimination come
+    /// close to dividing by nothing? A ratio near zero means it did, and the
+    /// answer is worthless however small its residual. A healthy ratio means only
+    /// that this particular failure did not occur -- an ill-conditioned system can
+    /// have entirely healthy pivots and still return an answer whose error is
+    /// large.
+    ///
+    /// Reading it as "the solve is fine" is the mistake this comment exists to
+    /// prevent. It rules out one failure mode and reports on no other.
     double smallest_pivot_ratio{};
 };
 
@@ -87,18 +96,21 @@ struct TridiagonalSolution {
 ///   - a pivot vanishes relative to the scale of the row that produced it;
 ///   - the computed solution contains a non-finite entry.
 ///
-/// Callers who need the guarantee rather than the absence of an observed failure
-/// should assert `diagnostics.diagonally_dominant` themselves. The PDE schemes do
-/// exactly that on the operators they generate, where the property is genuinely
-/// theirs to establish.
+/// Callers who want the structural certificate rather than the absence of an
+/// observed failure should assert `diagnostics.diagonally_dominant` themselves.
+/// The PDE schemes do exactly that on the operators they generate, where the
+/// property is theirs to establish. Note what that buys: no pivot breakdown and
+/// bounded growth. It does not buy an accurate answer, which depends on
+/// conditioning that none of these diagnostics measures.
 [[nodiscard]] Result<TridiagonalSolution> solve_tridiagonal(const TridiagonalSystem& system);
 
 /// Whether the matrix is diagonally dominant: weakly in every row, strictly in at
 /// least one.
 ///
-/// A sufficient condition for the Thomas algorithm's stability, not a necessary
-/// one. Exposed so a caller who generates its own matrices -- as the PDE schemes
-/// do -- can assert the property about them before relying on it.
+/// A sufficient structural certificate for the elimination -- no pivot breakdown,
+/// bounded growth -- and not a necessary one, nor a statement about accuracy.
+/// Exposed so a caller who generates its own matrices, as the PDE schemes do, can
+/// assert the property about them before relying on it.
 [[nodiscard]] bool is_diagonally_dominant(const TridiagonalSystem& system) noexcept;
 
 /// The residual ||Ax - b||_inf of a claimed solution.
