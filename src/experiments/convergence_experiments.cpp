@@ -111,6 +111,25 @@ nlohmann::json config_to_json(const ConvergenceExperimentConfig& c) {
     };
 }
 
+/// Reads a field that summarize_seeds populates only when given a reference.
+///
+/// The experiments here always pass one, so these are never empty in practice --
+/// but "never in practice" is exactly the reasoning that turns a contract change
+/// into undefined behaviour rather than an error. The optional is checked, and an
+/// absent value becomes a reported failure naming the field.
+Result<double> require(const std::optional<double>& value, const char* field) {
+    if (!value.has_value()) {
+        return Result<double>::failure(
+            ErrorCode::NonFiniteValue,
+            fmt::format("summarize_seeds did not populate '{}', which means it was called without "
+                        "a reference value; an error against no reference is not zero, it is "
+                        "unanswerable",
+                        field),
+            "convergence_experiments");
+    }
+    return Result<double>::success(*value);
+}
+
 /// Seeds for independent replications.
 ///
 /// Spaced widely rather than consecutively. Philox is a counter-based generator
@@ -169,14 +188,46 @@ Result<ExperimentRecord> run_sampling_convergence(const ConvergenceExperimentCon
     };
 
     const std::vector<Scenario> scenarios{
-        {"atm_call", OptionType::Call, 100.0, 1.0, 0.30},
-        {"otm_call", OptionType::Call, 130.0, 1.0, 0.30},
-        {"itm_call", OptionType::Call, 80.0, 1.0, 0.30},
-        {"atm_put", OptionType::Put, 100.0, 1.0, 0.30},
-        {"short_maturity", OptionType::Call, 100.0, 0.08333333333333333, 0.30},
-        {"long_maturity", OptionType::Call, 100.0, 5.0, 0.30},
-        {"low_volatility", OptionType::Call, 100.0, 1.0, 0.10},
-        {"high_volatility", OptionType::Call, 100.0, 1.0, 0.80},
+        {.name = "atm_call",
+         .type = OptionType::Call,
+         .strike = 100.0,
+         .maturity = 1.0,
+         .volatility = 0.30},
+        {.name = "otm_call",
+         .type = OptionType::Call,
+         .strike = 130.0,
+         .maturity = 1.0,
+         .volatility = 0.30},
+        {.name = "itm_call",
+         .type = OptionType::Call,
+         .strike = 80.0,
+         .maturity = 1.0,
+         .volatility = 0.30},
+        {.name = "atm_put",
+         .type = OptionType::Put,
+         .strike = 100.0,
+         .maturity = 1.0,
+         .volatility = 0.30},
+        {.name = "short_maturity",
+         .type = OptionType::Call,
+         .strike = 100.0,
+         .maturity = 0.08333333333333333,
+         .volatility = 0.30},
+        {.name = "long_maturity",
+         .type = OptionType::Call,
+         .strike = 100.0,
+         .maturity = 5.0,
+         .volatility = 0.30},
+        {.name = "low_volatility",
+         .type = OptionType::Call,
+         .strike = 100.0,
+         .maturity = 1.0,
+         .volatility = 0.10},
+        {.name = "high_volatility",
+         .type = OptionType::Call,
+         .strike = 100.0,
+         .maturity = 1.0,
+         .volatility = 0.80},
     };
 
     const auto market = MarketState::create(config.spot, config.rate, config.dividend_yield);
@@ -249,7 +300,7 @@ Result<ExperimentRecord> run_sampling_convergence(const ConvergenceExperimentCon
                 if (!priced.ok()) {
                     return Result<ExperimentRecord>::failure(priced.error());
                 }
-                replications.push_back(SeedResult{seed, priced.value().value});
+                replications.push_back(SeedResult{.seed = seed, .estimate = priced.value().value});
                 if (priced.value().standard_error.has_value()) {
                     standard_errors.add(*priced.value().standard_error);
                 }
@@ -288,8 +339,15 @@ Result<ExperimentRecord> run_sampling_convergence(const ConvergenceExperimentCon
             // is the negation of this order; both are reported.
             level.step_size = 1.0 / static_cast<double>(paths);
             level.source = ErrorSource::Simulated;
-            level.error = *summary.value().rmse;
-            level.signed_error = *summary.value().bias;
+
+            const auto rmse = require(summary.value().rmse, "rmse");
+            const auto bias = require(summary.value().bias, "bias");
+            if (!rmse || !bias) {
+                return Result<ExperimentRecord>::failure(rmse.ok() ? bias.error() : rmse.error());
+            }
+            level.error = rmse.value();
+            // Assigned as an optional rather than dereferenced and re-wrapped.
+            level.signed_error = summary.value().bias;
             level.paths = paths;
             levels.push_back(level);
 
@@ -301,8 +359,8 @@ Result<ExperimentRecord> run_sampling_convergence(const ConvergenceExperimentCon
                 // report a confident, wrong verdict. See kLevelSeedStride.
                 {"first_seed", level_seeds.front()},
                 {"last_seed", level_seeds.back()},
-                {"rmse", *summary.value().rmse},
-                {"bias", *summary.value().bias},
+                {"rmse", rmse.value()},
+                {"bias", bias.value()},
                 {"across_seed_standard_deviation", summary.value().standard_deviation},
                 {"mean_reported_standard_error", standard_errors.mean()},
                 {"mean_confidence_interval_width", interval_widths.mean()},
@@ -314,8 +372,8 @@ Result<ExperimentRecord> run_sampling_convergence(const ConvergenceExperimentCon
             record.table.rows.push_back({scenario.name,
                                          std::to_string(paths),
                                          number(reference),
-                                         number(*summary.value().rmse),
-                                         number(*summary.value().bias),
+                                         number(rmse.value()),
+                                         number(bias.value()),
                                          number(standard_errors.mean()),
                                          number(interval_widths.mean()),
                                          number(coverage),
@@ -438,9 +496,9 @@ Result<ExperimentRecord> run_strong_convergence(const ConvergenceExperimentConfi
     };
 
     const std::vector<Variation> variations{
-        {"baseline", config.volatility, config.maturity},
-        {"high_volatility", 0.60, config.maturity},
-        {"long_maturity", config.volatility, 3.0},
+        {.name = "baseline", .volatility = config.volatility, .maturity = config.maturity},
+        {.name = "high_volatility", .volatility = 0.60, .maturity = config.maturity},
+        {.name = "long_maturity", .volatility = config.volatility, .maturity = 3.0},
     };
 
     const auto market = MarketState::create(config.spot, config.rate, config.dividend_yield);
@@ -491,13 +549,20 @@ Result<ExperimentRecord> run_strong_convergence(const ConvergenceExperimentConfi
                 if (!level.ok()) {
                     return Result<ExperimentRecord>::failure(level.error());
                 }
+                const auto standard_error =
+                    require(level.value().error_standard_error, "error_standard_error");
+                const auto resolution = require(level.value().resolution(), "resolution");
+                if (!standard_error || !resolution) {
+                    return Result<ExperimentRecord>::failure(
+                        standard_error.ok() ? resolution.error() : standard_error.error());
+                }
                 record.table.rows.push_back({variation.name,
                                              std::string(to_string(scheme)),
                                              std::to_string(steps),
                                              number(level.value().step_size),
                                              number(level.value().error),
-                                             number(*level.value().error_standard_error),
-                                             number(*level.value().resolution()),
+                                             number(standard_error.value()),
+                                             number(resolution.value()),
                                              std::to_string(config.strong_paths)});
                 levels.push_back(level.value());
             }
@@ -633,8 +698,8 @@ namespace {
 /// would silently leave too few levels to fit -- or none at all under a
 /// configuration that happened to skip this window.
 const std::vector<std::int64_t>& call_payoff_steps() {
-    static const std::vector<std::int64_t> steps{8, 16, 32, 64};
-    return steps;
+    static const std::vector<std::int64_t> kSteps{8, 16, 32, 64};
+    return kSteps;
 }
 
 }  // namespace
@@ -683,13 +748,17 @@ Result<ExperimentRecord> run_weak_convergence(const ConvergenceExperimentConfig&
                 if (!level.ok()) {
                     return Result<ExperimentRecord>::failure(level.error());
                 }
+                const auto signed_error = require(level.value().signed_error, "signed_error");
+                if (!signed_error) {
+                    return Result<ExperimentRecord>::failure(signed_error.error());
+                }
                 record.table.rows.push_back({std::string(to_string(test_function)),
                                              std::string(to_string(scheme)),
                                              std::string(to_string(level.value().source)),
                                              std::to_string(steps),
                                              number(level.value().step_size),
                                              number(level.value().error),
-                                             number(*level.value().signed_error),
+                                             number(signed_error.value()),
                                              "exact"});
                 levels.push_back(level.value());
             }
@@ -736,14 +805,20 @@ Result<ExperimentRecord> run_weak_convergence(const ConvergenceExperimentConfig&
             if (!level.ok()) {
                 return Result<ExperimentRecord>::failure(level.error());
             }
+            const auto signed_error = require(level.value().signed_error, "signed_error");
+            const auto resolution = require(level.value().resolution(), "resolution");
+            if (!signed_error || !resolution) {
+                return Result<ExperimentRecord>::failure(signed_error.ok() ? resolution.error()
+                                                                           : signed_error.error());
+            }
             record.table.rows.push_back({"call_payoff",
                                          std::string(to_string(scheme)),
                                          std::string(to_string(level.value().source)),
                                          std::to_string(steps),
                                          number(level.value().step_size),
                                          number(level.value().error),
-                                         number(*level.value().signed_error),
-                                         number(*level.value().resolution())});
+                                         number(signed_error.value()),
+                                         number(resolution.value())});
             levels.push_back(level.value());
         }
 
@@ -849,9 +924,14 @@ Result<ExperimentRecord> run_bias_variance_tradeoff(const ConvergenceExperimentC
     const auto market = MarketState::create(config.spot, config.rate, config.dividend_yield);
     const auto model = BlackScholesModel::create(config.volatility);
     const auto option = EuropeanOption::create(OptionType::Call, config.strike, config.maturity);
-    if (!market.ok() || !model.ok() || !option.ok()) {
-        return Result<ExperimentRecord>::failure(
-            !market.ok() ? market.error() : (!model.ok() ? model.error() : option.error()));
+    if (!market.ok()) {
+        return Result<ExperimentRecord>::failure(market.error());
+    }
+    if (!model.ok()) {
+        return Result<ExperimentRecord>::failure(model.error());
+    }
+    if (!option.ok()) {
+        return Result<ExperimentRecord>::failure(option.error());
     }
     const auto analytic =
         BlackScholesAnalyticEngine::price(market.value(), option.value(), model.value());
@@ -912,7 +992,8 @@ Result<ExperimentRecord> run_bias_variance_tradeoff(const ConvergenceExperimentC
                     if (!priced.ok()) {
                         return Result<ExperimentRecord>::failure(priced.error());
                     }
-                    replications.push_back(SeedResult{seed, priced.value().value});
+                    replications.push_back(
+                        SeedResult{.seed = seed, .estimate = priced.value().value});
                     if (priced.value().standard_error.has_value()) {
                         standard_errors.add(*priced.value().standard_error);
                     }
@@ -926,25 +1007,33 @@ Result<ExperimentRecord> run_bias_variance_tradeoff(const ConvergenceExperimentC
                     std::chrono::duration<double>(std::chrono::steady_clock::now() - cell_start)
                         .count();
 
-                const double bias = *summary.value().bias;
+                const auto rmse = require(summary.value().rmse, "rmse");
+                const auto bias_result = require(summary.value().bias, "bias");
+                if (!rmse || !bias_result) {
+                    return Result<ExperimentRecord>::failure(rmse.ok() ? bias_result.error()
+                                                                       : rmse.error());
+                }
+                const double bias = bias_result.value();
                 const double dispersion = summary.value().standard_deviation;
 
                 // The decomposition that answers the question. RMSE^2 = bias^2 +
                 // variance, so comparing |bias| against the per-run dispersion says
                 // which term the error is made of -- and therefore whether more
-                // paths would help.
-                const char* regime = std::abs(bias) > 2.0 * dispersion   ? "bias_dominated"
-                                     : dispersion > 2.0 * std::abs(bias) ? "sampling_dominated"
-                                                                         : "mixed";
-                if (std::string(regime) == "bias_dominated") {
+                // paths would help. Written as a chain of ifs rather than nested
+                // conditionals: three named outcomes read better than a ternary
+                // tree, and a reader has to be able to check the boundaries.
+                const char* regime = "mixed";
+                if (std::abs(bias) > 2.0 * dispersion) {
+                    regime = "bias_dominated";
                     bias_floor_found = true;
+                } else if (dispersion > 2.0 * std::abs(bias)) {
+                    regime = "sampling_dominated";
                 }
-
                 cells.push_back(nlohmann::json{
                     {"scheme", to_string(scheme)},
                     {"steps", steps},
                     {"paths", paths},
-                    {"rmse", *summary.value().rmse},
+                    {"rmse", rmse.value()},
                     {"bias", bias},
                     {"across_seed_standard_deviation", dispersion},
                     {"mean_reported_standard_error", standard_errors.mean()},
@@ -964,7 +1053,7 @@ Result<ExperimentRecord> run_bias_variance_tradeoff(const ConvergenceExperimentC
                     {std::string(to_string(scheme)),
                      std::to_string(steps),
                      std::to_string(paths),
-                     number(*summary.value().rmse),
+                     number(rmse.value()),
                      number(bias),
                      number(dispersion),
                      number(standard_errors.mean()),

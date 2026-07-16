@@ -32,6 +32,18 @@ constexpr const char* kContext = "ordinary_least_squares";
 }  // namespace
 
 Result<ConfidenceInterval> LinearFit::slope_interval(double level) const {
+    // DeMorgan does not hold for IEEE-754, so the negated form below is the guard
+    // rather than a clumsy spelling of one. Every comparison against NaN is false,
+    // which makes !(x > 0 && x < 1) *true* for NaN and rejects it, while the
+    // "simplified" x <= 0 || x >= 1 is false and would let NaN through -- into a
+    // Student-t quantile, and back out as a NaN interval wrapped around a real
+    // slope. RegressionTest.RejectsInvalidConfidenceLevel fails if anyone applies
+    // the transform.
+    //
+    // The directive sits immediately above the statement it suppresses: with the
+    // explanation in between it would land on a comment and do nothing, which is
+    // how this check came back after it was first suppressed.
+    // NOLINTNEXTLINE(readability-simplify-boolean-expr)
     if (!(level > 0.0 && level < 1.0)) {
         return Result<ConfidenceInterval>::failure(
             ErrorCode::InvalidArgument,
@@ -53,8 +65,8 @@ Result<ConfidenceInterval> LinearFit::slope_interval(double level) const {
     }
 
     const double half_width = critical.value() * slope_standard_error;
-    return Result<ConfidenceInterval>::success(
-        ConfidenceInterval{slope - half_width, slope + half_width, level});
+    return Result<ConfidenceInterval>::success(ConfidenceInterval{
+        .lower = slope - half_width, .upper = slope + half_width, .level = level});
 }
 
 Result<LinearFit> ordinary_least_squares(std::span<const double> x, std::span<const double> y) {

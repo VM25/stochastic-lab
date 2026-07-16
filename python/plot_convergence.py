@@ -63,7 +63,17 @@ def _reference_line(ax, xs, ys, order: float, label: str) -> None:
     A guide, not a fit. Anchored rather than fitted so it cannot be mistaken for
     the measurement: it shows what the theoretical order looks like on these axes,
     and the reader compares the data against it.
+
+    At most one guide per order per panel. Two schemes sharing a theoretical order
+    would otherwise stack identical dashed lines and repeat the label in the
+    legend, which reads as two different references rather than one.
     """
+    drawn = getattr(ax, "_dw_guides", set())
+    if order in drawn:
+        return
+    drawn.add(order)
+    ax._dw_guides = drawn
+
     x0, y0 = xs[-1], ys[-1]
     guide = [y0 * (x / x0) ** order for x in xs]
     ax.plot(xs, guide, "--", color="#57606a", linewidth=1.0, alpha=0.7, label=label, zorder=1)

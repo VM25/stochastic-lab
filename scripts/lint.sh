@@ -16,6 +16,11 @@
 # fails to find <cstdint>, aborts the translation unit, and then reports nothing
 # -- which looks exactly like success. That silent-pass mode is the reason this
 # script exists rather than a bare clang-tidy invocation.
+#
+# A full pass takes several minutes and streams its output as it goes. Judge the
+# result by the exit code, or by the "static analysis clean" line at the end --
+# never by counting "error:" lines in a run that has not finished, which reports
+# only the files reached so far.
 
 set -euo pipefail
 
@@ -91,9 +96,33 @@ while IFS= read -r file; do
     TU+=("$file")
 done < <(find src -type f -name '*.cpp' | sort)
 
+# Every translation unit is analysed, even after one fails, and the failures are
+# summarised at the end.
+#
+# The obvious loop -- run clang-tidy and let `set -e` abort -- stops at the first
+# bad file and never reports the rest. A full pass takes minutes, so that turns
+# one fix-and-rerun into many, and, worse, it makes a partial result look like a
+# complete one: a reader who sees five findings and fixes them has no reason to
+# suspect the twenty behind them. That is precisely the failure this project
+# exists to prevent, so the tooling must not commit it either.
 echo "==> clang-tidy (${#TU[@]} translation units)"
+FAILED=()
 for tu in "${TU[@]}"; do
     echo "    $tu"
-    "$CLANG_TIDY" "${TIDY_ARGS[@]}" "$tu"
+    if ! "$CLANG_TIDY" "${TIDY_ARGS[@]}" "$tu"; then
+        FAILED+=("$tu")
+    fi
 done
+
+if (( ${#FAILED[@]} > 0 )); then
+    echo ""
+    echo "==> static analysis FAILED in ${#FAILED[@]} of ${#TU[@]} translation units:"
+    for tu in "${FAILED[@]}"; do
+        echo "    $tu"
+    done
+    exit 1
+fi
+
+# The terminal marker. Grep for this rather than counting "error:" lines: the
+# output streams, so a count taken mid-run reports only the files reached so far.
 echo "    static analysis clean"
