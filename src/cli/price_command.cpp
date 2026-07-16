@@ -3,6 +3,7 @@
 #include <diffusionworks/config/domain_parsers.hpp>
 #include <diffusionworks/core/build_info.hpp>
 #include <diffusionworks/engines/black_scholes_analytic.hpp>
+#include <diffusionworks/engines/monte_carlo_engine.hpp>
 
 #include "output.hpp"
 
@@ -15,6 +16,118 @@ namespace diffusionworks::cli {
 namespace {
 
 constexpr const char* kContext = "price";
+
+/// Serialises the market for the result document.
+[[nodiscard]] nlohmann::json describe(const MarketState& market) {
+    return nlohmann::json{
+        {"spot", market.spot()},
+        {"rate", market.rate()},
+        {"dividend_yield", market.dividend_yield()},
+    };
+}
+
+[[nodiscard]] nlohmann::json describe(const EuropeanOption& option) {
+    return nlohmann::json{
+        {"type", "european"},
+        {"option_type", to_string(option.type())},
+        {"strike", option.strike()},
+        {"maturity", option.maturity()},
+    };
+}
+
+[[nodiscard]] nlohmann::json describe(const AsianOption& option) {
+    return nlohmann::json{
+        {"type", "asian"},
+        {"option_type", to_string(option.type())},
+        // The averaging and monitoring travel with the instrument: an Asian price
+        // quoted without them is ambiguous.
+        {"averaging", to_string(option.averaging())},
+        {"strike", option.strike()},
+        {"maturity", option.maturity()},
+        {"monitoring_count", option.monitoring_count()},
+    };
+}
+
+[[nodiscard]] nlohmann::json describe(const BlackScholesModel& model) {
+    return nlohmann::json{
+        {"type", "black_scholes"},
+        {"volatility", model.volatility()},
+    };
+}
+
+/// Prices a European option by whichever method the configuration names.
+[[nodiscard]] Result<PricingResult> price_european(const MarketState& market,
+                                                   const EuropeanOption& option,
+                                                   const BlackScholesModel& model,
+                                                   const ConfigNode& method,
+                                                   const std::string& method_type,
+                                                   const Options& options,
+                                                   bool want_greeks) {
+    if (method_type == "analytic") {
+        const Status unknown = method.reject_unknown_keys({"type"});
+        if (!unknown) {
+            return Result<PricingResult>::failure(unknown.error());
+        }
+
+        auto priced = BlackScholesAnalyticEngine::price(market, option, model);
+        if (!priced || !want_greeks) {
+            return priced;
+        }
+
+        auto greeks = BlackScholesAnalyticEngine::greeks(market, option, model);
+        if (!greeks) {
+            return Result<PricingResult>::failure(std::move(greeks).error());
+        }
+        PricingResult result = std::move(priced).value();
+        for (const UndefinedGreek& entry : greeks.value().undefined) {
+            result.add_warning(fmt::format("{} is undefined here: {}", entry.name, entry.reason));
+        }
+        result.greeks = std::move(greeks).value();
+        return Result<PricingResult>::success(std::move(result));
+    }
+
+    if (method_type == "monte_carlo") {
+        auto config = parse_monte_carlo_config(method, options.seed);
+        if (!config) {
+            return Result<PricingResult>::failure(std::move(config).error());
+        }
+        return MonteCarloEngine::price(market, option, model, config.value());
+    }
+
+    return Result<PricingResult>::failure(
+        ErrorCode::UnsupportedCombination,
+        fmt::format("'method.type' is '{}'; European options support 'analytic' and "
+                    "'monte_carlo'. Finite-difference methods are not yet implemented.",
+                    method_type),
+        kContext);
+}
+
+/// Prices an Asian option.
+[[nodiscard]] Result<PricingResult> price_asian(const MarketState& market,
+                                                const AsianOption& option,
+                                                const BlackScholesModel& model,
+                                                const ConfigNode& method,
+                                                const std::string& method_type,
+                                                const Options& options) {
+    if (method_type != "monte_carlo") {
+        // Naming 'analytic' for an arithmetic Asian must fail rather than fall
+        // back: the sum of lognormals is not lognormal, so no closed form exists,
+        // and quietly pricing something else would be worse than refusing.
+        return Result<PricingResult>::failure(
+            ErrorCode::UnsupportedCombination,
+            fmt::format("'method.type' is '{}'; Asian options support 'monte_carlo' in this "
+                        "build. The arithmetic average of lognormals is not lognormal and has no "
+                        "closed form; the geometric analytic engine arrives in Phase 4.",
+                        method_type),
+            kContext);
+    }
+
+    auto config = parse_monte_carlo_config(method, options.seed);
+    if (!config) {
+        return Result<PricingResult>::failure(std::move(config).error());
+    }
+    return MonteCarloEngine::price(market, option, model, config.value());
+}
 
 }  // namespace
 
@@ -33,7 +146,7 @@ Result<nlohmann::json> run_price(const ConfigDocument& config, const Options& op
         return Result<nlohmann::json>::failure(unknown.error());
     }
 
-    // --- Domain objects -----------------------------------------------------
+    // --- Market -------------------------------------------------------------
 
     auto market_node = root.object("market");
     if (!market_node) {
@@ -44,14 +157,7 @@ Result<nlohmann::json> run_price(const ConfigDocument& config, const Options& op
         return Result<nlohmann::json>::failure(std::move(market).error());
     }
 
-    auto instrument_node = root.object("instrument");
-    if (!instrument_node) {
-        return Result<nlohmann::json>::failure(std::move(instrument_node).error());
-    }
-    auto option = parse_european_option(instrument_node.value());
-    if (!option) {
-        return Result<nlohmann::json>::failure(std::move(option).error());
-    }
+    // --- Model --------------------------------------------------------------
 
     auto model_node = root.object("model");
     if (!model_node) {
@@ -62,31 +168,15 @@ Result<nlohmann::json> run_price(const ConfigDocument& config, const Options& op
         return Result<nlohmann::json>::failure(std::move(model).error());
     }
 
-    // --- Method selection ---------------------------------------------------
+    // --- Method -------------------------------------------------------------
 
     auto method_node = root.object("method");
     if (!method_node) {
         return Result<nlohmann::json>::failure(std::move(method_node).error());
     }
-    const Status method_unknown = method_node.value().reject_unknown_keys({"type"});
-    if (!method_unknown) {
-        return Result<nlohmann::json>::failure(method_unknown.error());
-    }
     auto method_type = method_node.value().string("type");
     if (!method_type) {
         return Result<nlohmann::json>::failure(std::move(method_type).error());
-    }
-    if (method_type.value() != "analytic") {
-        // Naming an unimplemented method must fail rather than silently fall
-        // back to the analytic engine, which would answer a question the
-        // configuration did not ask.
-        return Result<nlohmann::json>::failure(
-            ErrorCode::UnsupportedCombination,
-            fmt::format("'method.type' is '{}'; this build supports 'analytic' for Black-Scholes "
-                        "European options. Monte Carlo and finite-difference methods are not yet "
-                        "implemented.",
-                        method_type.value()),
-            kContext);
     }
 
     auto want_greeks = root.boolean_or("greeks", true);
@@ -94,59 +184,67 @@ Result<nlohmann::json> run_price(const ConfigDocument& config, const Options& op
         return Result<nlohmann::json>::failure(std::move(want_greeks).error());
     }
 
-    // --- Valuation ----------------------------------------------------------
+    // --- Instrument ---------------------------------------------------------
 
-    auto priced = BlackScholesAnalyticEngine::price(market.value(), option.value(), model.value());
+    auto instrument_node = root.object("instrument");
+    if (!instrument_node) {
+        return Result<nlohmann::json>::failure(std::move(instrument_node).error());
+    }
+    auto instrument_type = instrument_node.value().string("type");
+    if (!instrument_type) {
+        return Result<nlohmann::json>::failure(std::move(instrument_type).error());
+    }
+
+    nlohmann::json instrument_description;
+    Result<PricingResult> priced = Result<PricingResult>::failure(
+        ErrorCode::NotImplemented, "no instrument was dispatched", kContext);
+
+    if (instrument_type.value() == "european") {
+        auto option = parse_european_option(instrument_node.value());
+        if (!option) {
+            return Result<nlohmann::json>::failure(std::move(option).error());
+        }
+        instrument_description = describe(option.value());
+        priced = price_european(market.value(),
+                                option.value(),
+                                model.value(),
+                                method_node.value(),
+                                method_type.value(),
+                                options,
+                                want_greeks.value());
+    } else if (instrument_type.value() == "asian") {
+        auto option = parse_asian_option(instrument_node.value());
+        if (!option) {
+            return Result<nlohmann::json>::failure(std::move(option).error());
+        }
+        instrument_description = describe(option.value());
+        priced = price_asian(market.value(),
+                             option.value(),
+                             model.value(),
+                             method_node.value(),
+                             method_type.value(),
+                             options);
+    } else {
+        return Result<nlohmann::json>::failure(
+            ErrorCode::UnsupportedCombination,
+            fmt::format("'instrument.type' is '{}'; this build supports 'european' and 'asian'",
+                        instrument_type.value()),
+            kContext);
+    }
+
     if (!priced) {
         return Result<nlohmann::json>::failure(std::move(priced).error());
     }
-    PricingResult result = std::move(priced).value();
-
-    if (want_greeks.value()) {
-        auto greeks =
-            BlackScholesAnalyticEngine::greeks(market.value(), option.value(), model.value());
-        if (!greeks) {
-            // A failure here means the computation broke, not that a derivative
-            // does not exist -- the engine reports non-existence per Greek. That
-            // is serious enough to fail the run rather than warn.
-            return Result<nlohmann::json>::failure(std::move(greeks).error());
-        }
-
-        // Individual Greeks can fail to exist where the price is still exact, at
-        // the degenerate payoff kink. That does not invalidate the price, so the
-        // run succeeds; each missing Greek is raised as a warning so its absence
-        // is visible to a reader who only skims the top of the output.
-        for (const UndefinedGreek& entry : greeks.value().undefined) {
-            result.add_warning(fmt::format("{} is undefined here: {}", entry.name, entry.reason));
-        }
-
-        result.greeks = std::move(greeks).value();
-    }
+    const PricingResult result = std::move(priced).value();
 
     // --- Result document ----------------------------------------------------
 
     nlohmann::json document;
     document["status"] = "ok";
     document["command"] = "price";
-
-    document["market"] = nlohmann::json{
-        {"spot", market.value().spot()},
-        {"rate", market.value().rate()},
-        {"dividend_yield", market.value().dividend_yield()},
-    };
-
-    document["instrument"] = nlohmann::json{
-        {"type", "european"},
-        {"option_type", to_string(option.value().type())},
-        {"strike", option.value().strike()},
-        {"maturity", option.value().maturity()},
-    };
-
-    document["model"] = nlohmann::json{
-        {"type", "black_scholes"},
-        {"volatility", model.value().volatility()},
-    };
-
+    document["market"] = describe(market.value());
+    document["instrument"] = std::move(instrument_description);
+    document["model"] = describe(model.value());
     document["method"] = method_type.value();
     document["result"] = to_json(result);
 
@@ -157,12 +255,13 @@ Result<nlohmann::json> run_price(const ConfigDocument& config, const Options& op
         document["configuration_source"] = config.source().string();
     }
 
-    // Seed and thread count are omitted rather than defaulted: an analytic price
-    // consumes no randomness and runs on one thread by construction, and
-    // reporting a seed would imply a stochastic method.
-    if (options.seed.has_value()) {
+    // Threads are reported only where they could have mattered. This build runs
+    // single-threaded; multithreading arrives in Phase 12.
+    if (options.threads.has_value() && options.threads.value() != 1) {
         document["warnings"] = nlohmann::json::array(
-            {"--seed was supplied but the analytic engine is deterministic and ignores it"});
+            {fmt::format("--threads {} was supplied but this build runs single-threaded; "
+                         "multithreading arrives in Phase 12",
+                         options.threads.value())});
     }
 
     document["build_metadata"] = to_json(collect_build_info());

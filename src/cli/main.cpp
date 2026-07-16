@@ -6,6 +6,7 @@
 #include "options.hpp"
 #include "output.hpp"
 #include "price_command.hpp"
+#include "simulate_command.hpp"
 
 #include <fmt/format.h>
 #include <fmt/ostream.h>
@@ -50,6 +51,7 @@ namespace {
         case cli::CommandKind::Price:
             return cli::run_price(config.value(), options);
         case cli::CommandKind::Simulate:
+            return cli::run_simulate(config.value(), options);
         case cli::CommandKind::Validate:
         case cli::CommandKind::Experiment:
         case cli::CommandKind::Calibrate:

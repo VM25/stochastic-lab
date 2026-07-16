@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "command": "price",
+  "market": { "spot": 100.0, "rate": 0.05, "dividend_yield": 0.0 },
+  "instrument": {
+    "type": "asian",
+    "option_type": "call",
+    "averaging": "arithmetic",
+    "strike": 100.0,
+    "maturity": 1.0,
+    "monitoring_count": 12
+  },
+  "model": { "type": "black_scholes", "volatility": 0.20 },
+  "method": {
+    "type": "monte_carlo",
+    "paths": 200000,
+    "steps": 12,
+    "scheme": "exact",
+    "seed": 20260715
+  },
+  "greeks": false
+}

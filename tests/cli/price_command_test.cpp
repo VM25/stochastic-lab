@@ -149,23 +149,100 @@ TEST(PriceCommandTest, ReportsDiagnostics) {
 
 // Naming an unimplemented method must fail rather than quietly fall back to the
 // analytic engine, which would answer a question the configuration did not ask.
+//
+// Monte Carlo became supported in Phase 3, so the unimplemented case is now a
+// finite-difference method, which arrives in Phase 6.
 TEST(PriceCommandTest, RejectsUnimplementedMethod) {
     nlohmann::json config = base_config();
-    config["method"]["type"] = "monte_carlo";
+    config["method"]["type"] = "crank_nicolson";
 
     const auto result = run(config);
     ASSERT_FALSE(result.ok());
     EXPECT_EQ(result.error().code, ErrorCode::UnsupportedCombination);
-    EXPECT_NE(result.error().message.find("monte_carlo"), std::string::npos);
+    EXPECT_NE(result.error().message.find("crank_nicolson"), std::string::npos);
 }
 
+// Monte Carlo is now a supported method for a European option, and must produce
+// a price with its uncertainty rather than a bare number.
+TEST(PriceCommandTest, PricesEuropeanByMonteCarlo) {
+    nlohmann::json config = base_config();
+    config["method"] = {{"type", "monte_carlo"},
+                        {"paths", 100000},
+                        {"steps", 1},
+                        {"scheme", "exact"},
+                        {"seed", 20260715}};
+    config["greeks"] = false;
+
+    const auto result = run(config);
+    ASSERT_TRUE(result.ok()) << result.error().describe();
+
+    const nlohmann::json& priced = result.value()["result"];
+    EXPECT_EQ(priced["method"], "monte_carlo_exact");
+    ASSERT_TRUE(priced.contains("standard_error"));
+    ASSERT_TRUE(priced.contains("confidence_interval"));
+
+    // Hull 9th ed. Example 15.6 gives 4.76 for these terms; the interval must
+    // contain it.
+    EXPECT_LE(priced["confidence_interval"]["lower"].get<double>(), 4.76);
+    EXPECT_GE(priced["confidence_interval"]["upper"].get<double>(), 4.76);
+}
+
+// A stochastic method has no default seed: a run whose seed was chosen for it
+// cannot be reproduced from its own record.
+TEST(PriceCommandTest, MonteCarloRequiresASeed) {
+    nlohmann::json config = base_config();
+    config["method"] = {{"type", "monte_carlo"}, {"paths", 1000}, {"scheme", "exact"}};
+    config["greeks"] = false;
+
+    const auto result = run(config);
+    ASSERT_FALSE(result.ok());
+    EXPECT_NE(result.error().message.find("seed"), std::string::npos);
+}
+
+// Asian options became supported in Phase 3, so the unsupported case is now a
+// barrier, which arrives in Phase 7.
 TEST(PriceCommandTest, RejectsUnsupportedInstrument) {
     nlohmann::json config = base_config();
-    config["instrument"]["type"] = "asian";
+    config["instrument"]["type"] = "down_and_out";
 
     const auto result = run(config);
     ASSERT_FALSE(result.ok());
     EXPECT_EQ(result.error().code, ErrorCode::UnsupportedCombination);
+}
+
+// An arithmetic Asian has no closed form: the sum of lognormals is not
+// lognormal. Naming 'analytic' must fail rather than quietly price something
+// else.
+TEST(PriceCommandTest, RejectsAnalyticPricingOfAnArithmeticAsian) {
+    nlohmann::json config = base_config();
+    config["instrument"] = {{"type", "asian"},
+                            {"option_type", "call"},
+                            {"averaging", "arithmetic"},
+                            {"strike", 100.0},
+                            {"maturity", 1.0},
+                            {"monitoring_count", 12}};
+
+    const auto result = run(config);
+    ASSERT_FALSE(result.ok());
+    EXPECT_EQ(result.error().code, ErrorCode::UnsupportedCombination);
+}
+
+// An Asian price without its averaging convention and monitoring frequency is
+// ambiguous, so both are required rather than defaulted.
+TEST(PriceCommandTest, AsianRequiresItsAveragingConvention) {
+    nlohmann::json config = base_config();
+    config["instrument"] = {{"type", "asian"},
+                            {"option_type", "call"},
+                            {"strike", 100.0},
+                            {"maturity", 1.0},
+                            {"monitoring_count", 12}};
+    config["method"] = {
+        {"type", "monte_carlo"}, {"paths", 1000}, {"steps", 12}, {"scheme", "exact"}, {"seed", 1}};
+    config["greeks"] = false;
+
+    const auto result = run(config);
+    ASSERT_FALSE(result.ok()) << "averaging must not default";
+    EXPECT_NE(result.error().message.find("averaging"), std::string::npos);
 }
 
 TEST(PriceCommandTest, RejectsUnsupportedModel) {

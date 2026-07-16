@@ -87,6 +87,75 @@ Result<EuropeanOption> parse_european_option(const ConfigNode& node) {
     return EuropeanOption::create(*option_type, strike.value(), maturity.value());
 }
 
+Result<AsianOption> parse_asian_option(const ConfigNode& node) {
+    const Status unknown = node.reject_unknown_keys(
+        {"type", "option_type", "averaging", "strike", "maturity", "monitoring_count"});
+    if (!unknown) {
+        return Result<AsianOption>::failure(unknown.error());
+    }
+
+    auto instrument_type = node.string("type");
+    if (!instrument_type) {
+        return Result<AsianOption>::failure(std::move(instrument_type).error());
+    }
+    if (instrument_type.value() != "asian") {
+        return Result<AsianOption>::failure(
+            ErrorCode::UnsupportedCombination,
+            fmt::format("'{}.type' is '{}' but this parser builds Asian options; expected 'asian'",
+                        node.path(),
+                        instrument_type.value()),
+            kContext);
+    }
+
+    auto option_type_text = node.string("option_type");
+    if (!option_type_text) {
+        return Result<AsianOption>::failure(std::move(option_type_text).error());
+    }
+    const auto option_type = parse_option_type(option_type_text.value());
+    if (!option_type.has_value()) {
+        return Result<AsianOption>::failure(
+            ErrorCode::InvalidConfiguration,
+            fmt::format("'{}.option_type' is '{}'; expected 'call' or 'put'",
+                        node.path(),
+                        option_type_text.value()),
+            kContext);
+    }
+
+    // Required, not defaulted: an Asian price without its averaging convention is
+    // ambiguous, and choosing one silently would price a different contract.
+    auto averaging_text = node.string("averaging");
+    if (!averaging_text) {
+        return Result<AsianOption>::failure(std::move(averaging_text).error());
+    }
+    const auto averaging = parse_averaging_type(averaging_text.value());
+    if (!averaging.has_value()) {
+        return Result<AsianOption>::failure(
+            ErrorCode::InvalidConfiguration,
+            fmt::format("'{}.averaging' is '{}'; expected 'arithmetic' or 'geometric'",
+                        node.path(),
+                        averaging_text.value()),
+            kContext);
+    }
+
+    auto strike = node.positive_number("strike");
+    if (!strike) {
+        return Result<AsianOption>::failure(std::move(strike).error());
+    }
+
+    auto maturity = node.positive_number("maturity");
+    if (!maturity) {
+        return Result<AsianOption>::failure(std::move(maturity).error());
+    }
+
+    auto monitoring_count = node.positive_integer("monitoring_count");
+    if (!monitoring_count) {
+        return Result<AsianOption>::failure(std::move(monitoring_count).error());
+    }
+
+    return AsianOption::create(
+        *option_type, *averaging, strike.value(), maturity.value(), monitoring_count.value());
+}
+
 Result<BlackScholesModel> parse_black_scholes_model(const ConfigNode& node) {
     const Status unknown = node.reject_unknown_keys({"type", "volatility"});
     if (!unknown) {
@@ -114,6 +183,80 @@ Result<BlackScholesModel> parse_black_scholes_model(const ConfigNode& node) {
     }
 
     return BlackScholesModel::create(volatility.value());
+}
+
+Result<MonteCarloConfig> parse_monte_carlo_config(const ConfigNode& node,
+                                                  std::optional<std::uint64_t> seed_override) {
+    const Status unknown =
+        node.reject_unknown_keys({"type", "paths", "steps", "scheme", "seed", "confidence_level"});
+    if (!unknown) {
+        return Result<MonteCarloConfig>::failure(unknown.error());
+    }
+
+    MonteCarloConfig config;
+
+    auto paths = node.positive_integer("paths");
+    if (!paths) {
+        return Result<MonteCarloConfig>::failure(std::move(paths).error());
+    }
+    config.paths = paths.value();
+
+    auto steps = node.integer_or("steps", 1);
+    if (!steps) {
+        return Result<MonteCarloConfig>::failure(std::move(steps).error());
+    }
+    config.steps = steps.value();
+
+    auto scheme_text = node.string_or("scheme", "exact");
+    if (!scheme_text) {
+        return Result<MonteCarloConfig>::failure(std::move(scheme_text).error());
+    }
+    const auto scheme = parse_discretization_scheme(scheme_text.value());
+    if (!scheme.has_value()) {
+        return Result<MonteCarloConfig>::failure(
+            ErrorCode::InvalidConfiguration,
+            fmt::format("'{}.scheme' is '{}'; expected 'exact', 'euler_maruyama' or 'milstein'",
+                        node.path(),
+                        scheme_text.value()),
+            kContext);
+    }
+    config.scheme = *scheme;
+
+    auto confidence_level = node.number_or("confidence_level", 0.95);
+    if (!confidence_level) {
+        return Result<MonteCarloConfig>::failure(std::move(confidence_level).error());
+    }
+    config.confidence_level = confidence_level.value();
+
+    // --seed beats the file, and the precedence lives here so that no caller can
+    // reorder it. Without either, the run is rejected: a seed chosen implicitly
+    // cannot be reproduced from the record the run leaves behind (ADR-010).
+    if (seed_override.has_value()) {
+        config.seed = *seed_override;
+    } else {
+        if (!node.contains("seed")) {
+            return Result<MonteCarloConfig>::failure(
+                ErrorCode::InvalidConfiguration,
+                fmt::format("'{}.seed' is required for a stochastic method, and has no default: a "
+                            "run whose seed was chosen for it cannot be reproduced from its own "
+                            "record. Supply it in the configuration or with --seed.",
+                            node.path()),
+                kContext);
+        }
+        auto seed = node.integer("seed");
+        if (!seed) {
+            return Result<MonteCarloConfig>::failure(std::move(seed).error());
+        }
+        if (seed.value() < 0) {
+            return Result<MonteCarloConfig>::failure(
+                ErrorCode::InvalidConfiguration,
+                fmt::format("'{}.seed' must be non-negative but is {}", node.path(), seed.value()),
+                kContext);
+        }
+        config.seed = static_cast<std::uint64_t>(seed.value());
+    }
+
+    return Result<MonteCarloConfig>::success(config);
 }
 
 }  // namespace diffusionworks

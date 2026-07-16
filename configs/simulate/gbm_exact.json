@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "command": "simulate",
+  "market": { "spot": 100.0, "rate": 0.05, "dividend_yield": 0.02 },
+  "model": { "type": "black_scholes", "volatility": 0.30 },
+  "maturity": 2.0,
+  "method": {
+    "type": "monte_carlo",
+    "paths": 200000,
+    "steps": 8,
+    "scheme": "exact",
+    "seed": 20260715
+  }
+}
