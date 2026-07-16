@@ -350,3 +350,108 @@ jobs:
           find src -type f -name '*.cpp' \
             -exec clang-tidy -p build/debug --warnings-as-errors='*' {} +
           echo "OK: static analysis is clean"
+
+  # ---------------------------------------------------------------------------
+  # The experiment machinery must keep working, and its published records must
+  # keep matching the code that produced them.
+  #
+  # Not a re-run of the full studies: EXP-01 through EXP-04 at their published
+  # configuration take minutes and are stochastic, so asserting their exact
+  # numbers here would either be slow or flaky. What is checked is that every
+  # experiment still runs end to end from its stored configuration, still emits a
+  # complete record, and still reaches a defensible status -- and that the plotting
+  # layer can regenerate every published figure from the committed records, which
+  # EXPERIMENT-CATALOG's final gate requires.
+  # ---------------------------------------------------------------------------
+  experiments:
+    name: experiment records and figures
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Install plotting tooling
+        run: pip install 'matplotlib==3.9.4'
+
+      - name: Configure
+        env:
+          CC: gcc-13
+          CXX: g++-13
+        run: cmake --preset release
+
+      - name: Build
+        run: cmake --build --preset release
+
+      - name: Every experiment runs from its stored configuration
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/records
+          for id in EXP-01 EXP-02 EXP-03 EXP-04; do
+            ./build/release/src/diffusionworks experiment \
+              --config configs/experiment/convergence.json \
+              --id "$id" --output "/tmp/records/$id.json"
+          done
+
+      - name: Records carry every required artifact
+        run: |
+          set -euo pipefail
+          python3 - <<'EOF'
+          import json, pathlib, sys
+
+          # EXPERIMENT-CATALOG "Required Artifacts". A record missing any of these
+          # is not publishable, so a missing field fails the build rather than
+          # being noticed later by a reader.
+          required = [
+              "id", "name", "question", "status", "interpretation", "limitations",
+              "reproduction_command", "configuration", "results", "table",
+              "runtime_seconds", "build_metadata",
+          ]
+
+          failed = False
+          for path in sorted(pathlib.Path("/tmp/records").glob("*.json")):
+              record = json.loads(path.read_text())
+
+              for field in required:
+                  if field not in record:
+                      print(f"FAIL: {path.name} is missing '{field}'")
+                      failed = True
+
+              # An experiment claiming no limitations has not been thought about.
+              if not record.get("limitations"):
+                  print(f"FAIL: {path.name} lists no limitations")
+                  failed = True
+
+              # A failed experiment is a result and must be preserved, but it must
+              # not pass CI silently either.
+              if record["status"] == "fail":
+                  print(f"FAIL: {record['id']} reports status 'fail'")
+                  for limitation in record["limitations"]:
+                      print(f"  - {limitation}")
+                  failed = True
+              else:
+                  print(f"OK: {record['id']} {record['status']}")
+
+          sys.exit(1 if failed else 0)
+          EOF
+
+      - name: Every published figure regenerates from its record
+        run: |
+          set -euo pipefail
+          python3 python/plot_convergence.py /tmp/records/*.json --outdir /tmp/figures
+          # EXPERIMENT-CATALOG's final gate requires that all published charts can
+          # be regenerated automatically. Every figure committed under
+          # docs/figures/ must therefore be reproducible from a record.
+          for figure in docs/figures/*.png; do
+            name=$(basename "$figure")
+            if [ ! -f "/tmp/figures/$name" ]; then
+              echo "FAIL: $name is committed but no record regenerates it"
+              exit 1
+            fi
+          done
+          echo "OK: every committed figure regenerates from its record"

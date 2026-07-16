@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <string>
+#include <string_view>
 
 namespace diffusionworks::cli {
 
@@ -37,5 +38,12 @@ using diffusionworks::to_json;
 /// discarding the result (TESTING-STRATEGY section 8).
 [[nodiscard]] Status write_document(const std::filesystem::path& path,
                                     const nlohmann::json& document);
+
+/// Writes raw text to `path`, creating parent directories as needed.
+///
+/// Used for CSV artifacts, which are text rather than JSON. Shares
+/// write_document's failure handling: a stream that fails mid-write is reported
+/// rather than leaving a truncated file behind a successful exit code.
+[[nodiscard]] Status write_text(const std::filesystem::path& path, std::string_view text);
 
 }  // namespace diffusionworks::cli

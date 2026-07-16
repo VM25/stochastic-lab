@@ -2,7 +2,9 @@
 #include <diffusionworks/core/config.hpp>
 #include <diffusionworks/core/error.hpp>
 #include <diffusionworks/core/result.hpp>
+#include <diffusionworks/experiments/experiment.hpp>
 
+#include "experiment_command.hpp"
 #include "options.hpp"
 #include "output.hpp"
 #include "price_command.hpp"
@@ -52,8 +54,9 @@ namespace {
             return cli::run_price(config.value(), options);
         case cli::CommandKind::Simulate:
             return cli::run_simulate(config.value(), options);
-        case cli::CommandKind::Validate:
         case cli::CommandKind::Experiment:
+            return cli::run_experiment(config.value(), options);
+        case cli::CommandKind::Validate:
         case cli::CommandKind::Calibrate:
         case cli::CommandKind::Benchmark:
             break;
@@ -66,16 +69,43 @@ namespace {
         "cli");
 }
 
+/// Renders a document's summary table as CSV, when it has one.
+[[nodiscard]] dw::Result<std::string> document_csv(const nlohmann::json& document) {
+    if (!document.contains("table")) {
+        return dw::Result<std::string>::failure(
+            dw::ErrorCode::UnsupportedCombination,
+            "--format csv is not supported for a single valuation, which is not tabular. Use "
+            "console or json.",
+            "cli");
+    }
+
+    dw::CsvTable table;
+    table.headers = document.at("table").at("headers").get<std::vector<std::string>>();
+    table.rows = document.at("table").at("rows").get<std::vector<std::vector<std::string>>>();
+    return table.render();
+}
+
 /// Emits a result document in the requested format.
 [[nodiscard]] dw::Status emit(const nlohmann::json& document, const cli::Options& options) {
     const cli::OutputFormat format = options.format.value_or(cli::OutputFormat::Console);
 
     if (format == cli::OutputFormat::Csv) {
-        return dw::Status::failure(
-            dw::ErrorCode::UnsupportedCombination,
-            "--format csv is not supported for a single valuation, which is not tabular. Use "
-            "console or json.",
-            "cli");
+        auto csv = document_csv(document);
+        if (!csv) {
+            return dw::Status::failure(std::move(csv).error());
+        }
+        if (options.output.has_value()) {
+            // Not const: it is returned by value on the failure path, and const
+            // would force a copy where a move would do.
+            dw::Status written = cli::write_text(*options.output, csv.value());
+            if (!written) {
+                return written;
+            }
+            fmt::print(stdout, "wrote {}\n", options.output->string());
+            return dw::Status::success();
+        }
+        fmt::print(stdout, "{}", csv.value());
+        return dw::Status::success();
     }
 
     if (options.output.has_value()) {

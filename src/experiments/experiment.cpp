@@ -34,7 +34,9 @@ Result<std::string> CsvTable::render() const {
             // and look entirely plausible.
             return Result<std::string>::failure(
                 ErrorCode::InvalidArgument,
-                fmt::format("row {} has {} fields but there are {} headers", i, rows[i].size(),
+                fmt::format("row {} has {} fields but there are {} headers",
+                            i,
+                            rows[i].size(),
                             headers.size()),
                 "CsvTable::render");
         }

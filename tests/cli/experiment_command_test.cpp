@@ -1,0 +1,327 @@
+#include <diffusionworks/core/config.hpp>
+#include <diffusionworks/core/error.hpp>
+
+#include "experiment_command.hpp"
+#include "options.hpp"
+
+#include <gtest/gtest.h>
+
+#include <cmath>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace diffusionworks::cli {
+namespace {
+
+/// A configuration small enough to run in a test.
+///
+/// The defaults are sized for a real study and take minutes; these are cut to the
+/// smallest shape the machinery still accepts, which is the point of the test --
+/// the wiring, not the physics. The physics is tested in
+/// tests/experiments/convergence_test.cpp against its own acceptance rules.
+constexpr const char* kTinyConfig = R"({
+  "schema_version": 1,
+  "command": "experiment",
+  "convergence": {
+    "spot": 100.0,
+    "rate": 0.05,
+    "dividend_yield": 0.0,
+    "volatility": 0.30,
+    "maturity": 1.0,
+    "strike": 100.0,
+    "master_seed": 20260715,
+    "seed_count": 4,
+    "step_counts": [8, 16, 32],
+    "asymptotic_level_count": 3,
+    "strong_paths": 500,
+    "call_payoff_paths": 500,
+    "path_counts": [100, 400, 1600]
+  }
+})";
+
+ConfigDocument tiny_config() {
+    auto parsed = parse_config(kTinyConfig, "test.json");
+    EXPECT_TRUE(parsed.ok()) << parsed.error().describe();
+    return parsed.value();
+}
+
+Options options_for(const std::string& id) {
+    Options options;
+    options.command = CommandKind::Experiment;
+    options.experiment_id = id;
+    return options;
+}
+
+// ---------------------------------------------------------------------------
+// The record's required artifacts
+// ---------------------------------------------------------------------------
+
+// EXPERIMENT-CATALOG lists exactly what each experiment must produce. A record
+// missing any of these is not publishable, so the shape is pinned here rather
+// than left to whoever reads the JSON later.
+TEST(ExperimentCommandTest, RecordCarriesEveryRequiredArtifact) {
+    const auto document = run_experiment(tiny_config(), options_for("EXP-02"));
+    ASSERT_TRUE(document.ok()) << document.error().describe();
+
+    for (const char* field : {"id",
+                              "name",
+                              "question",
+                              "status",
+                              "interpretation",
+                              "limitations",
+                              "reproduction_command",
+                              "configuration",
+                              "results",
+                              "table",
+                              "runtime_seconds",
+                              "build_metadata",
+                              "configuration_source",
+                              "configuration_document"}) {
+        EXPECT_TRUE(document.value().contains(field)) << "missing required field: " << field;
+    }
+
+    EXPECT_EQ(document.value().at("id"), "EXP-02");
+    EXPECT_FALSE(document.value().at("interpretation").get<std::string>().empty());
+
+    // Limitations are populated even on a pass. An experiment that claims no
+    // limitations has not been thought about.
+    EXPECT_FALSE(document.value().at("limitations").empty());
+}
+
+// Provenance is part of the record, not decoration: a convergence slope produced
+// under different flags is a different result, and this project disables
+// floating-point contraction precisely because such things change answers.
+TEST(ExperimentCommandTest, RecordCarriesBuildProvenance) {
+    const auto document = run_experiment(tiny_config(), options_for("EXP-02"));
+    ASSERT_TRUE(document.ok());
+
+    const auto& build = document.value().at("build_metadata");
+    for (const char* field :
+         {"compiler_id", "compiler_version", "build_type", "build_flags", "git_commit"}) {
+        EXPECT_TRUE(build.contains(field)) << "missing provenance: " << field;
+    }
+}
+
+// The configuration travels with the result, so the artifact can be reproduced
+// from itself rather than from whatever the file happens to say later.
+TEST(ExperimentCommandTest, RecordEmbedsTheConfigurationItRanWith) {
+    const auto document = run_experiment(tiny_config(), options_for("EXP-02"));
+    ASSERT_TRUE(document.ok());
+
+    EXPECT_EQ(document.value().at("configuration").at("volatility"), 0.30);
+    EXPECT_EQ(document.value().at("configuration").at("strong_paths"), 500);
+    EXPECT_EQ(document.value().at("configuration_document").at("convergence").at("volatility"),
+              0.30);
+}
+
+TEST(ExperimentCommandTest, TableIsRectangularAndLabelled) {
+    const auto document = run_experiment(tiny_config(), options_for("EXP-02"));
+    ASSERT_TRUE(document.ok());
+
+    const auto headers = document.value().at("table").at("headers").get<std::vector<std::string>>();
+    const auto rows =
+        document.value().at("table").at("rows").get<std::vector<std::vector<std::string>>>();
+
+    ASSERT_FALSE(headers.empty());
+    ASSERT_FALSE(rows.empty());
+    for (const auto& row : rows) {
+        // A ragged CSV parses cleanly and shifts every column after the gap, so a
+        // plot drawn from it looks entirely plausible and is wrong.
+        EXPECT_EQ(row.size(), headers.size());
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Each experiment runs end to end
+// ---------------------------------------------------------------------------
+
+TEST(ExperimentCommandTest, EveryImplementedExperimentProducesARecord) {
+    for (const char* id : {"EXP-01", "EXP-02", "EXP-03", "EXP-04"}) {
+        const auto document = run_experiment(tiny_config(), options_for(id));
+        ASSERT_TRUE(document.ok()) << id << ": " << document.error().describe();
+        EXPECT_EQ(document.value().at("id"), id);
+
+        const std::string status = document.value().at("status");
+        // Any of the four statuses is a legitimate outcome at these tiny sample
+        // sizes -- what matters is that the record exists and says which.
+        EXPECT_TRUE(status == "pass" || status == "fail" || status == "warning" ||
+                    status == "inconclusive")
+            << id << " reported an unknown status: " << status;
+    }
+}
+
+// Regression: EXP-01's sweep levels must not share paths.
+//
+// A run of N paths at a given seed uses path indices 0..N-1, so sweeping N with
+// the seed fixed nests the levels -- the N=400 run re-uses every path the N=100
+// run used. That correlates the residuals, breaks the independence ordinary least
+// squares assumes, and narrows the fitted interval around a slope it has not
+// earned. The first EXP-01 run failed exactly this way: slope -0.5551 with a 95%
+// interval of [-0.5834, -0.5269], confidently excluding the theoretical -0.5. The
+// rate was never wrong.
+//
+// Checked exactly, on the seed regions themselves, rather than through a statistic
+// that could agree by chance. Each level must occupy a seed range disjoint from
+// every other level's; a path is a pure function of (seed, path index), so
+// disjoint seed ranges mean no shared paths, with no sampling argument required.
+TEST(ExperimentCommandTest, SamplingConvergenceLevelsDoNotSharePaths) {
+    const auto document = run_experiment(tiny_config(), options_for("EXP-01"));
+    ASSERT_TRUE(document.ok()) << document.error().describe();
+
+    const auto& points = document.value().at("results").at("scenarios").at(0).at("points");
+    ASSERT_GE(points.size(), 3U);
+
+    std::vector<std::pair<std::uint64_t, std::uint64_t>> ranges;
+    for (const auto& point : points) {
+        ranges.emplace_back(point.at("first_seed").get<std::uint64_t>(),
+                            point.at("last_seed").get<std::uint64_t>());
+    }
+
+    for (std::size_t i = 0; i < ranges.size(); ++i) {
+        for (std::size_t j = i + 1; j < ranges.size(); ++j) {
+            const bool disjoint =
+                ranges[i].second < ranges[j].first || ranges[j].second < ranges[i].first;
+            EXPECT_TRUE(disjoint) << "levels " << i << " and " << j << " share seed space: ["
+                                  << ranges[i].first << ", " << ranges[i].second << "] overlaps ["
+                                  << ranges[j].first << ", " << ranges[j].second
+                                  << "]. Nested levels correlate the fit's residuals and "
+                                  << "narrow its interval around a slope it has not earned.";
+        }
+    }
+}
+
+// The seed is part of a run's identity, so the command line must be able to
+// override the file without editing it.
+TEST(ExperimentCommandTest, CommandLineSeedOverridesTheConfiguration) {
+    Options options = options_for("EXP-02");
+    options.seed = 987654321;
+
+    const auto document = run_experiment(tiny_config(), options);
+    ASSERT_TRUE(document.ok()) << document.error().describe();
+    EXPECT_EQ(document.value().at("configuration").at("master_seed"), 987654321);
+}
+
+// ---------------------------------------------------------------------------
+// Rejection
+// ---------------------------------------------------------------------------
+
+TEST(ExperimentCommandTest, RequiresAnExperimentId) {
+    Options options;
+    options.command = CommandKind::Experiment;
+
+    const auto document = run_experiment(tiny_config(), options);
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidArgument);
+}
+
+TEST(ExperimentCommandTest, RejectsAnUnknownExperimentId) {
+    const auto document = run_experiment(tiny_config(), options_for("EXP-99"));
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::NotImplemented);
+    // The message must say what *is* available, or the user has to read the source.
+    EXPECT_NE(document.error().describe().find("EXP-01"), std::string::npos);
+}
+
+// A typo must fail loudly. Ignoring it would leave the default in place and
+// produce a plausible study of a model the author did not configure.
+TEST(ExperimentCommandTest, RejectsAnUnknownConfigurationKey) {
+    constexpr const char* kTypo = R"({
+      "schema_version": 1,
+      "command": "experiment",
+      "convergence": { "volatilty": 0.30 }
+    })";
+    auto parsed = parse_config(kTypo, "test.json");
+    ASSERT_TRUE(parsed.ok());
+
+    const auto document = run_experiment(parsed.value(), options_for("EXP-02"));
+    ASSERT_FALSE(document.ok());
+    // InvalidConfiguration, not InvalidArgument: the document parsed fine and was
+    // rejected on meaning, which is a distinction the error codes deliberately
+    // keep and a caller can act on differently.
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidConfiguration);
+    // The message must name the offending key, or the user cannot find the typo.
+    EXPECT_NE(document.error().describe().find("volatilty"), std::string::npos)
+        << document.error().describe();
+}
+
+// Two levels can be joined by a line of any slope, so a study configured with
+// them would report an assumption as a measurement.
+TEST(ExperimentCommandTest, RejectsTooFewGridLevels) {
+    constexpr const char* kTooFew = R"({
+      "schema_version": 1,
+      "command": "experiment",
+      "convergence": { "step_counts": [8, 16] }
+    })";
+    auto parsed = parse_config(kTooFew, "test.json");
+    ASSERT_TRUE(parsed.ok());
+
+    const auto document = run_experiment(parsed.value(), options_for("EXP-02"));
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidArgument);
+}
+
+TEST(ExperimentCommandTest, RejectsAnAsymptoticWindowWiderThanTheGrid) {
+    constexpr const char* kBadWindow = R"({
+      "schema_version": 1,
+      "command": "experiment",
+      "convergence": { "step_counts": [8, 16, 32], "asymptotic_level_count": 5 }
+    })";
+    auto parsed = parse_config(kBadWindow, "test.json");
+    ASSERT_TRUE(parsed.ok());
+
+    const auto document = run_experiment(parsed.value(), options_for("EXP-02"));
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidArgument);
+}
+
+TEST(ExperimentCommandTest, RejectsASingleSeed) {
+    constexpr const char* kOneSeed = R"({
+      "schema_version": 1,
+      "command": "experiment",
+      "convergence": { "seed_count": 1 }
+    })";
+    auto parsed = parse_config(kOneSeed, "test.json");
+    ASSERT_TRUE(parsed.ok());
+
+    const auto document = run_experiment(parsed.value(), options_for("EXP-01"));
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidArgument);
+}
+
+// ---------------------------------------------------------------------------
+// Argument parsing
+// ---------------------------------------------------------------------------
+
+TEST(ExperimentCommandTest, ParsesTheIdFlag) {
+    const std::vector<std::string_view> args{"experiment", "--config", "c.json", "--id", "EXP-02"};
+    const auto parsed = parse_arguments(args);
+    ASSERT_TRUE(parsed.ok()) << parsed.error().describe();
+    ASSERT_TRUE(parsed.value().experiment_id.has_value());
+    EXPECT_EQ(*parsed.value().experiment_id, "EXP-02");
+}
+
+// Silently ignoring a flag on the wrong command is how a run ends up not doing
+// what its command line says it did.
+TEST(ExperimentCommandTest, RejectsTheIdFlagOnOtherCommands) {
+    const std::vector<std::string_view> args{"price", "--config", "c.json", "--id", "EXP-02"};
+    const auto parsed = parse_arguments(args);
+    ASSERT_FALSE(parsed.ok());
+    EXPECT_EQ(parsed.error().code, ErrorCode::InvalidArgument);
+}
+
+TEST(ExperimentCommandTest, RejectsTheIdFlagWithoutAValue) {
+    const std::vector<std::string_view> args{"experiment", "--id"};
+    EXPECT_FALSE(parse_arguments(args).ok());
+}
+
+TEST(ExperimentCommandTest, HelpMentionsTheIdFlag) {
+    const std::string help = command_usage_text(CommandKind::Experiment);
+    EXPECT_NE(help.find("--id"), std::string::npos);
+
+    // And the flag must not be advertised where it is rejected.
+    EXPECT_EQ(command_usage_text(CommandKind::Price).find("--id"), std::string::npos);
+}
+
+}  // namespace
+}  // namespace diffusionworks::cli

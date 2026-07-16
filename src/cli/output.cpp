@@ -46,7 +46,6 @@ void append_key_value(std::string& out,
 
 }  // namespace
 
-
 nlohmann::json to_json(const PricingResult& result) {
     nlohmann::json document{
         {"value", result.value},
@@ -234,7 +233,11 @@ std::string render_console(const nlohmann::json& document) {
     return out;
 }
 
-Status write_document(const std::filesystem::path& path, const nlohmann::json& document) {
+namespace {
+
+/// Shared by write_document and write_text: both need the same directory
+/// creation, the same open failure, and the same mid-write check.
+Status write_bytes(const std::filesystem::path& path, std::string_view bytes) {
     if (path.has_parent_path()) {
         std::error_code ec;
         std::filesystem::create_directories(path.parent_path(), ec);
@@ -254,7 +257,7 @@ Status write_document(const std::filesystem::path& path, const nlohmann::json& d
                                kContext);
     }
 
-    out << document.dump(2) << "\n";
+    out << bytes;
     out.flush();
 
     // A stream that failed mid-write must not be reported as a successful run;
@@ -265,6 +268,16 @@ Status write_document(const std::filesystem::path& path, const nlohmann::json& d
     }
 
     return Status::success();
+}
+
+}  // namespace
+
+Status write_document(const std::filesystem::path& path, const nlohmann::json& document) {
+    return write_bytes(path, document.dump(2) + "\n");
+}
+
+Status write_text(const std::filesystem::path& path, std::string_view text) {
+    return write_bytes(path, text);
 }
 
 }  // namespace diffusionworks::cli

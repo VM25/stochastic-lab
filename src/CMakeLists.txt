@@ -18,6 +18,7 @@ target_sources(
             engines/geometric_asian_analytic.cpp
             engines/monte_carlo_engine.cpp
             experiments/convergence.cpp
+            experiments/convergence_experiments.cpp
             experiments/experiment.cpp
             experiments/scheme_moments.cpp
             instruments/asian_option.cpp
@@ -74,6 +75,7 @@ add_executable(diffusionworks)
 target_sources(
     diffusionworks
     PRIVATE cli/main.cpp
+            cli/experiment_command.cpp
             cli/options.cpp
             cli/output.cpp
             cli/price_command.cpp
@@ -103,6 +105,7 @@ set_target_properties(
 if(DW_BUILD_TESTS)
     add_library(
         diffusionworks_cli_lib STATIC
+        cli/experiment_command.cpp
         cli/options.cpp
         cli/output.cpp
         cli/price_command.cpp

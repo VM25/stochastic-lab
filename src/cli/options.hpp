@@ -70,6 +70,12 @@ struct Options {
     std::optional<std::uint64_t> seed;
     std::optional<unsigned int> threads;
     std::optional<OutputFormat> format;
+
+    /// Which catalog experiment to run, e.g. "EXP-02". Only meaningful for the
+    /// experiment command, which refuses to run without it: "run every experiment"
+    /// is not a default a numerics tool should assume from a bare invocation.
+    std::optional<std::string> experiment_id;
+
     bool help{false};
 };
 

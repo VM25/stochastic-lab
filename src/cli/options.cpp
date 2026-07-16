@@ -220,6 +220,22 @@ Result<Options> parse_arguments(const std::vector<std::string_view>& args) {
                     kContext);
             }
             options.format = format;
+        } else if (name == "--id") {
+            auto value = take_value(name);
+            if (!value) {
+                return Result<Options>::failure(std::move(value).error());
+            }
+            if (options.command != CommandKind::Experiment) {
+                // Accepted only where it means something. Silently ignoring a flag
+                // on the wrong command is how a run ends up not doing what its
+                // command line says it did.
+                return Result<Options>::failure(
+                    ErrorCode::InvalidArgument,
+                    fmt::format("--id applies to the experiment command, not '{}'",
+                                to_string(options.command)),
+                    kContext);
+            }
+            options.experiment_id = std::string(value.value());
         } else {
             return Result<Options>::failure(ErrorCode::InvalidArgument,
                                             fmt::format("unknown option '{}' for command '{}'",
@@ -302,6 +318,12 @@ std::string command_usage_text(CommandKind kind) {
             break;
     }
 
+    // Only the experiment command takes --id, so only its help mentions it.
+    const std::string command_options =
+        kind == CommandKind::Experiment
+            ? "      --id <EXP-NN>      Catalog experiment to run (required)\n"
+            : "";
+
     return fmt::format(R"(diffusionworks {0}
 
 {1}
@@ -314,14 +336,15 @@ Usage:
 Options:
   -c, --config <path>    Configuration file (JSON)
   -o, --output <path>    Write the result artifact to this path
-      --seed <n>         Master random seed; overrides the configuration
+{3}      --seed <n>         Master random seed; overrides the configuration
   -t, --threads <n>      Worker thread count; overrides the configuration
   -f, --format <fmt>     Output format: console, json, csv
   -h, --help             Show this help
 )",
                        to_string(kind),
                        description,
-                       detail);
+                       detail,
+                       command_options);
 }
 
 }  // namespace diffusionworks::cli
