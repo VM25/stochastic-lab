@@ -25,6 +25,7 @@ target_sources(
             instruments/european_option.cpp
             market/market_state.cpp
             models/black_scholes.cpp
+            numerics/tridiagonal.cpp
             random/random_stream.cpp
             simulation/gbm_path_generator.cpp
             simulation/gbm_stepper.cpp

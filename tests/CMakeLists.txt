@@ -69,7 +69,8 @@ add_dw_test(
 add_dw_test(
     dw_test_numerics
     LABEL unit
-    SOURCES numerics/normal_test.cpp)
+    SOURCES numerics/normal_test.cpp
+            numerics/tridiagonal_test.cpp)
 
 # --- Randomness -------------------------------------------------------------
 #
