@@ -73,9 +73,8 @@ Result<AssetGrid> AssetGrid::with_strike_on_node(double s_max, std::int64_t node
     if (nodes < kMinimumNodes) {
         return Result<AssetGrid>::failure(
             ErrorCode::InvalidArgument,
-            fmt::format("a grid needs at least {} nodes, but {} were requested",
-                        kMinimumNodes,
-                        nodes),
+            fmt::format(
+                "a grid needs at least {} nodes, but {} were requested", kMinimumNodes, nodes),
             kContext);
     }
 

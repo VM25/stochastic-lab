@@ -10,6 +10,7 @@
 #include <chrono>
 #include <cmath>
 #include <limits>
+#include <ranges>
 #include <utility>
 
 namespace diffusionworks {
@@ -160,8 +161,8 @@ FiniteDifferenceEngine::solve(const MarketState& market,
     diagnostics.explicit_stability_ratio = dtau / stability_limit.value();
     diagnostics.sign_structure_holds = operator_diagnostics.sign_structure_holds();
     diagnostics.peclet_violating_nodes =
-        static_cast<std::int64_t>(operator_diagnostics.negative_sub_diagonal_nodes.size() +
-                                  operator_diagnostics.negative_super_diagonal_nodes.size());
+        static_cast<std::int64_t>(operator_diagnostics.negative_sub_diagonal_nodes.size()) +
+        static_cast<std::int64_t>(operator_diagnostics.negative_super_diagonal_nodes.size());
 
     // The highest violating node, in price terms. This is the quantity that makes
     // the violation judgeable: it shrinks with dS, so refinement confines it to an
@@ -190,8 +191,7 @@ FiniteDifferenceEngine::solve(const MarketState& market,
     double worst_pivot = std::numeric_limits<double>::infinity();
     double worst_residual = 0.0;
     bool solved_any = false;
-    diagnostics.most_negative_value =
-        std::min(0.0, *std::min_element(current.begin(), current.end()));
+    diagnostics.most_negative_value = std::min(0.0, *std::ranges::min_element(current));
 
     for (std::int64_t step = 1; step <= config.time_steps; ++step) {
         const double tau = time.value().time_at(step);
@@ -276,7 +276,7 @@ FiniteDifferenceEngine::solve(const MarketState& market,
         }
 
         diagnostics.most_negative_value =
-            std::min(diagnostics.most_negative_value, *std::min_element(next.begin(), next.end()));
+            std::min(diagnostics.most_negative_value, *std::ranges::min_element(next));
 
         current.swap(next);
     }
@@ -294,7 +294,7 @@ FiniteDifferenceEngine::solve(const MarketState& market,
     // The tolerance scales with the value: a strict > 0 test would count rounding
     // noise in the flat far-field region, where the second difference is
     // legitimately zero to many digits.
-    const double value_scale = std::max(1.0, *std::max_element(current.begin(), current.end()));
+    const double value_scale = std::max(1.0, *std::ranges::max_element(current));
     for (std::size_t i = 1; i + 1 < n; ++i) {
         const double second_difference = current[i + 1] - 2.0 * current[i] + current[i - 1];
         if (second_difference < -1e-9 * value_scale) {

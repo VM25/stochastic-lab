@@ -88,7 +88,7 @@ struct PdeExperimentConfig {
 
 /// EXP-06: how do explicit, implicit, and Crank-Nicolson differ in stability,
 /// accuracy, and cost?
-[[nodiscard]] Result<ExperimentRecord> run_pde_stability_and_convergence(
-    const PdeExperimentConfig& config);
+[[nodiscard]] Result<ExperimentRecord>
+run_pde_stability_and_convergence(const PdeExperimentConfig& config);
 
 }  // namespace diffusionworks

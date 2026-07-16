@@ -44,8 +44,10 @@ Result<Context> make_context(const PdeExperimentConfig& c, double volatility, do
     if (!analytic.ok()) {
         return Result<Context>::failure(analytic.error());
     }
-    return Result<Context>::success(
-        Context{market.value(), option.value(), model.value(), analytic.value().value});
+    return Result<Context>::success(Context{.market = market.value(),
+                                            .option = option.value(),
+                                            .model = model.value(),
+                                            .analytic = analytic.value().value});
 }
 
 /// A fitted order with its interval, as JSON.
@@ -252,9 +254,11 @@ Result<ExperimentRecord> run_pde_stability_and_convergence(const PdeExperimentCo
         };
 
         const std::vector<Arm> arms{
-            {"implicit", PdeScheme::Implicit, 0},
-            {"crank_nicolson", PdeScheme::CrankNicolson, 0},
-            {"crank_nicolson_rannacher2", PdeScheme::CrankNicolson, 2},
+            {.label = "implicit", .scheme = PdeScheme::Implicit, .rannacher = 0},
+            {.label = "crank_nicolson", .scheme = PdeScheme::CrankNicolson, .rannacher = 0},
+            {.label = "crank_nicolson_rannacher2",
+             .scheme = PdeScheme::CrankNicolson,
+             .rannacher = 2},
         };
 
         for (const Arm& arm : arms) {

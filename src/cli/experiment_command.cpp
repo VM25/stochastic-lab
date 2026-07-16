@@ -303,8 +303,7 @@ Result<PdeExperimentConfig> parse_pde_config(const ConfigNode& root) {
     config.s_max_sweep_time_steps =
         read_integer("s_max_sweep_time_steps", config.s_max_sweep_time_steps);
     config.alignment_nodes = read_integer("alignment_nodes", config.alignment_nodes);
-    config.alignment_time_steps =
-        read_integer("alignment_time_steps", config.alignment_time_steps);
+    config.alignment_time_steps = read_integer("alignment_time_steps", config.alignment_time_steps);
     config.stability_nodes = read_integer("stability_nodes", config.stability_nodes);
 
     config.space_nodes = read_integers("space_nodes", config.space_nodes);
