@@ -2,6 +2,7 @@
 
 #include <diffusionworks/core/error.hpp>
 
+#include <string>
 #include <type_traits>
 #include <utility>
 #include <variant>

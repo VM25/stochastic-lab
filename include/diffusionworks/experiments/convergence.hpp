@@ -7,6 +7,7 @@
 #include <diffusionworks/simulation/gbm_stepper.hpp>
 #include <diffusionworks/statistics/regression.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <optional>
 #include <string>

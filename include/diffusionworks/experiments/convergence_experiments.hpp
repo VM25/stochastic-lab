@@ -3,6 +3,7 @@
 #include <diffusionworks/experiments/convergence.hpp>
 #include <diffusionworks/experiments/experiment.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <vector>
 

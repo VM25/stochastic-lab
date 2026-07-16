@@ -5,6 +5,7 @@
 #include <diffusionworks/simulation/gbm_stepper.hpp>
 #include <diffusionworks/simulation/time_grid.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <span>
 

@@ -316,6 +316,33 @@ jobs:
   # ---------------------------------------------------------------------------
   # Static analysis.
   # ---------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------
+  # A header must include what it names.
+  #
+  # This job exists because of a real failure. Moving ConfidenceInterval out of
+  # engines/pricing_result.hpp removed the only path by which
+  # statistics/multi_seed.hpp was seeing <optional>. It kept compiling on macOS,
+  # where libc++ supplies it through another route, and broke every compiling job
+  # here, where libstdc++ does not -- with an error naming a struct member, in a
+  # file the change never touched.
+  #
+  # The compiling jobs below would catch it again, but only after several minutes
+  # and with a diagnostic that points at the wrong file. This runs in a second and
+  # names the header and the include.
+  # ---------------------------------------------------------------------------
+  include-hygiene:
+    name: include hygiene
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Every header includes what it names
+        run: python3 scripts/check_includes.py
+
   static-analysis:
     name: clang-tidy
     runs-on: ubuntu-24.04

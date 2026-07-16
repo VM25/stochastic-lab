@@ -4,6 +4,7 @@
 #include <diffusionworks/statistics/online_moments.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace diffusionworks {

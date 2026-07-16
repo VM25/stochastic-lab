@@ -75,6 +75,16 @@ echo "==> clang-format --check (${#SOURCES[@]} files)"
 "$CLANG_FORMAT" --dry-run --Werror --style=file "${SOURCES[@]}"
 echo "    formatting clean"
 
+# --- Include hygiene --------------------------------------------------------
+#
+# Cheap, and it catches a class of defect the compilers here cannot: a header
+# leaning on a transitive include builds fine under libc++ and fails under
+# libstdc++, with an error naming a struct member in a file the change never
+# touched. Run before clang-tidy, which takes minutes.
+
+echo "==> include hygiene"
+python3 scripts/check_includes.py
+
 # --- Static analysis --------------------------------------------------------
 
 if [[ ! -f "$BUILD_DIR/compile_commands.json" ]]; then
