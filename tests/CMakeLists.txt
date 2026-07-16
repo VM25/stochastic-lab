@@ -81,7 +81,8 @@ add_dw_test(
 add_dw_test(
     dw_test_random
     LABEL unit
-    SOURCES random/philox_test.cpp)
+    SOURCES random/philox_test.cpp
+            random/reproducibility_test.cpp)
 
 add_dw_test(
     dw_test_random_stream

@@ -1,0 +1,332 @@
+{
+  "schema_version": 1,
+  "description": "Golden values for the DiffusionWorks random stream, separated by reproducibility tier.",
+  "reproducibility_tiers": {
+    "raw_words": {
+      "guarantee": "bit_exact_everywhere",
+      "reason": "Philox uses integer arithmetic only (multiply, xor, add on uint64). No floating point is involved, so no platform, compiler, or optimisation level can change it.",
+      "test_requirement": "exact equality"
+    },
+    "uniforms_hex": {
+      "guarantee": "bit_exact_everywhere",
+      "reason": "Every step of the transform is exact: the shift is integer, converting a 52-bit integer to double is exact, adding 0.5 is exact in that binade (spacing 0.5), and scaling by 2^-52 is a power of two. Nothing rounds.",
+      "test_requirement": "exact equality; stored as hex to make that explicit"
+    },
+    "normals": {
+      "guarantee": "tolerance_only_across_platforms",
+      "reason": "inverse_norm_cdf evaluates a rational polynomial for |p - 0.5| <= 0.425 (about 85% of draws), which uses only + - * / and is bit-exact on any IEEE-754 platform once contraction is disabled. The remaining ~15% take tail branches that call std::log, whose accuracy IEEE-754 does not specify: glibc, macOS libm and musl may each return a different last bit. Those draws are bit-reproducible on a fixed platform and toolchain, and agree to about an ulp across them.",
+      "test_requirement": "relative tolerance ~1e-14",
+      "note": "These are the true quantiles at 50 digits, not AS 241's output, so the fixture validates the algorithm rather than recording it."
+    }
+  },
+  "coordinates": {
+    "description": "A draw is f(master_seed, purpose, path, position). The map to Philox is key = (master_seed, purpose), counter = (position / 4, path, 0, 0), and the draw selects word (position mod 4) of the 256-bit output.",
+    "purpose_identifiers": {
+      "asset_shock": 0,
+      "variance_shock": 1,
+      "diagnostic": 1000
+    },
+    "purpose_identifiers_are_frozen": "These values are part of the reproducibility contract. Changing one changes every stored result that used it.",
+    "max_master_seed": "18446744073709551615",
+    "max_purpose": "18446744073709551615",
+    "max_path": "18446744073709551615",
+    "max_position": "18446744073709551615",
+    "words_per_block": 4
+  },
+  "provenance": {
+    "generator": "python/generate_random_stream_golden.py",
+    "mpmath_working_digits": 50,
+    "generated_utc": "2026-07-15T20:13:33Z",
+    "git_commit": "dd2a783b80ae04d5269a20be0ecc835af9a5ab01"
+  },
+  "cases": [
+    {
+      "name": "asset_seed0_path0",
+      "master_seed": "0",
+      "purpose": 0,
+      "path": "0",
+      "raw_words": [
+        "16554d9eca36314c",
+        "db20fe9d672d0fdc",
+        "d7e772cee186176b",
+        "7e68b68aec7ba23b",
+        "02f4ba6408e4d89b",
+        "3dd62b0b9ca8c5b2",
+        "1c8667a55d902e79",
+        "907d7a052fd5b4dc"
+      ],
+      "uniforms_hex": [
+        "0x1.6554d9eca3638p-4",
+        "0x1.b641fd3ace5a1p-1",
+        "0x1.afcee59dc30c3p-1",
+        "0x1.f9a2da2bb1eeap-2",
+        "0x1.7a5d3204726c0p-7",
+        "0x1.eeb1585ce5464p-3",
+        "0x1.c8667a55d9028p-4",
+        "0x1.20faf40a5fab7p-1"
+      ],
+      "normals": [
+        "-1.357954106242255382557248",
+        "1.062396801897207724432081",
+        "1.008427548489210559200561",
+        "-0.01557858675228984397106982",
+        "-2.271884148324595555605623",
+        "-0.7013279206286978531349060",
+        "-1.218980191079758198103770",
+        "0.1621715579164505031252495"
+      ]
+    },
+    {
+      "name": "asset_seed1_path0",
+      "master_seed": "1",
+      "purpose": 0,
+      "path": "0",
+      "raw_words": [
+        "cb7ea744cf19bb4c",
+        "a34eacbe1377d650",
+        "e8dbce5eb7b8301f",
+        "344790248cacfe2f",
+        "4db6a27b756282df",
+        "d944fa03babe0e2f",
+        "27f872e577060d32",
+        "07f697696a0482a2"
+      ],
+      "uniforms_hex": [
+        "0x1.96fd4e899e337p-1",
+        "0x1.469d597c26efbp-1",
+        "0x1.d1b79cbd6f707p-1",
+        "0x1.a23c81246567cp-3",
+        "0x1.36da89edd58a2p-2",
+        "0x1.b289f407757c1p-1",
+        "0x1.3fc3972bb8304p-3",
+        "0x1.fda5da5a81220p-6"
+      ],
+      "normals": [
+        "0.8235463949243593015641137",
+        "0.3529025001923654365827786",
+        "1.338320293804352082481764",
+        "-0.8266527119773468452778152",
+        "-0.5141658112314123629904806",
+        "1.030911121761340399100511",
+        "-1.010471272503731837930745",
+        "-1.864775535016337446559931"
+      ]
+    },
+    {
+      "name": "asset_seed20260715_path0",
+      "master_seed": "20260715",
+      "purpose": 0,
+      "path": "0",
+      "raw_words": [
+        "8f4fdeb4a88342fc",
+        "130cf8c5e685f1c8",
+        "cc3802508bb33932",
+        "e8f2269d88c6d87f",
+        "0f7f181c68bea4a8",
+        "188048e21e8abd1f",
+        "5cf031117009dfa6",
+        "aa0fb51f1fe8587e"
+      ],
+      "uniforms_hex": [
+        "0x1.1e9fbd6951069p-1",
+        "0x1.30cf8c5e685f8p-4",
+        "0x1.987004a117667p-1",
+        "0x1.d1e44d3b118dbp-1",
+        "0x1.efe3038d17d50p-5",
+        "0x1.88048e21e8ab8p-4",
+        "0x1.73c0c445c0276p-2",
+        "0x1.541f6a3e3fd0bp-1"
+      ],
+      "normals": [
+        "0.1504937736036039413607131",
+        "-1.443664517492601757412318",
+        "0.8335391284554540215867546",
+        "1.340415981634242934349354",
+        "-1.550314258507740106927593",
+        "-1.306404788295392601567187",
+        "-0.3503446392818965539977038",
+        "0.4242333447535762587434301"
+      ]
+    },
+    {
+      "name": "asset_seed20260715_path1",
+      "master_seed": "20260715",
+      "purpose": 0,
+      "path": "1",
+      "raw_words": [
+        "c169383f37b993a7",
+        "fa7b65c130964985",
+        "099f7e7d06a7d5a6",
+        "c4aed65405947f5e",
+        "511a15666b3481cc",
+        "da293468e02a7bf8",
+        "e236f259668576a2",
+        "7954f28336de380b"
+      ],
+      "uniforms_hex": [
+        "0x1.82d2707e6f733p-1",
+        "0x1.f4f6cb82612c9p-1",
+        "0x1.33efcfa0d4fb0p-5",
+        "0x1.895daca80b28fp-1",
+        "0x1.44685599acd22p-2",
+        "0x1.b45268d1c054fp-1",
+        "0x1.c46de4b2cd0afp-1",
+        "0x1.e553ca0cdb78ep-2"
+      ],
+      "normals": [
+        "0.6919377075996499615001149",
+        "2.022650363516800884767444",
+        "-1.779365410195605088859584",
+        "0.7332361811028931698484042",
+        "-0.4766540221630575065184446",
+        "1.045877634605070995861822",
+        "1.193437283820218579298812",
+        "-0.06533800129647083201217851"
+      ]
+    },
+    {
+      "name": "asset_seed20260715_path1000000",
+      "master_seed": "20260715",
+      "purpose": 0,
+      "path": "1000000",
+      "raw_words": [
+        "8708e124281e6317",
+        "cb7e311fb986f6ba",
+        "15822b572c9c3238",
+        "cf8b1c9b70e9c19f",
+        "4a1360a0b34d3b88",
+        "aa5331c5c4d3e843",
+        "5f2241147ecb3013",
+        "660373fde05b0157"
+      ],
+      "uniforms_hex": [
+        "0x1.0e11c248503cdp-1",
+        "0x1.96fc623f730dfp-1",
+        "0x1.5822b572c9c38p-4",
+        "0x1.9f163936e1d39p-1",
+        "0x1.284d8282cd34ep-2",
+        "0x1.54a6638b89a7dp-1",
+        "0x1.7c890451fb2cep-2",
+        "0x1.980dcff7816c2p-2"
+      ],
+      "normals": [
+        "0.06893479692412484026841238",
+        "0.8235216175133981226793666",
+        "-1.378545429467192542777680",
+        "0.8805394451690150823633934",
+        "-0.5552607040880902379950127",
+        "0.4270593393396661776286277",
+        "-0.3275752263369958802381702",
+        "-0.2572570059017027797924560"
+      ]
+    },
+    {
+      "name": "variance_seed20260715_path0",
+      "master_seed": "20260715",
+      "purpose": 1,
+      "path": "0",
+      "raw_words": [
+        "57c411454882d1b0",
+        "f87ab0849163f733",
+        "84734bc5feb6f588",
+        "190c9d318b80dd08",
+        "d0ab8edd870d48d2",
+        "b731df059f146037",
+        "003a22846d7e6bbc",
+        "402c4046232b581e"
+      ],
+      "uniforms_hex": [
+        "0x1.5f104515220b6p-2",
+        "0x1.f0f5610922c7fp-1",
+        "0x1.08e6978bfd6dfp-1",
+        "0x1.90c9d318b80d8p-4",
+        "0x1.a1571dbb0e1a9p-1",
+        "0x1.6e63be0b3e28dp-1",
+        "0x1.d114236bf3400p-11",
+        "0x1.00b101188cad6p-2"
+      ],
+      "normals": [
+        "-0.4047367792938399414200073",
+        "1.890016054855243716765182",
+        "0.04358972067942090151213132",
+        "-1.293907279188141754475393",
+        "0.8969146478497007418641278",
+        "0.5698336171504854420470314",
+        "-3.125648563908627434064668",
+        "-0.6723664506130549318767210"
+      ]
+    },
+    {
+      "name": "diagnostic_seed42_path7",
+      "master_seed": "42",
+      "purpose": 1000,
+      "path": "7",
+      "raw_words": [
+        "13026717192383b9",
+        "0cbb48d947f01e5d",
+        "495f05f1f04b7ff5",
+        "9e0a1e1066369985",
+        "af04e02d529e350a",
+        "e0ac843d195fe178",
+        "0770c94a5f8d96b0",
+        "1f615286ff00c0bd"
+      ],
+      "uniforms_hex": [
+        "0x1.3026717192388p-4",
+        "0x1.97691b28fe030p-5",
+        "0x1.257c17c7c12dep-2",
+        "0x1.3c143c20cc6d3p-1",
+        "0x1.5e09c05aa53c7p-1",
+        "0x1.c159087a32bfdp-1",
+        "0x1.dc325297e3660p-6",
+        "0x1.f615286ff00c8p-4"
+      ],
+      "normals": [
+        "-1.444811555255578574136277",
+        "-1.647450555094157940671629",
+        "-0.5633267903487234577087530",
+        "0.2985069921243973787346034",
+        "0.4779810317294663997224779",
+        "1.163232429160865602945825",
+        "-1.894720318328452488835131",
+        "-1.162191853291287043349599"
+      ]
+    },
+    {
+      "name": "max_seed_max_path",
+      "master_seed": "18446744073709551615",
+      "purpose": 0,
+      "path": "18446744073709551615",
+      "raw_words": [
+        "0262b1914125d2d5",
+        "a68416468ded71f6",
+        "1713000d06e99e2e",
+        "d6a4bafd66bf95d3",
+        "4ebd9b5c78bbc980",
+        "6091e393c21e5ee8",
+        "4f5e39bd7e5b65d5",
+        "d0fc1b404121a98d"
+      ],
+      "uniforms_hex": [
+        "0x1.3158c8a092ec0p-7",
+        "0x1.4d082c8d1bdafp-1",
+        "0x1.713000d06e998p-4",
+        "0x1.ad4975facd7f3p-1",
+        "0x1.3af66d71e2ef2p-2",
+        "0x1.82478e4f08796p-2",
+        "0x1.3d78e6f5f96dap-2",
+        "0x1.a1f8368082435p-1"
+      ],
+      "normals": [
+        "-2.352715436493320464014577",
+        "0.3865437276988585136825890",
+        "-1.339932348690470875316444",
+        "0.9881119451567562413852623",
+        "-0.5027197204627521675798143",
+        "-0.3127742525168611981640614",
+        "-0.4957610116410186263865227",
+        "0.9015305056834425447086269"
+      ]
+    }
+  ]
+}
