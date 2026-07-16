@@ -90,11 +90,18 @@ nlohmann::json local_orders_json(const std::vector<double>& h, const std::vector
 struct Run {
     double price{};
     double runtime_seconds{};
-    PdeDiagnostics diagnostics;
+    PdeDiagnostics diagnostics{};
     std::size_t warnings{};
     bool ok{};
     std::string failure;
 };
+
+// Every field is named at each construction below, including the ones taking their
+// default. Two toolchains disagree about the alternative: clang-tidy's
+// modernize-use-designated-initializers wants designated form, and GCC 13 warns
+// under -Wmissing-field-initializers when a designated list omits a member -- a
+// warning GCC 16 no longer emits, so a local GCC build does not reproduce it.
+// Naming every field satisfies both and depends on neither's version.
 
 Run execute(const Context& ctx, const PdeConfig& config) {
     const auto start = std::chrono::steady_clock::now();
@@ -105,7 +112,12 @@ Run execute(const Context& ctx, const PdeConfig& config) {
     if (!priced.ok()) {
         // Preserved, not discarded. A configuration that fails is evidence about
         // the scheme, and EXP-06 exists partly to produce exactly this.
-        return Run{.runtime_seconds = elapsed, .ok = false, .failure = priced.error().message};
+        return Run{.price = 0.0,
+                   .runtime_seconds = elapsed,
+                   .diagnostics = PdeDiagnostics{},
+                   .warnings = 0,
+                   .ok = false,
+                   .failure = priced.error().message};
     }
 
     const auto solution = FiniteDifferenceEngine::solve(ctx.market, ctx.option, ctx.model, config);
@@ -113,7 +125,8 @@ Run execute(const Context& ctx, const PdeConfig& config) {
                .runtime_seconds = elapsed,
                .diagnostics = solution.ok() ? solution.value().diagnostics : PdeDiagnostics{},
                .warnings = priced.value().warnings.size(),
-               .ok = true};
+               .ok = true,
+               .failure = {}};
 }
 
 }  // namespace
@@ -343,8 +356,11 @@ Result<ExperimentRecord> run_pde_stability_and_convergence(const PdeExperimentCo
         nlohmann::json levels = nlohmann::json::array();
         for (const double multiple : config.s_max_multiples) {
             const double s_max = multiple * config.strike;
-            const auto nodes =
-                static_cast<std::int64_t>(std::llround(s_max / config.s_max_sweep_spacing)) + 1;
+            // The node count grows with S_max so that dS stays where it is.
+            // llround already returns long long; naming int64_t here would be a
+            // no-op on this platform and a real conversion elsewhere, so the
+            // destination type does the work instead of a cast.
+            const std::int64_t nodes = std::llround(s_max / config.s_max_sweep_spacing) + 1;
 
             PdeConfig pde;
             pde.asset_nodes = nodes;

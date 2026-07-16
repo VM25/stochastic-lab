@@ -222,7 +222,7 @@ TEST(FiniteDifferenceTest, StabilityBoundIsSufficientNotNecessary) {
         const double dtau_max = (1.0 / 1000.0) / s.value().diagnostics.explicit_stability_ratio;
 
         PdeConfig config = probe;
-        config.time_steps = static_cast<std::int64_t>(std::llround(1.0 / (ratio * dtau_max)));
+        config.time_steps = std::llround(1.0 / (ratio * dtau_max));
         return FiniteDifferenceEngine::price(market, option, model, config);
     };
 
