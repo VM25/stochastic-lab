@@ -1,5 +1,7 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 #include <string>
 
 namespace diffusionworks {
@@ -54,5 +56,13 @@ struct BuildInfo {
 /// The compile-time half is fixed at build time; the run-time half is sampled on
 /// each call, so `timestamp_utc` differs between calls.
 [[nodiscard]] BuildInfo collect_build_info();
+
+/// Serialises provenance.
+///
+/// Lives beside BuildInfo rather than in the CLI because provenance is part of
+/// every published artifact, not a rendering concern. EXPERIMENT-CATALOG requires
+/// each experiment record to carry the compiler, hardware, and commit that
+/// produced it, and experiments/ must not reach into cli/ to say so.
+[[nodiscard]] nlohmann::json to_json(const BuildInfo& info);
 
 }  // namespace diffusionworks

@@ -1,7 +1,7 @@
 #pragma once
 
+#include <diffusionworks/core/interval.hpp>
 #include <diffusionworks/core/result.hpp>
-#include <diffusionworks/engines/pricing_result.hpp>
 
 #include <cstdint>
 

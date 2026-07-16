@@ -46,26 +46,6 @@ void append_key_value(std::string& out,
 
 }  // namespace
 
-nlohmann::json to_json(const BuildInfo& info) {
-    return nlohmann::json{
-        {"version", info.version},
-        {"compiler_id", info.compiler_id},
-        {"compiler_version", info.compiler_version},
-        {"build_type", info.build_type},
-        {"build_flags", info.build_flags},
-        {"cxx_standard", info.cxx_standard},
-        {"git_commit", info.git_commit},
-        {"git_commit_short", info.git_commit_short},
-        {"git_branch", info.git_branch},
-        {"git_dirty", info.git_dirty},
-        {"os_name", info.os_name},
-        {"os_version", info.os_version},
-        {"cpu_brand", info.cpu_brand},
-        {"logical_cores", info.logical_cores},
-        {"hostname", info.hostname},
-        {"timestamp_utc", info.timestamp_utc},
-    };
-}
 
 nlohmann::json to_json(const PricingResult& result) {
     nlohmann::json document{

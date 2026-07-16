@@ -103,7 +103,16 @@ add_dw_test(
     LABEL unit
     SOURCES statistics/distributions_test.cpp
             statistics/online_moments_test.cpp
-            statistics/multi_seed_test.cpp)
+            statistics/multi_seed_test.cpp
+            statistics/regression_test.cpp)
+
+# --- Experiments ------------------------------------------------------------
+
+add_dw_test(
+    dw_test_experiments
+    LABEL statistical
+    SOURCES experiments/scheme_moments_test.cpp
+            experiments/convergence_test.cpp)
 
 # --- Domain types -----------------------------------------------------------
 

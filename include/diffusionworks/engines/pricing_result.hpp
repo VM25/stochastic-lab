@@ -1,5 +1,10 @@
 #pragma once
 
+// ConfidenceInterval was defined here until the convergence framework needed it
+// in statistics/, which must not depend on engines/. Re-exported by this include
+// so every existing user of a PricingResult still sees the name.
+#include <diffusionworks/core/interval.hpp>
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -8,20 +13,6 @@
 #include <vector>
 
 namespace diffusionworks {
-
-/// A two-sided confidence interval for a stochastic estimate.
-struct ConfidenceInterval {
-    double lower{};
-    double upper{};
-
-    /// Nominal coverage, e.g. 0.95. Reported alongside the bounds because an
-    /// interval without its level is not interpretable.
-    double level{};
-
-    [[nodiscard]] double width() const noexcept { return upper - lower; }
-
-    [[nodiscard]] bool contains(double x) const noexcept { return x >= lower && x <= upper; }
-};
 
 /// A sensitivity that does not exist at the requested point, and why.
 struct UndefinedGreek {

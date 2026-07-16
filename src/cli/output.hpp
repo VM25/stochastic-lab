@@ -11,8 +11,10 @@
 
 namespace diffusionworks::cli {
 
-/// Serialises build and environment provenance.
-[[nodiscard]] nlohmann::json to_json(const BuildInfo& info);
+// Provenance serialisation now lives in core, beside BuildInfo. Re-exposed here
+// so that unqualified to_json(build_info) calls in this namespace still resolve:
+// the PricingResult overload below would otherwise hide it.
+using diffusionworks::to_json;
 
 /// Serialises a valuation.
 ///

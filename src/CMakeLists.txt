@@ -17,6 +17,9 @@ target_sources(
             engines/black_scholes_analytic.cpp
             engines/geometric_asian_analytic.cpp
             engines/monte_carlo_engine.cpp
+            experiments/convergence.cpp
+            experiments/experiment.cpp
+            experiments/scheme_moments.cpp
             instruments/asian_option.cpp
             instruments/european_option.cpp
             market/market_state.cpp
@@ -27,7 +30,8 @@ target_sources(
             simulation/time_grid.cpp
             statistics/distributions.cpp
             statistics/multi_seed.cpp
-            statistics/online_moments.cpp)
+            statistics/online_moments.cpp
+            statistics/regression.cpp)
 
 target_include_directories(
     diffusionworks_core
