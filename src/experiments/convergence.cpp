@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <ranges>
 #include <span>
 #include <utility>
 #include <vector>
@@ -326,10 +327,9 @@ Result<ConvergenceStudy> fit_convergence(std::string scheme,
 
     // Sorted coarse-to-fine so that "the finest levels" is a well-defined suffix
     // regardless of the order the caller measured them in.
-    std::sort(
-        levels.begin(), levels.end(), [](const ConvergenceLevel& a, const ConvergenceLevel& b) {
-            return a.step_size > b.step_size;
-        });
+    std::ranges::sort(levels, [](const ConvergenceLevel& a, const ConvergenceLevel& b) {
+        return a.step_size > b.step_size;
+    });
 
     ConvergenceStudy study;
     study.scheme = std::move(scheme);
@@ -343,10 +343,11 @@ Result<ConvergenceStudy> fit_convergence(std::string scheme,
         if (!(coarse.error > 0.0) || !(fine.error > 0.0)) {
             continue;
         }
-        study.local_orders.push_back(LocalOrder{coarse.steps,
-                                                fine.steps,
-                                                std::log(coarse.error / fine.error) /
-                                                    std::log(coarse.step_size / fine.step_size)});
+        study.local_orders.push_back(
+            LocalOrder{.coarse_steps = coarse.steps,
+                       .fine_steps = fine.steps,
+                       .order = std::log(coarse.error / fine.error) /
+                                std::log(coarse.step_size / fine.step_size)});
     }
 
     for (const ConvergenceLevel& l : levels) {
@@ -376,11 +377,12 @@ Result<ConvergenceStudy> fit_convergence(std::string scheme,
         return Result<ConvergenceStudy>::failure(full_interval.error());
     }
 
+    // The finest levels, as a suffix. subspan rather than pointer arithmetic: it
+    // carries the bound with it, so an off-by-one here is a contract violation
+    // rather than a silent read past the end of the sweep.
     const std::size_t offset = levels.size() - asymptotic_level_count;
-    const std::span<const double> tail_steps{step_sizes.data() + offset, asymptotic_level_count};
-    const std::span<const double> tail_errors{errors.data() + offset, asymptotic_level_count};
-
-    const auto asymptotic = fit_power_law(tail_steps, tail_errors);
+    const auto asymptotic = fit_power_law(std::span<const double>(step_sizes).subspan(offset),
+                                          std::span<const double>(errors).subspan(offset));
     if (!asymptotic.ok()) {
         return Result<ConvergenceStudy>::failure(asymptotic.error());
     }
@@ -404,10 +406,8 @@ Result<ConvergenceStudy> fit_convergence(std::string scheme,
     // collapses to a point, and containment would reject every order including the
     // true one. There the only meaningful slack is the neglected higher-order term,
     // so a documented tolerance is used instead.
-    const bool exact_study =
-        std::all_of(levels.begin(), levels.end(), [](const ConvergenceLevel& l) {
-            return l.source == ErrorSource::Analytic;
-        });
+    const bool exact_study = std::ranges::all_of(
+        levels, [](const ConvergenceLevel& l) { return l.source == ErrorSource::Analytic; });
 
     const auto consistent_with = [&](const LinearFit& fit, const ConfidenceInterval& interval) {
         return exact_study ? std::abs(fit.slope - theoretical_order) <= kAnalyticOrderTolerance
