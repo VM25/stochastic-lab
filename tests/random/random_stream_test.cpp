@@ -1,3 +1,4 @@
+#include <diffusionworks/core/error.hpp>
 #include <diffusionworks/random/random_stream.hpp>
 #include <diffusionworks/statistics/online_moments.hpp>
 
@@ -5,7 +6,9 @@
 
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <set>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -366,13 +369,17 @@ TEST(CorrelatedNormalsTest, RecoversTheRequestedCorrelation) {
     constexpr int kSamples = 1000000;
 
     for (const double rho : {-0.9, -0.5, 0.0, 0.3, 0.7, 0.95}) {
+        const auto made = CorrelationCoefficient::create(rho);
+        ASSERT_TRUE(made.ok()) << made.error().describe();
+        const CorrelationCoefficient coefficient = made.value();
+
         OnlineCovariance covariance;
         RandomStream asset(kSeed, StreamPurpose::AssetShock, 0);
         RandomStream variance(kSeed, StreamPurpose::VarianceShock, 0);
 
         for (int i = 0; i < kSamples; ++i) {
             const CorrelatedNormals pair =
-                correlate(asset.next_normal(), variance.next_normal(), rho);
+                correlate(asset.next_normal(), variance.next_normal(), coefficient);
             covariance.add(pair.first, pair.second);
         }
 
@@ -393,13 +400,16 @@ TEST(CorrelatedNormalsTest, BothMarginalsRemainStandardNormal) {
     constexpr int kSamples = 1000000;
     constexpr double rho = 0.7;
 
+    const CorrelationCoefficient coefficient = CorrelationCoefficient::create(rho).value();
+
     OnlineMoments first_moments;
     OnlineMoments second_moments;
     RandomStream asset(kSeed, StreamPurpose::AssetShock, 5);
     RandomStream variance(kSeed, StreamPurpose::VarianceShock, 5);
 
     for (int i = 0; i < kSamples; ++i) {
-        const CorrelatedNormals pair = correlate(asset.next_normal(), variance.next_normal(), rho);
+        const CorrelatedNormals pair =
+            correlate(asset.next_normal(), variance.next_normal(), coefficient);
         first_moments.add(pair.first);
         second_moments.add(pair.second);
     }
@@ -416,17 +426,20 @@ TEST(CorrelatedNormalsTest, BothMarginalsRemainStandardNormal) {
 // two runs stay comparable.
 TEST(CorrelatedNormalsTest, FirstComponentIsUnchanged) {
     for (const double rho : {-1.0, -0.5, 0.0, 0.5, 1.0}) {
-        const CorrelatedNormals pair = correlate(1.234, -0.567, rho);
+        const CorrelationCoefficient coefficient = CorrelationCoefficient::create(rho).value();
+        const CorrelatedNormals pair = correlate(1.234, -0.567, coefficient);
         EXPECT_DOUBLE_EQ(pair.first, 1.234) << "rho = " << rho;
     }
 }
 
 TEST(CorrelatedNormalsTest, HandlesPerfectCorrelation) {
-    const CorrelatedNormals positive = correlate(1.5, -2.0, 1.0);
+    const CorrelatedNormals positive =
+        correlate(1.5, -2.0, CorrelationCoefficient::create(1.0).value());
     EXPECT_DOUBLE_EQ(positive.first, 1.5);
     EXPECT_DOUBLE_EQ(positive.second, 1.5) << "rho = 1 must make the components identical";
 
-    const CorrelatedNormals negative = correlate(1.5, -2.0, -1.0);
+    const CorrelatedNormals negative =
+        correlate(1.5, -2.0, CorrelationCoefficient::create(-1.0).value());
     EXPECT_DOUBLE_EQ(negative.second, -1.5) << "rho = -1 must make them exact opposites";
 }
 
@@ -434,16 +447,113 @@ TEST(CorrelatedNormalsTest, HandlesPerfectCorrelation) {
 // unguarded sqrt would return NaN and poison every path that touched it.
 TEST(CorrelatedNormalsTest, StaysFiniteAtTheCorrelationBoundary) {
     for (const double rho : {-1.0, 1.0, -0.9999999999999999, 0.9999999999999999}) {
-        const CorrelatedNormals pair = correlate(0.5, 0.5, rho);
+        const auto made = CorrelationCoefficient::create(rho);
+        ASSERT_TRUE(made.ok()) << "rho = " << rho << ": " << made.error().describe();
+        const CorrelatedNormals pair = correlate(0.5, 0.5, made.value());
         EXPECT_TRUE(std::isfinite(pair.first)) << "rho = " << rho;
         EXPECT_TRUE(std::isfinite(pair.second)) << "rho = " << rho;
     }
 }
 
 TEST(CorrelatedNormalsTest, ZeroCorrelationPassesBothThrough) {
-    const CorrelatedNormals pair = correlate(1.5, -2.5, 0.0);
+    const CorrelatedNormals pair =
+        correlate(1.5, -2.5, CorrelationCoefficient::create(0.0).value());
     EXPECT_DOUBLE_EQ(pair.first, 1.5);
     EXPECT_DOUBLE_EQ(pair.second, -2.5);
+}
+
+// ---------------------------------------------------------------------------
+// Correlation validation
+//
+// The gap this closes: an unchecked correlate() given rho = 2 computes
+// sqrt(1 - 4), clamps the negative argument to zero, and returns a perfectly
+// plausible pair carrying a correlation of 1 rather than the 2 requested. No
+// downstream test would catch it -- the marginals stay standard normal and the
+// pair looks entirely reasonable. Validation at construction makes the invalid
+// state unrepresentable instead.
+// ---------------------------------------------------------------------------
+
+TEST(CorrelationCoefficientTest, AcceptsTheClosedUnitInterval) {
+    for (const double rho : {-1.0, -0.9999, -0.5, 0.0, 0.5, 0.9999, 1.0}) {
+        const auto made = CorrelationCoefficient::create(rho);
+        ASSERT_TRUE(made.ok()) << "rho = " << rho << ": " << made.error().describe();
+        EXPECT_DOUBLE_EQ(made.value().value(), rho);
+    }
+}
+
+TEST(CorrelationCoefficientTest, RejectsMagnitudesAboveOne) {
+    for (const double rho : {1.0000000001, 2.0, -2.0, 1e300, -1e300}) {
+        const auto made = CorrelationCoefficient::create(rho);
+        ASSERT_FALSE(made.ok()) << "rho = " << rho << " was accepted";
+        EXPECT_EQ(made.error().code, ErrorCode::InvalidArgument);
+        EXPECT_NE(made.error().message.find("[-1, 1]"), std::string::npos);
+    }
+}
+
+TEST(CorrelationCoefficientTest, RejectsNonFiniteInputs) {
+    for (const double rho : {std::numeric_limits<double>::quiet_NaN(),
+                             std::numeric_limits<double>::infinity(),
+                             -std::numeric_limits<double>::infinity()}) {
+        const auto made = CorrelationCoefficient::create(rho);
+        ASSERT_FALSE(made.ok()) << "a non-finite correlation was accepted";
+        EXPECT_EQ(made.error().code, ErrorCode::InvalidArgument);
+    }
+}
+
+// The complement is what an out-of-range rho would have corrupted silently.
+TEST(CorrelationCoefficientTest, ComplementMatchesTheCholeskyFactor) {
+    for (const double rho : {-0.9, -0.5, 0.0, 0.5, 0.9}) {
+        const CorrelationCoefficient coefficient = CorrelationCoefficient::create(rho).value();
+        EXPECT_NEAR(coefficient.complement(), std::sqrt(1.0 - rho * rho), 1e-15) << "rho = " << rho;
+    }
+}
+
+// At |rho| = 1 the true complement is exactly zero, and rounding in 1 - rho*rho
+// can make the argument marginally negative. Clamping there is legitimate --
+// bounded by an ulp -- unlike clamping rho = 2, which is a caller error.
+TEST(CorrelationCoefficientTest, ComplementIsExactlyZeroAtPerfectCorrelation) {
+    for (const double rho : {-1.0, 1.0}) {
+        const CorrelationCoefficient coefficient = CorrelationCoefficient::create(rho).value();
+        EXPECT_DOUBLE_EQ(coefficient.complement(), 0.0) << "rho = " << rho;
+        EXPECT_TRUE(std::isfinite(coefficient.complement()));
+    }
+}
+
+// The regression for the silent-clamp defect: rho = 2 must never reach correlate.
+TEST(CorrelationCoefficientTest, OutOfRangeCorrelationCannotProduceAPlausiblePair) {
+    const auto made = CorrelationCoefficient::create(2.0);
+    ASSERT_FALSE(made.ok())
+        << "rho = 2 was accepted; correlate would have clamped sqrt(1-4) to zero and returned a "
+           "pair with correlation 1, which is a wrong number that looks right";
+}
+
+// Non-finite normals must not be laundered into finite-looking output. correlate
+// does not validate its draws -- the stream cannot produce a non-finite one -- so
+// this pins that a NaN in propagates rather than vanishing.
+TEST(CorrelatedNormalsTest, NonFiniteInputsPropagateRatherThanBeingHidden) {
+    const CorrelationCoefficient coefficient = CorrelationCoefficient::create(0.5).value();
+    constexpr double kNaN = std::numeric_limits<double>::quiet_NaN();
+
+    const CorrelatedNormals from_first = correlate(kNaN, 1.0, coefficient);
+    EXPECT_TRUE(std::isnan(from_first.first));
+    EXPECT_TRUE(std::isnan(from_first.second)) << "a NaN first shock vanished from the second";
+
+    const CorrelatedNormals from_second = correlate(1.0, kNaN, coefficient);
+    EXPECT_TRUE(std::isfinite(from_second.first)) << "the first component must pass through";
+    EXPECT_TRUE(std::isnan(from_second.second));
+}
+
+// At rho = 1 the second shock is multiplied by a zero complement, so a NaN there
+// is annihilated: 0 * NaN is NaN in IEEE, not zero. Pinned because the opposite
+// would be a silent laundering of an invalid state.
+TEST(CorrelatedNormalsTest, PerfectCorrelationDoesNotLaunderANonFiniteSecondShock) {
+    const CorrelationCoefficient coefficient = CorrelationCoefficient::create(1.0).value();
+    const CorrelatedNormals pair =
+        correlate(1.0, std::numeric_limits<double>::quiet_NaN(), coefficient);
+
+    EXPECT_DOUBLE_EQ(pair.first, 1.0);
+    EXPECT_TRUE(std::isnan(pair.second))
+        << "0 * NaN must remain NaN; a zero complement must not erase an invalid shock";
 }
 
 }  // namespace

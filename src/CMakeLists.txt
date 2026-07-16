@@ -18,6 +18,7 @@ target_sources(
             instruments/european_option.cpp
             market/market_state.cpp
             models/black_scholes.cpp
+            random/random_stream.cpp
             statistics/distributions.cpp
             statistics/multi_seed.cpp
             statistics/online_moments.cpp)

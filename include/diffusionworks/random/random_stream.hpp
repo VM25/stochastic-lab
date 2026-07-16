@@ -1,11 +1,13 @@
 #pragma once
 
+#include <diffusionworks/core/result.hpp>
 #include <diffusionworks/numerics/normal.hpp>
 #include <diffusionworks/random/philox.hpp>
 
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <limits>
 
 namespace diffusionworks {
 
@@ -16,8 +18,10 @@ namespace diffusionworks {
 /// shocks are correlated by construction; if they also shared a stream they
 /// would be the *same* number, and the correlation would be a fiction.
 ///
-/// Values are part of the reproducibility contract: changing one changes every
-/// stored result that used it, so they are fixed rather than incidental.
+/// The numeric values are FROZEN. They are part of the reproducibility contract:
+/// changing one silently changes every stored result that used it, while leaving
+/// the code looking correct. New purposes take new values; existing ones are
+/// never renumbered, and gaps are never reused. A test pins them.
 enum class StreamPurpose : std::uint64_t {
     /// Shocks driving the asset price.
     AssetShock = 0,
@@ -27,6 +31,50 @@ enum class StreamPurpose : std::uint64_t {
 
     /// Draws used by tests and diagnostics, kept away from pricing streams.
     Diagnostic = 1000,
+};
+
+/// The coordinate space, and why it cannot collide.
+///
+/// A draw is identified by four coordinates and a lane:
+///
+///     value = f(master_seed, purpose, path, position)
+///
+/// mapped onto Philox as
+///
+///     key     = (master_seed, purpose)
+///     counter = (position / 4, path, 0, 0)
+///     lane    = position mod 4
+///
+/// Collision-freedom is structural rather than statistical. Philox is a bijection
+/// on (counter, key), so distinct (counter, key) pairs give distinct 256-bit
+/// outputs; and the map above is injective, since master_seed, purpose, path and
+/// position / 4 are each recoverable from the pair, with the lane selecting a
+/// word inside that block. Two different coordinate tuples therefore cannot
+/// address the same value -- no birthday bound, no seeding heuristic, no
+/// assumption of independence between separately seeded generators.
+///
+/// Every coordinate is a full uint64 and none is narrowed, so no cast can
+/// truncate one. The limits below are exhaustive rather than advisory:
+struct StreamLimits {
+    /// Largest master seed. The whole 64-bit space is usable.
+    static constexpr std::uint64_t kMaxMasterSeed = std::numeric_limits<std::uint64_t>::max();
+
+    /// Largest purpose identifier.
+    static constexpr std::uint64_t kMaxPurpose = std::numeric_limits<std::uint64_t>::max();
+
+    /// Largest path index. 1.8e19 paths; a run at 1e9 paths per second would need
+    /// ~585 years to exhaust it.
+    static constexpr std::uint64_t kMaxPath = std::numeric_limits<std::uint64_t>::max();
+
+    /// Largest position within a path, i.e. the deepest time step or dimension.
+    ///
+    /// position / 4 must not overflow the counter word, and it cannot: dividing a
+    /// uint64 by 4 yields at most 2^62 - 1, comfortably inside counter[0]. The
+    /// binding limit is position itself.
+    static constexpr std::uint64_t kMaxPosition = std::numeric_limits<std::uint64_t>::max();
+
+    /// Philox emits four 64-bit words per block; `position mod 4` selects the lane.
+    static constexpr std::uint64_t kWordsPerBlock = 4;
 };
 
 /// Maps a 64-bit word to a uniform in the open interval (0, 1).
@@ -126,13 +174,12 @@ public:
     [[nodiscard]] std::uint64_t path() const noexcept { return path_; }
 
 private:
-    /// Philox emits four words per block, so consecutive draws within a block are
-    /// served from the buffer and only every fourth costs a round of mixing.
-    static constexpr std::uint64_t kWordsPerBlock = 4;
-
     [[nodiscard]] std::uint64_t next_bits() noexcept {
-        const std::uint64_t block = position_ / kWordsPerBlock;
-        const std::uint64_t word = position_ % kWordsPerBlock;
+        // Philox emits four words per block, so consecutive draws within a block
+        // are served from the buffer and only every fourth costs a round of
+        // mixing.
+        const std::uint64_t block = position_ / StreamLimits::kWordsPerBlock;
+        const std::uint64_t word = position_ % StreamLimits::kWordsPerBlock;
 
         if (!buffer_valid_ || block != buffered_block_) {
             // counter[0] indexes blocks along the path and counter[1] the path
@@ -164,24 +211,60 @@ struct CorrelatedNormals {
     double second{};
 };
 
-/// Draws two standard normals with correlation rho.
+/// A validated correlation coefficient with its Cholesky complement precomputed.
+///
+/// Exists because correlate() sits in the innermost path loop, where validating
+/// on every call would be both wasteful and, worse, untrustworthy: an unchecked
+/// correlate() given rho = 2 would compute sqrt(1 - 4), clamp the negative
+/// argument to zero, and silently return a perfectly plausible pair carrying a
+/// correlation of 1 rather than the 2 that was asked for. That is precisely the
+/// class of failure this project refuses -- a wrong number that looks right.
+///
+/// Following the project's domain-type pattern (ADR-006), validation happens once
+/// at construction and the hot loop consumes a value that cannot be invalid.
+/// Precomputing sqrt(1 - rho^2) is a consequence rather than the motive: it also
+/// removes a square root from every draw.
+class CorrelationCoefficient {
+public:
+    /// Validates and constructs. Requires rho in [-1, 1] and finite.
+    ///
+    /// The interval is closed: perfect correlation is degenerate but meaningful
+    /// (the two shocks coincide), and rejecting it would rule out a limit the
+    /// validation plan requires testing.
+    [[nodiscard]] static Result<CorrelationCoefficient> create(double rho);
+
+    [[nodiscard]] double value() const noexcept { return rho_; }
+
+    /// \f$ \sqrt{1-\rho^2} \f$, the off-diagonal Cholesky factor.
+    [[nodiscard]] double complement() const noexcept { return complement_; }
+
+private:
+    CorrelationCoefficient(double rho, double complement) noexcept
+        : rho_(rho), complement_(complement) {}
+
+    double rho_;
+    double complement_;
+};
+
+/// Combines two independent standard normals into a correlated pair.
 ///
 /// \f[ Z_1 = Z_1, \qquad Z_2' = \rho Z_1 + \sqrt{1-\rho^2}\, Z_2 \f]
 ///
 /// This is MATHEMATICAL-SPEC section 8, and is the Cholesky factor of a 2x2
-/// correlation matrix written out. The first component is passed through
-/// unchanged, which matters for reproducibility: switching a model from
-/// independent to correlated shocks leaves the asset's own draws untouched, so
-/// the two runs remain comparable.
+/// correlation matrix written out. The first component passes through unchanged,
+/// which matters for reproducibility: switching a model from independent to
+/// correlated shocks leaves the asset's own draws untouched, so the two runs
+/// remain comparable.
 ///
 /// The two normals must come from different streams. Drawing both from one would
-/// make Z_2 the draw after Z_1 rather than an independent one -- still
+/// make z2 the draw after z1 rather than an independent one -- still
 /// reproducible, and still wrong.
-[[nodiscard]] inline CorrelatedNormals correlate(double z1, double z2, double rho) noexcept {
-    // sqrt is guarded against a negative argument from rounding when |rho| is at
-    // or just past 1; the caller's validation admits exactly [-1, 1].
-    const double complement = std::sqrt(std::max(0.0, 1.0 - rho * rho));
-    return CorrelatedNormals{z1, rho * z1 + complement * z2};
+///
+/// Unchecked by design: the coefficient carries its own validity, so there is
+/// nothing left to check here.
+[[nodiscard]] inline CorrelatedNormals
+correlate(double z1, double z2, const CorrelationCoefficient& rho) noexcept {
+    return CorrelatedNormals{z1, rho.value() * z1 + rho.complement() * z2};
 }
 
 }  // namespace diffusionworks
