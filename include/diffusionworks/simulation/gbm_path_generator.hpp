@@ -28,6 +28,20 @@ struct PathDiagnostics {
     std::int64_t non_positive_states{0};
 };
 
+/// Which member of an antithetic pair to generate.
+enum class PathVariate : std::uint8_t {
+    /// The path driven by Z.
+    Primary,
+
+    /// The path driven by -Z, sharing the primary's coordinates exactly.
+    ///
+    /// A reflection of the same draw, not another sample. Because the uniform is
+    /// mapped through a monotone inverse CDF that is odd about u = 0.5, the
+    /// antithetic shock is the exact negation of the primary's -- so the pair is
+    /// genuinely antithetic rather than approximately so.
+    Antithetic,
+};
+
 /// Generates GBM paths on a fixed grid.
 ///
 /// A path is a pure function of its index. Path 500 is the same sequence whether
@@ -69,7 +83,10 @@ public:
     /// because it is a genuine and expected property of the explicit schemes
     /// whose bias the experiments exist to measure.
     [[nodiscard]] Result<PathDiagnostics>
-    generate(std::uint64_t master_seed, std::uint64_t path_index, std::span<double> out) const;
+    generate(std::uint64_t master_seed,
+             std::uint64_t path_index,
+             std::span<double> out,
+             PathVariate variate = PathVariate::Primary) const;
 
     [[nodiscard]] const TimeGrid& grid() const noexcept { return grid_; }
 

@@ -187,8 +187,15 @@ Result<BlackScholesModel> parse_black_scholes_model(const ConfigNode& node) {
 
 Result<MonteCarloConfig> parse_monte_carlo_config(const ConfigNode& node,
                                                   std::optional<std::uint64_t> seed_override) {
-    const Status unknown =
-        node.reject_unknown_keys({"type", "paths", "steps", "scheme", "seed", "confidence_level"});
+    const Status unknown = node.reject_unknown_keys({"type",
+                                                     "paths",
+                                                     "steps",
+                                                     "scheme",
+                                                     "seed",
+                                                     "confidence_level",
+                                                     "antithetic",
+                                                     "control_variate",
+                                                     "control_variate_pilot_paths"});
     if (!unknown) {
         return Result<MonteCarloConfig>::failure(unknown.error());
     }
@@ -227,6 +234,27 @@ Result<MonteCarloConfig> parse_monte_carlo_config(const ConfigNode& node,
         return Result<MonteCarloConfig>::failure(std::move(confidence_level).error());
     }
     config.confidence_level = confidence_level.value();
+
+    // Variance reduction is off unless asked for: a technique that changes the
+    // estimator must appear in the configuration, so a stored result says plainly
+    // which estimator produced its number.
+    auto antithetic = node.boolean_or("antithetic", false);
+    if (!antithetic) {
+        return Result<MonteCarloConfig>::failure(std::move(antithetic).error());
+    }
+    config.variance_reduction.antithetic = antithetic.value();
+
+    auto control_variate = node.boolean_or("control_variate", false);
+    if (!control_variate) {
+        return Result<MonteCarloConfig>::failure(std::move(control_variate).error());
+    }
+    config.variance_reduction.control_variate = control_variate.value();
+
+    auto pilot_paths = node.integer_or("control_variate_pilot_paths", 2000);
+    if (!pilot_paths) {
+        return Result<MonteCarloConfig>::failure(std::move(pilot_paths).error());
+    }
+    config.control_variate_pilot_paths = pilot_paths.value();
 
     // --seed beats the file, and the precedence lives here so that no caller can
     // reorder it. Without either, the run is rejected: a seed chosen implicitly

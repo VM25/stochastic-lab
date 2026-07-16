@@ -20,7 +20,8 @@ GbmPathGenerator::GbmPathGenerator(const MarketState& market,
 
 Result<PathDiagnostics> GbmPathGenerator::generate(std::uint64_t master_seed,
                                                    std::uint64_t path_index,
-                                                   std::span<double> out) const {
+                                                   std::span<double> out,
+                                                   PathVariate variate) const {
     if (out.size() != path_size()) {
         return Result<PathDiagnostics>::failure(
             ErrorCode::InvalidArgument,
@@ -38,8 +39,13 @@ Result<PathDiagnostics> GbmPathGenerator::generate(std::uint64_t master_seed,
     out[0] = initial_spot_;
 
     for (std::int64_t step = 0; step < grid_.steps(); ++step) {
+        // The antithetic member reads the same coordinates and negates: an exact
+        // reflection of the primary's shock, not an independent draw.
+        const double shock = (variate == PathVariate::Primary) ? stream.next_normal()
+                                                               : stream.next_antithetic_normal();
+
         const double previous = out[static_cast<std::size_t>(step)];
-        const double next = stepper_.advance(previous, stream.next_normal());
+        const double next = stepper_.advance(previous, shock);
         out[static_cast<std::size_t>(step) + 1] = next;
 
         if (!std::isfinite(next)) {
