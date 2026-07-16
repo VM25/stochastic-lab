@@ -230,38 +230,63 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Pinned to the version the committed fixture was generated with. mpmath is
-      # deterministic, but a version bump could change how mp.diff chooses its
+      # Pinned to the versions the committed fixtures were generated with. mpmath
+      # is deterministic, but a version bump could change how mp.diff chooses its
       # steps and shift the last digits, which would read as a spurious failure.
-      - name: Install mpmath
-        run: pip install 'mpmath==1.4.1'
+      # numpy and scipy are the independent cross-checks the generators run
+      # internally: numpy confirms the Philox algorithm, scipy sanity-checks the
+      # distribution values.
+      - name: Install reference tooling
+        run: pip install 'mpmath==1.4.1' 'numpy==2.0.2' 'scipy==1.13.1'
 
       - name: Regenerate and compare
         run: |
           set -euo pipefail
-          python3 python/generate_bs_references.py > /tmp/regenerated.json
 
-          # provenance carries a timestamp and commit, which differ by design;
-          # the numbers must not.
+          python3 python/generate_bs_references.py > /tmp/bs.json
+          python3 python/generate_philox_kat.py > /tmp/philox.json
+          python3 python/generate_distribution_references.py > /tmp/dist.json
+          python3 python/generate_random_stream_golden.py > /tmp/stream.json
+
+          # Every fixture's numbers must reproduce from its generator. Provenance
+          # carries a timestamp and commit, which differ by design; the values
+          # must not. Without this the "independent oracle" is only a snapshot of
+          # whatever the engine agreed with the day it was written.
           python3 - <<'EOF'
           import json, sys
 
-          with open("data/references/black_scholes.json") as f:
-              committed = json.load(f)
-          with open("/tmp/regenerated.json") as f:
-              regenerated = json.load(f)
+          # (committed path, regenerated path, keys holding the values)
+          fixtures = [
+              ("data/references/black_scholes.json", "/tmp/bs.json", ["cases"]),
+              ("data/references/philox_kat.json", "/tmp/philox.json", ["cases"]),
+              (
+                  "data/references/distributions.json",
+                  "/tmp/dist.json",
+                  ["inverse_norm_cdf", "student_t_cdf", "student_t_quantile"],
+              ),
+              (
+                  "data/references/random_stream_golden.json",
+                  "/tmp/stream.json",
+                  ["cases", "reproducibility_tiers", "coordinates"],
+              ),
+          ]
 
-          if committed["cases"] != regenerated["cases"]:
-              print("FAIL: committed reference values do not match the generator output")
-              for a, b in zip(committed["cases"], regenerated["cases"]):
-                  if a != b:
-                      print(f"  first mismatch: {a['scenario']} {a['option_type']}")
-                      print(f"    committed   : {a}")
-                      print(f"    regenerated : {b}")
-                      break
-              sys.exit(1)
+          failed = False
+          for committed_path, regenerated_path, keys in fixtures:
+              with open(committed_path) as f:
+                  committed = json.load(f)
+              with open(regenerated_path) as f:
+                  regenerated = json.load(f)
 
-          print(f"OK: {len(committed['cases'])} reference cases reproduce exactly")
+              for key in keys:
+                  if committed[key] != regenerated[key]:
+                      print(f"FAIL: {committed_path} key '{key}' does not match its generator")
+                      failed = True
+                  else:
+                      count = len(committed[key])
+                      print(f"OK: {committed_path} '{key}' reproduces ({count} entries)")
+
+          sys.exit(1 if failed else 0)
           EOF
 
   # ---------------------------------------------------------------------------
