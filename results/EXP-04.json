@@ -7,14 +7,14 @@
     "cpu_brand": "Apple M1",
     "cxx_standard": "20",
     "git_branch": "main",
-    "git_commit": "b9b8cf867b94393704485e1d5366da15b12cff86",
-    "git_commit_short": "b9b8cf8",
+    "git_commit": "584ec3b76f64d63050a94eceb22e5cb112e7ffea",
+    "git_commit_short": "584ec3b",
     "git_dirty": false,
     "hostname": "MacBookPro",
     "logical_cores": 8,
     "os_name": "Darwin",
     "os_version": "25.5.0",
-    "timestamp_utc": "2026-07-16T17:01:28Z",
+    "timestamp_utc": "2026-07-16T17:50:49Z",
     "version": "0.1.0"
   },
   "configuration": {
@@ -102,7 +102,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.6600297307807229,
-        "runtime_seconds": 0.001126417,
+        "runtime_seconds": 0.001474458,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 1,
@@ -115,7 +115,7 @@
         "paths": 10000,
         "regime": "bias_dominated",
         "rmse": 0.3417809867231978,
-        "runtime_seconds": 0.006597083,
+        "runtime_seconds": 0.007272416,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 1,
@@ -128,7 +128,7 @@
         "paths": 100000,
         "regime": "bias_dominated",
         "rmse": 0.3135558143074757,
-        "runtime_seconds": 0.062240042,
+        "runtime_seconds": 0.073881666,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 1,
@@ -141,7 +141,7 @@
         "paths": 250000,
         "regime": "bias_dominated",
         "rmse": 0.315465527026178,
-        "runtime_seconds": 0.154285959,
+        "runtime_seconds": 0.18867225,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 1,
@@ -154,7 +154,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.6214997691959616,
-        "runtime_seconds": 0.00113025,
+        "runtime_seconds": 0.001428542,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 2,
@@ -167,7 +167,7 @@
         "paths": 10000,
         "regime": "mixed",
         "rmse": 0.20481751738313486,
-        "runtime_seconds": 0.007795667,
+        "runtime_seconds": 0.009934083,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 2,
@@ -180,7 +180,7 @@
         "paths": 100000,
         "regime": "sampling_dominated",
         "rmse": 0.07544544737323697,
-        "runtime_seconds": 0.073814833,
+        "runtime_seconds": 0.10121025,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 2,
@@ -193,7 +193,7 @@
         "paths": 250000,
         "regime": "mixed",
         "rmse": 0.05718789330008127,
-        "runtime_seconds": 0.183469708,
+        "runtime_seconds": 0.20793825,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 2,
@@ -206,7 +206,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.5387848136756017,
-        "runtime_seconds": 0.001533916,
+        "runtime_seconds": 0.001560583,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 4,
@@ -219,7 +219,7 @@
         "paths": 10000,
         "regime": "sampling_dominated",
         "rmse": 0.29159062671935865,
-        "runtime_seconds": 0.0118895,
+        "runtime_seconds": 0.012069542,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 4,
@@ -232,7 +232,7 @@
         "paths": 100000,
         "regime": "sampling_dominated",
         "rmse": 0.07312127996142982,
-        "runtime_seconds": 0.117335667,
+        "runtime_seconds": 0.138205958,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 4,
@@ -245,7 +245,7 @@
         "paths": 250000,
         "regime": "sampling_dominated",
         "rmse": 0.054414137068245,
-        "runtime_seconds": 0.287208,
+        "runtime_seconds": 0.32006075,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 4,
@@ -258,7 +258,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.5893590433487133,
-        "runtime_seconds": 0.002574834,
+        "runtime_seconds": 0.002664334,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 8,
@@ -271,7 +271,7 @@
         "paths": 10000,
         "regime": "sampling_dominated",
         "rmse": 0.28051137719373653,
-        "runtime_seconds": 0.022120166,
+        "runtime_seconds": 0.023819,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 8,
@@ -284,7 +284,7 @@
         "paths": 100000,
         "regime": "sampling_dominated",
         "rmse": 0.08829771354511509,
-        "runtime_seconds": 0.217129833,
+        "runtime_seconds": 0.248326208,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 8,
@@ -297,7 +297,7 @@
         "paths": 250000,
         "regime": "sampling_dominated",
         "rmse": 0.054990305250077864,
-        "runtime_seconds": 0.542645125,
+        "runtime_seconds": 1.023453584,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 8,
@@ -310,7 +310,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.5412221093642925,
-        "runtime_seconds": 0.004663583,
+        "runtime_seconds": 0.006381542,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 16,
@@ -323,7 +323,7 @@
         "paths": 10000,
         "regime": "sampling_dominated",
         "rmse": 0.23395609898955755,
-        "runtime_seconds": 0.042698,
+        "runtime_seconds": 0.056951042,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 16,
@@ -336,7 +336,7 @@
         "paths": 100000,
         "regime": "sampling_dominated",
         "rmse": 0.08563712610117225,
-        "runtime_seconds": 0.425628708,
+        "runtime_seconds": 0.565670667,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 16,
@@ -349,7 +349,7 @@
         "paths": 250000,
         "regime": "sampling_dominated",
         "rmse": 0.04239805424273338,
-        "runtime_seconds": 1.052921917,
+        "runtime_seconds": 2.075222125,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 16,
@@ -362,7 +362,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.5584855800888903,
-        "runtime_seconds": 0.008668833,
+        "runtime_seconds": 0.009141625,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 32,
@@ -375,7 +375,7 @@
         "paths": 10000,
         "regime": "sampling_dominated",
         "rmse": 0.28848004942784944,
-        "runtime_seconds": 0.083353292,
+        "runtime_seconds": 0.094747625,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 32,
@@ -388,7 +388,7 @@
         "paths": 100000,
         "regime": "sampling_dominated",
         "rmse": 0.09945748421205887,
-        "runtime_seconds": 0.829884375,
+        "runtime_seconds": 0.9058515,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 32,
@@ -401,7 +401,7 @@
         "paths": 250000,
         "regime": "sampling_dominated",
         "rmse": 0.04807837222130634,
-        "runtime_seconds": 2.075777042,
+        "runtime_seconds": 2.229309625,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 32,
@@ -414,7 +414,7 @@
         "paths": 1000,
         "regime": "mixed",
         "rmse": 0.8318574368823938,
-        "runtime_seconds": 0.001009292,
+        "runtime_seconds": 0.001003542,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 1,
@@ -427,7 +427,7 @@
         "paths": 10000,
         "regime": "bias_dominated",
         "rmse": 0.48345345618783847,
-        "runtime_seconds": 0.006643584,
+        "runtime_seconds": 0.006776875,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 1,
@@ -440,7 +440,7 @@
         "paths": 100000,
         "regime": "bias_dominated",
         "rmse": 0.4652374488701389,
-        "runtime_seconds": 0.062744834,
+        "runtime_seconds": 0.064166667,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 1,
@@ -453,7 +453,7 @@
         "paths": 250000,
         "regime": "bias_dominated",
         "rmse": 0.4708235348335998,
-        "runtime_seconds": 0.155612125,
+        "runtime_seconds": 0.160571375,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 1,
@@ -466,7 +466,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.7320786500092406,
-        "runtime_seconds": 0.001119084,
+        "runtime_seconds": 0.001123208,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 2,
@@ -479,7 +479,7 @@
         "paths": 10000,
         "regime": "mixed",
         "rmse": 0.3810041487437565,
-        "runtime_seconds": 0.007814791,
+        "runtime_seconds": 0.007889709,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 2,
@@ -492,7 +492,7 @@
         "paths": 100000,
         "regime": "bias_dominated",
         "rmse": 0.27162476742490993,
-        "runtime_seconds": 0.074202083,
+        "runtime_seconds": 0.080033167,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 2,
@@ -505,7 +505,7 @@
         "paths": 250000,
         "regime": "bias_dominated",
         "rmse": 0.2732482216333004,
-        "runtime_seconds": 0.184805083,
+        "runtime_seconds": 0.210472333,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 2,
@@ -518,7 +518,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.5843384981568813,
-        "runtime_seconds": 0.001543666,
+        "runtime_seconds": 0.001880959,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 4,
@@ -531,7 +531,7 @@
         "paths": 10000,
         "regime": "sampling_dominated",
         "rmse": 0.3472070525635109,
-        "runtime_seconds": 0.01203175,
+        "runtime_seconds": 0.012465208,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 4,
@@ -544,7 +544,7 @@
         "paths": 100000,
         "regime": "bias_dominated",
         "rmse": 0.17231910524501365,
-        "runtime_seconds": 0.116300875,
+        "runtime_seconds": 0.123785584,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 4,
@@ -557,7 +557,7 @@
         "paths": 250000,
         "regime": "bias_dominated",
         "rmse": 0.1548764973689773,
-        "runtime_seconds": 0.290452167,
+        "runtime_seconds": 0.324272125,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 4,
@@ -570,7 +570,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.5760401051825704,
-        "runtime_seconds": 0.002601375,
+        "runtime_seconds": 0.003052875,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 8,
@@ -583,7 +583,7 @@
         "paths": 10000,
         "regime": "sampling_dominated",
         "rmse": 0.2924415295658699,
-        "runtime_seconds": 0.022568209,
+        "runtime_seconds": 0.028547958,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 8,
@@ -596,7 +596,7 @@
         "paths": 100000,
         "regime": "mixed",
         "rmse": 0.1277170390937125,
-        "runtime_seconds": 0.222255042,
+        "runtime_seconds": 0.258292375,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 8,
@@ -609,7 +609,7 @@
         "paths": 250000,
         "regime": "mixed",
         "rmse": 0.09816125918591867,
-        "runtime_seconds": 0.55387925,
+        "runtime_seconds": 0.575385125,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 8,
@@ -622,7 +622,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.5316014503781084,
-        "runtime_seconds": 0.004811125,
+        "runtime_seconds": 0.004768084,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 16,
@@ -635,7 +635,7 @@
         "paths": 10000,
         "regime": "sampling_dominated",
         "rmse": 0.23320389118903143,
-        "runtime_seconds": 0.044718625,
+        "runtime_seconds": 0.044499166,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 16,
@@ -648,7 +648,7 @@
         "paths": 100000,
         "regime": "mixed",
         "rmse": 0.09773362968201221,
-        "runtime_seconds": 0.435639458,
+        "runtime_seconds": 0.463067625,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 16,
@@ -661,7 +661,7 @@
         "paths": 250000,
         "regime": "mixed",
         "rmse": 0.06069098219695012,
-        "runtime_seconds": 1.087894708,
+        "runtime_seconds": 1.125841208,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 16,
@@ -674,7 +674,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.5478951677819645,
-        "runtime_seconds": 0.009069958,
+        "runtime_seconds": 0.009164916,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 32,
@@ -687,7 +687,7 @@
         "paths": 10000,
         "regime": "sampling_dominated",
         "rmse": 0.2943215487358605,
-        "runtime_seconds": 0.086953625,
+        "runtime_seconds": 0.089954917,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 32,
@@ -700,7 +700,7 @@
         "paths": 100000,
         "regime": "sampling_dominated",
         "rmse": 0.1072210805925691,
-        "runtime_seconds": 0.865579209,
+        "runtime_seconds": 1.4432865,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 32,
@@ -713,7 +713,7 @@
         "paths": 250000,
         "regime": "mixed",
         "rmse": 0.05848881027145592,
-        "runtime_seconds": 2.373432417,
+        "runtime_seconds": 3.523722042,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 32,
@@ -728,7 +728,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.6600297307807229,
-        "runtime_seconds": 0.001126417,
+        "runtime_seconds": 0.001474458,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 1,
@@ -741,7 +741,7 @@
         "paths": 10000,
         "regime": "bias_dominated",
         "rmse": 0.3417809867231978,
-        "runtime_seconds": 0.006597083,
+        "runtime_seconds": 0.007272416,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 1,
@@ -754,7 +754,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.6214997691959616,
-        "runtime_seconds": 0.00113025,
+        "runtime_seconds": 0.001428542,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 2,
@@ -767,7 +767,7 @@
         "paths": 10000,
         "regime": "mixed",
         "rmse": 0.20481751738313486,
-        "runtime_seconds": 0.007795667,
+        "runtime_seconds": 0.009934083,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 2,
@@ -780,7 +780,7 @@
         "paths": 100000,
         "regime": "sampling_dominated",
         "rmse": 0.07544544737323697,
-        "runtime_seconds": 0.073814833,
+        "runtime_seconds": 0.10121025,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 2,
@@ -793,7 +793,7 @@
         "paths": 250000,
         "regime": "mixed",
         "rmse": 0.05718789330008127,
-        "runtime_seconds": 0.183469708,
+        "runtime_seconds": 0.20793825,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 2,
@@ -806,7 +806,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.5387848136756017,
-        "runtime_seconds": 0.001533916,
+        "runtime_seconds": 0.001560583,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 4,
@@ -819,7 +819,7 @@
         "paths": 100000,
         "regime": "sampling_dominated",
         "rmse": 0.07312127996142982,
-        "runtime_seconds": 0.117335667,
+        "runtime_seconds": 0.138205958,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 4,
@@ -832,7 +832,7 @@
         "paths": 250000,
         "regime": "sampling_dominated",
         "rmse": 0.054414137068245,
-        "runtime_seconds": 0.287208,
+        "runtime_seconds": 0.32006075,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 4,
@@ -845,7 +845,7 @@
         "paths": 250000,
         "regime": "sampling_dominated",
         "rmse": 0.04239805424273338,
-        "runtime_seconds": 1.052921917,
+        "runtime_seconds": 2.075222125,
         "scheme": "euler_maruyama",
         "seed_count": 16,
         "steps": 16,
@@ -858,7 +858,7 @@
         "paths": 1000,
         "regime": "mixed",
         "rmse": 0.8318574368823938,
-        "runtime_seconds": 0.001009292,
+        "runtime_seconds": 0.001003542,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 1,
@@ -871,7 +871,7 @@
         "paths": 10000,
         "regime": "bias_dominated",
         "rmse": 0.48345345618783847,
-        "runtime_seconds": 0.006643584,
+        "runtime_seconds": 0.006776875,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 1,
@@ -884,7 +884,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.7320786500092406,
-        "runtime_seconds": 0.001119084,
+        "runtime_seconds": 0.001123208,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 2,
@@ -897,7 +897,7 @@
         "paths": 10000,
         "regime": "mixed",
         "rmse": 0.3810041487437565,
-        "runtime_seconds": 0.007814791,
+        "runtime_seconds": 0.007889709,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 2,
@@ -910,7 +910,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.5843384981568813,
-        "runtime_seconds": 0.001543666,
+        "runtime_seconds": 0.001880959,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 4,
@@ -923,7 +923,7 @@
         "paths": 10000,
         "regime": "sampling_dominated",
         "rmse": 0.3472070525635109,
-        "runtime_seconds": 0.01203175,
+        "runtime_seconds": 0.012465208,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 4,
@@ -936,7 +936,7 @@
         "paths": 100000,
         "regime": "bias_dominated",
         "rmse": 0.17231910524501365,
-        "runtime_seconds": 0.116300875,
+        "runtime_seconds": 0.123785584,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 4,
@@ -949,7 +949,7 @@
         "paths": 1000,
         "regime": "sampling_dominated",
         "rmse": 0.5760401051825704,
-        "runtime_seconds": 0.002601375,
+        "runtime_seconds": 0.003052875,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 8,
@@ -962,7 +962,7 @@
         "paths": 10000,
         "regime": "sampling_dominated",
         "rmse": 0.2924415295658699,
-        "runtime_seconds": 0.022568209,
+        "runtime_seconds": 0.028547958,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 8,
@@ -975,7 +975,7 @@
         "paths": 100000,
         "regime": "mixed",
         "rmse": 0.1277170390937125,
-        "runtime_seconds": 0.222255042,
+        "runtime_seconds": 0.258292375,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 8,
@@ -988,7 +988,7 @@
         "paths": 10000,
         "regime": "sampling_dominated",
         "rmse": 0.23320389118903143,
-        "runtime_seconds": 0.044718625,
+        "runtime_seconds": 0.044499166,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 16,
@@ -1001,7 +1001,7 @@
         "paths": 100000,
         "regime": "mixed",
         "rmse": 0.09773362968201221,
-        "runtime_seconds": 0.435639458,
+        "runtime_seconds": 0.463067625,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 16,
@@ -1014,7 +1014,7 @@
         "paths": 250000,
         "regime": "mixed",
         "rmse": 0.06069098219695012,
-        "runtime_seconds": 1.087894708,
+        "runtime_seconds": 1.125841208,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 16,
@@ -1027,7 +1027,7 @@
         "paths": 250000,
         "regime": "mixed",
         "rmse": 0.05848881027145592,
-        "runtime_seconds": 2.373432417,
+        "runtime_seconds": 3.523722042,
         "scheme": "milstein",
         "seed_count": 16,
         "steps": 32,
@@ -1035,7 +1035,7 @@
       }
     ]
   },
-  "runtime_seconds": 12.840820583,
+  "runtime_seconds": 16.871019083,
   "status": "pass",
   "table": {
     "headers": [
@@ -1061,7 +1061,7 @@
         "0.57656921538093187",
         "sampling_dominated",
         "1000",
-        "0.001126417"
+        "0.0014744580000000001"
       ],
       [
         "euler_maruyama",
@@ -1073,7 +1073,7 @@
         "0.18309438484653076",
         "bias_dominated",
         "10000",
-        "0.0065970830000000001"
+        "0.0072724160000000003"
       ],
       [
         "euler_maruyama",
@@ -1085,7 +1085,7 @@
         "0.05778425942187599",
         "bias_dominated",
         "100000",
-        "0.062240042000000002"
+        "0.073881665999999999"
       ],
       [
         "euler_maruyama",
@@ -1097,7 +1097,7 @@
         "0.036520841468196341",
         "bias_dominated",
         "250000",
-        "0.154285959"
+        "0.18867225000000001"
       ],
       [
         "euler_maruyama",
@@ -1109,7 +1109,7 @@
         "0.64365954942388448",
         "sampling_dominated",
         "2000",
-        "0.00113025"
+        "0.0014285420000000001"
       ],
       [
         "euler_maruyama",
@@ -1121,7 +1121,7 @@
         "0.20240710730777542",
         "mixed",
         "20000",
-        "0.007795667"
+        "0.0099340829999999998"
       ],
       [
         "euler_maruyama",
@@ -1133,7 +1133,7 @@
         "0.06411045385119922",
         "sampling_dominated",
         "200000",
-        "0.073814832999999996"
+        "0.10121025"
       ],
       [
         "euler_maruyama",
@@ -1145,7 +1145,7 @@
         "0.040510770266811311",
         "mixed",
         "500000",
-        "0.18346970800000001"
+        "0.20793824999999999"
       ],
       [
         "euler_maruyama",
@@ -1157,7 +1157,7 @@
         "0.68337938380851537",
         "sampling_dominated",
         "4000",
-        "0.001533916"
+        "0.0015605829999999999"
       ],
       [
         "euler_maruyama",
@@ -1169,7 +1169,7 @@
         "0.21281651097580434",
         "sampling_dominated",
         "40000",
-        "0.011889500000000001"
+        "0.012069542000000001"
       ],
       [
         "euler_maruyama",
@@ -1181,7 +1181,7 @@
         "0.06752759443254816",
         "sampling_dominated",
         "400000",
-        "0.117335667"
+        "0.13820595799999999"
       ],
       [
         "euler_maruyama",
@@ -1193,7 +1193,7 @@
         "0.042729403933559749",
         "sampling_dominated",
         "1000000",
-        "0.28720800000000002"
+        "0.32006075"
       ],
       [
         "euler_maruyama",
@@ -1205,7 +1205,7 @@
         "0.70427807439251033",
         "sampling_dominated",
         "8000",
-        "0.0025748339999999998"
+        "0.002664334"
       ],
       [
         "euler_maruyama",
@@ -1217,7 +1217,7 @@
         "0.21950441751750258",
         "sampling_dominated",
         "80000",
-        "0.022120166"
+        "0.023819"
       ],
       [
         "euler_maruyama",
@@ -1229,7 +1229,7 @@
         "0.069390916867689806",
         "sampling_dominated",
         "800000",
-        "0.21712983299999999"
+        "0.24832620799999999"
       ],
       [
         "euler_maruyama",
@@ -1241,7 +1241,7 @@
         "0.043875808683537597",
         "sampling_dominated",
         "2000000",
-        "0.54264512499999995"
+        "1.0234535840000001"
       ],
       [
         "euler_maruyama",
@@ -1253,7 +1253,7 @@
         "0.70260661768130173",
         "sampling_dominated",
         "16000",
-        "0.0046635829999999998"
+        "0.0063815419999999996"
       ],
       [
         "euler_maruyama",
@@ -1265,7 +1265,7 @@
         "0.22180312525343809",
         "sampling_dominated",
         "160000",
-        "0.042698"
+        "0.056951042"
       ],
       [
         "euler_maruyama",
@@ -1277,7 +1277,7 @@
         "0.070289352932880203",
         "sampling_dominated",
         "1600000",
-        "0.42562870800000002"
+        "0.56567066700000002"
       ],
       [
         "euler_maruyama",
@@ -1289,7 +1289,7 @@
         "0.044444466840714375",
         "sampling_dominated",
         "4000000",
-        "1.0529219169999999"
+        "2.0752221249999998"
       ],
       [
         "euler_maruyama",
@@ -1301,7 +1301,7 @@
         "0.70869269061059392",
         "sampling_dominated",
         "32000",
-        "0.0086688330000000008"
+        "0.0091416250000000004"
       ],
       [
         "euler_maruyama",
@@ -1313,7 +1313,7 @@
         "0.22268043377161265",
         "sampling_dominated",
         "320000",
-        "0.083353291999999995"
+        "0.094747625000000002"
       ],
       [
         "euler_maruyama",
@@ -1325,7 +1325,7 @@
         "0.070714548957612408",
         "sampling_dominated",
         "3200000",
-        "0.82988437500000001"
+        "0.90585150000000003"
       ],
       [
         "euler_maruyama",
@@ -1337,7 +1337,7 @@
         "0.044774711305909966",
         "sampling_dominated",
         "8000000",
-        "2.0757770419999999"
+        "2.229309625"
       ],
       [
         "milstein",
@@ -1349,7 +1349,7 @@
         "0.6723934779193671",
         "mixed",
         "1000",
-        "0.001009292"
+        "0.0010035420000000001"
       ],
       [
         "milstein",
@@ -1361,7 +1361,7 @@
         "0.21344361352850533",
         "bias_dominated",
         "10000",
-        "0.0066435840000000001"
+        "0.0067768749999999999"
       ],
       [
         "milstein",
@@ -1373,7 +1373,7 @@
         "0.067363957680523404",
         "bias_dominated",
         "100000",
-        "0.062744833999999999"
+        "0.064166666999999997"
       ],
       [
         "milstein",
@@ -1385,7 +1385,7 @@
         "0.042563438996882794",
         "bias_dominated",
         "250000",
-        "0.15561212499999999"
+        "0.16057137499999999"
       ],
       [
         "milstein",
@@ -1397,7 +1397,7 @@
         "0.69958502915743048",
         "sampling_dominated",
         "2000",
-        "0.001119084"
+        "0.0011232080000000001"
       ],
       [
         "milstein",
@@ -1409,7 +1409,7 @@
         "0.2192173408349708",
         "mixed",
         "20000",
-        "0.0078147909999999998"
+        "0.007889709"
       ],
       [
         "milstein",
@@ -1421,7 +1421,7 @@
         "0.06938390970644942",
         "bias_dominated",
         "200000",
-        "0.074202083000000002"
+        "0.080033167000000002"
       ],
       [
         "milstein",
@@ -1433,7 +1433,7 @@
         "0.043827349291111706",
         "bias_dominated",
         "500000",
-        "0.18480508300000001"
+        "0.21047233300000001"
       ],
       [
         "milstein",
@@ -1445,7 +1445,7 @@
         "0.71293882277436016",
         "sampling_dominated",
         "4000",
-        "0.001543666"
+        "0.001880959"
       ],
       [
         "milstein",
@@ -1457,7 +1457,7 @@
         "0.22120023134423084",
         "sampling_dominated",
         "40000",
-        "0.012031750000000001"
+        "0.012465208"
       ],
       [
         "milstein",
@@ -1469,7 +1469,7 @@
         "0.070205578247382897",
         "bias_dominated",
         "400000",
-        "0.116300875"
+        "0.123785584"
       ],
       [
         "milstein",
@@ -1481,7 +1481,7 @@
         "0.044421575827172759",
         "bias_dominated",
         "1000000",
-        "0.29045216699999998"
+        "0.32427212500000002"
       ],
       [
         "milstein",
@@ -1493,7 +1493,7 @@
         "0.71929939252826935",
         "sampling_dominated",
         "8000",
-        "0.002601375"
+        "0.003052875"
       ],
       [
         "milstein",
@@ -1505,7 +1505,7 @@
         "0.22379738934248697",
         "sampling_dominated",
         "80000",
-        "0.022568208999999999"
+        "0.028547957999999998"
       ],
       [
         "milstein",
@@ -1517,7 +1517,7 @@
         "0.070752008693256971",
         "mixed",
         "800000",
-        "0.22225504200000001"
+        "0.25829237500000002"
       ],
       [
         "milstein",
@@ -1529,7 +1529,7 @@
         "0.044727346686475968",
         "mixed",
         "2000000",
-        "0.55387925000000005"
+        "0.57538512500000005"
       ],
       [
         "milstein",
@@ -1541,7 +1541,7 @@
         "0.70982887002407813",
         "sampling_dominated",
         "16000",
-        "0.0048111250000000003"
+        "0.0047680839999999997"
       ],
       [
         "milstein",
@@ -1553,7 +1553,7 @@
         "0.22389445603496411",
         "sampling_dominated",
         "160000",
-        "0.044718624999999998"
+        "0.044499166"
       ],
       [
         "milstein",
@@ -1565,7 +1565,7 @@
         "0.070961848883302564",
         "mixed",
         "1600000",
-        "0.43563945799999998"
+        "0.46306762499999998"
       ],
       [
         "milstein",
@@ -1577,7 +1577,7 @@
         "0.044867119645493544",
         "mixed",
         "4000000",
-        "1.0878947080000001"
+        "1.125841208"
       ],
       [
         "milstein",
@@ -1589,7 +1589,7 @@
         "0.7118353960546504",
         "sampling_dominated",
         "32000",
-        "0.0090699579999999995"
+        "0.0091649160000000004"
       ],
       [
         "milstein",
@@ -1601,7 +1601,7 @@
         "0.22368624760122158",
         "sampling_dominated",
         "320000",
-        "0.086953625000000007"
+        "0.089954916999999995"
       ],
       [
         "milstein",
@@ -1613,7 +1613,7 @@
         "0.071053667111150756",
         "sampling_dominated",
         "3200000",
-        "0.86557920899999996"
+        "1.4432864999999999"
       ],
       [
         "milstein",
@@ -1625,7 +1625,7 @@
         "0.044988318371928487",
         "mixed",
         "8000000",
-        "2.3734324170000001"
+        "3.5237220420000002"
       ]
     ]
   }
