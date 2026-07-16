@@ -1,0 +1,1252 @@
+{
+  "build_metadata": {
+    "build_flags": "-ffp-contract=off -O3 -DNDEBUG",
+    "build_type": "Release",
+    "compiler_id": "AppleClang",
+    "compiler_version": "21.0.0.21000101",
+    "cpu_brand": "Apple M1",
+    "cxx_standard": "20",
+    "git_branch": "main",
+    "git_commit": "b9b8cf867b94393704485e1d5366da15b12cff86",
+    "git_commit_short": "b9b8cf8",
+    "git_dirty": false,
+    "hostname": "MacBookPro",
+    "logical_cores": 8,
+    "os_name": "Darwin",
+    "os_version": "25.5.0",
+    "timestamp_utc": "2026-07-16T17:00:23Z",
+    "version": "0.1.0"
+  },
+  "configuration": {
+    "asymptotic_level_count": 4,
+    "call_payoff_paths": 4000000,
+    "dividend_yield": 0.0,
+    "master_seed": 20260715,
+    "maturity": 1.0,
+    "path_counts": [
+      1000,
+      4000,
+      16000,
+      64000,
+      256000,
+      1024000
+    ],
+    "rate": 0.05,
+    "seed_count": 32,
+    "spot": 100.0,
+    "step_counts": [
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024
+    ],
+    "strike": 100.0,
+    "strong_paths": 100000,
+    "volatility": 0.3
+  },
+  "configuration_document": {
+    "command": "experiment",
+    "convergence": {
+      "asymptotic_level_count": 4,
+      "call_payoff_paths": 4000000,
+      "dividend_yield": 0.0,
+      "master_seed": 20260715,
+      "maturity": 1.0,
+      "path_counts": [
+        1000,
+        4000,
+        16000,
+        64000,
+        256000,
+        1024000
+      ],
+      "rate": 0.05,
+      "seed_count": 32,
+      "spot": 100.0,
+      "step_counts": [
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024
+      ],
+      "strike": 100.0,
+      "strong_paths": 100000,
+      "volatility": 0.3
+    },
+    "schema_version": 1
+  },
+  "configuration_source": "configs/experiment/convergence.json",
+  "id": "EXP-03",
+  "interpretation": "Both schemes converge weakly at order 1 across all three test functions. For f(S)=S and f(S)=S^2 this is established exactly rather than estimated: each scheme's step multiplies the state by a factor independent of it, so the terminal moments have closed forms and the bias is seen to halve per grid doubling to four significant figures. For the call payoff, which has no such form, the bias is estimated by pairing against the exact scheme on common Brownian paths and agrees with order 1. The result worth carrying forward is that Milstein and Euler share their first moment *exactly*: the Levy correction has mean zero, so it cannot move E[S] at any step count, and the two schemes' E[S] errors agree bit-for-bit at every level here. On the call payoff Milstein is not merely no better but about six times worse, and of the opposite sign. Both still converge at order 1; it is the constants that differ, and here they favour the scheme with the worse strong order. Strong order measures pathwise tracking and weak order measures how well an expectation is reproduced, so a scheme can excel at one while trailing at the other. Choose a scheme for the kind of accuracy the application needs, not for the larger of its two order numbers: Milstein earns its cost on a pathwise problem such as a barrier or a common-random-numbers Greek, and on a plain expectation it buys an extra term per step and, on this payoff, a worse answer.",
+  "limitations": [
+    "The call-payoff arm is restricted to 8 <= M <= 64. Below 8 the Euler terminal law is nearly normal rather than lognormal and the bias is non-monotone, changing sign between M=2 and M=4; above 64 the bias no longer clears its own sampling noise at 4e6 paths, because resolution behaves like sqrt(dt*N) and degrades as the grid refines. Both cuts are stated rather than silently applied.",
+    "The closed-form arms are exact only in the sense of the scheme's own moments; they assume the implementation realises the scheme the derivation describes. That assumption is checked separately, by confirming the simulated moments agree with the closed forms to within sampling error.",
+    "Weak order 1 is a statement about the rate, not the constant, and the constants do not order the two schemes consistently: Milstein's second-moment bias is about 1.3x smaller than Euler's, while its call-payoff bias is about 6x larger. Neither scheme dominates weakly, and the comparison depends on the test function.",
+    "The call-payoff arm's usable grid range is set by Euler, not Milstein. Because the paired estimator's standard error scales with the scheme's *strong* order, Euler's resolution decays as sqrt(dt*N) while Milstein's is constant in dt -- measured at 783 across every level. A study of Milstein alone could be fitted on a far finer grid."
+  ],
+  "name": "Weak SDE Convergence",
+  "question": "Do the schemes reproduce expected values at their theoretical weak rate?",
+  "reproduction_command": "diffusionworks experiment --id EXP-03",
+  "results": {
+    "studies": [
+      {
+        "asymptotic_fit": {
+          "confidence_level": 0.95,
+          "intercept": -2.030214198193871,
+          "observations": 4,
+          "r_squared": 0.9999999989479413,
+          "residual_standard_deviation": 3.554411050222438e-05,
+          "slope": 0.9998899605539351,
+          "slope_ci_lower": 0.9997912886558621,
+          "slope_ci_upper": 0.9999886324520081,
+          "slope_standard_error": 2.2932805473877077e-05
+        },
+        "asymptotic_level_count": 4,
+        "full_fit": {
+          "confidence_level": 0.95,
+          "intercept": -2.0322040698597688,
+          "observations": 7,
+          "r_squared": 0.9999999409833316,
+          "residual_standard_deviation": 0.00039830276976911304,
+          "slope": 0.9995545358029669,
+          "slope_ci_lower": 0.9992753840983738,
+          "slope_ci_upper": 0.9998336875075601,
+          "slope_standard_error": 0.00010859475497850553
+        },
+        "levels": [
+          {
+            "error": 0.008195665429099108,
+            "estimate": 105.11891397217332,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.008195665429099108,
+            "source": "analytic",
+            "step_size": 0.0625,
+            "steps": 16
+          },
+          {
+            "error": 0.004102175056317492,
+            "estimate": 105.1230074625461,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.004102175056317492,
+            "source": "analytic",
+            "step_size": 0.03125,
+            "steps": 32
+          },
+          {
+            "error": 0.0020521750479645107,
+            "estimate": 105.12505746255445,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.0020521750479645107,
+            "source": "analytic",
+            "step_size": 0.015625,
+            "steps": 64
+          },
+          {
+            "error": 0.001026359644882291,
+            "estimate": 105.12608327795753,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.001026359644882291,
+            "source": "analytic",
+            "step_size": 0.0078125,
+            "steps": 128
+          },
+          {
+            "error": 0.0005132478827363229,
+            "estimate": 105.12659638971968,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.0005132478827363229,
+            "source": "analytic",
+            "step_size": 0.00390625,
+            "steps": 256
+          },
+          {
+            "error": 0.0002566409657731583,
+            "estimate": 105.12685299663664,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.0002566409657731583,
+            "source": "analytic",
+            "step_size": 0.001953125,
+            "steps": 512
+          },
+          {
+            "error": 0.0001283247405012844,
+            "estimate": 105.12698131286191,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.0001283247405012844,
+            "source": "analytic",
+            "step_size": 0.0009765625,
+            "steps": 1024
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse_steps": 16,
+            "fine_steps": 32,
+            "order": 0.9984720318089696
+          },
+          {
+            "coarse_steps": 32,
+            "fine_steps": 64,
+            "order": 0.9992352624584583
+          },
+          {
+            "coarse_steps": 64,
+            "fine_steps": 128,
+            "order": 0.999617444501121
+          },
+          {
+            "coarse_steps": 128,
+            "fine_steps": 256,
+            "order": 0.9998086757596613
+          },
+          {
+            "coarse_steps": 256,
+            "fine_steps": 512,
+            "order": 0.9999042949388113
+          },
+          {
+            "coarse_steps": 512,
+            "fine_steps": 1024,
+            "order": 0.9999521328350418
+          }
+        ],
+        "method": "closed_form_scheme_moment",
+        "quantity": "weak_error:identity",
+        "scheme": "euler_maruyama",
+        "test_function": "identity",
+        "theoretical_order": 1.0,
+        "verdict": "consistent"
+      },
+      {
+        "asymptotic_fit": {
+          "confidence_level": 0.95,
+          "intercept": 5.2338200429644735,
+          "observations": 4,
+          "r_squared": 0.9999999859233578,
+          "residual_standard_deviation": 0.00012997810747719996,
+          "slope": 0.9995976012851912,
+          "slope_ci_lower": 0.9992367767662625,
+          "slope_ci_upper": 0.9999584258041198,
+          "slope_standard_error": 8.386094383908626e-05
+        },
+        "asymptotic_level_count": 4,
+        "full_fit": {
+          "confidence_level": 0.95,
+          "intercept": 5.226565971339778,
+          "observations": 7,
+          "r_squared": 0.9999992154629711,
+          "residual_standard_deviation": 0.001450507597548576,
+          "slope": 0.9983748674728363,
+          "slope_ci_lower": 0.997358274822437,
+          "slope_ci_upper": 0.9993914601232357,
+          "slope_standard_error": 0.0003954718096526358
+        },
+        "levels": [
+          {
+            "error": 11.661905382077748,
+            "estimate": 12080.834071190437,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -11.661905382077748,
+            "source": "analytic",
+            "step_size": 0.0625,
+            "steps": 16
+          },
+          {
+            "error": 5.853477610911796,
+            "estimate": 12086.642498961603,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -5.853477610911796,
+            "source": "analytic",
+            "step_size": 0.03125,
+            "steps": 32
+          },
+          {
+            "error": 2.9324064646916668,
+            "estimate": 12089.563570107823,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -2.9324064646916668,
+            "source": "analytic",
+            "step_size": 0.015625,
+            "steps": 64
+          },
+          {
+            "error": 1.4676247369061457,
+            "estimate": 12091.028351835608,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -1.4676247369061457,
+            "source": "analytic",
+            "step_size": 0.0078125,
+            "steps": 128
+          },
+          {
+            "error": 0.7341683207141614,
+            "estimate": 12091.7618082518,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -0.7341683207141614,
+            "source": "analytic",
+            "step_size": 0.00390625,
+            "steps": 256
+          },
+          {
+            "error": 0.3671732212696952,
+            "estimate": 12092.128803351245,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -0.3671732212696952,
+            "source": "analytic",
+            "step_size": 0.001953125,
+            "steps": 512
+          },
+          {
+            "error": 0.1836088871332322,
+            "estimate": 12092.312367685381,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -0.1836088871332322,
+            "source": "analytic",
+            "step_size": 0.0009765625,
+            "steps": 1024
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse_steps": 16,
+            "fine_steps": 32,
+            "order": 0.9944376183325766
+          },
+          {
+            "coarse_steps": 32,
+            "fine_steps": 64,
+            "order": 0.9972089081098974
+          },
+          {
+            "coarse_steps": 64,
+            "fine_steps": 128,
+            "order": 0.9986019645584268
+          },
+          {
+            "coarse_steps": 128,
+            "fine_steps": 256,
+            "order": 0.9993003578647599
+          },
+          {
+            "coarse_steps": 256,
+            "fine_steps": 512,
+            "order": 0.9996500198954448
+          },
+          {
+            "coarse_steps": 512,
+            "fine_steps": 1024,
+            "order": 0.999824953225284
+          }
+        ],
+        "method": "closed_form_scheme_moment",
+        "quantity": "weak_error:square",
+        "scheme": "euler_maruyama",
+        "test_function": "square",
+        "theoretical_order": 1.0,
+        "verdict": "consistent"
+      },
+      {
+        "asymptotic_fit": {
+          "confidence_level": 0.95,
+          "intercept": -2.118610659720074,
+          "observations": 3,
+          "r_squared": 0.9952759876571482,
+          "residual_standard_deviation": 0.061823576838179746,
+          "slope": 0.9154400744140101,
+          "slope_ci_lower": 0.11407664778745386,
+          "slope_ci_upper": 1.7168035010405664,
+          "slope_standard_error": 0.06306866946233479
+        },
+        "asymptotic_level_count": 3,
+        "full_fit": {
+          "confidence_level": 0.95,
+          "intercept": -2.5094197255009676,
+          "observations": 4,
+          "r_squared": 0.9863973140311125,
+          "residual_standard_deviation": 0.10421229241688922,
+          "slope": 0.8097241429509082,
+          "slope_ci_lower": 0.5204265757866238,
+          "slope_ci_upper": 1.0990217101151927,
+          "slope_standard_error": 0.06723702453698359
+        },
+        "levels": [
+          {
+            "error": 0.014031219812520772,
+            "error_standard_error": 0.001035519593761228,
+            "estimate": 14.971356795626743,
+            "non_positive_states": 0,
+            "paths": 4000000,
+            "reference": 14.960906821669866,
+            "resolution": 13.54993174156791,
+            "signed_error": 0.014031219812520772,
+            "source": "simulated",
+            "step_size": 0.125,
+            "steps": 8
+          },
+          {
+            "error": 0.009260577609058244,
+            "error_standard_error": 0.000738636656402667,
+            "estimate": 14.963622493935855,
+            "non_positive_states": 0,
+            "paths": 4000000,
+            "reference": 14.960906821669866,
+            "resolution": 12.537392409089767,
+            "signed_error": 0.009260577609058244,
+            "source": "simulated",
+            "step_size": 0.0625,
+            "steps": 16
+          },
+          {
+            "error": 0.005295989444966878,
+            "error_standard_error": 0.0005251315777421396,
+            "estimate": 14.959366409982234,
+            "non_positive_states": 0,
+            "paths": 4000000,
+            "reference": 14.960906821669866,
+            "resolution": 10.085071379134275,
+            "signed_error": 0.005295989444966878,
+            "source": "simulated",
+            "step_size": 0.03125,
+            "steps": 32
+          },
+          {
+            "error": 0.0026030842979194824,
+            "error_standard_error": 0.0003724655662076485,
+            "estimate": 14.971529967115387,
+            "non_positive_states": 0,
+            "paths": 4000000,
+            "reference": 14.960906821669866,
+            "resolution": 6.988791808121855,
+            "signed_error": 0.0026030842979194824,
+            "source": "simulated",
+            "step_size": 0.015625,
+            "steps": 64
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse_steps": 8,
+            "fine_steps": 16,
+            "order": 0.5994663494951818
+          },
+          {
+            "coarse_steps": 16,
+            "fine_steps": 32,
+            "order": 0.8062019345394779
+          },
+          {
+            "coarse_steps": 32,
+            "fine_steps": 64,
+            "order": 1.0246782142885424
+          }
+        ],
+        "method": "paired_simulation_common_random_numbers",
+        "paths": 4000000,
+        "quantity": "weak_error:call_payoff",
+        "scheme": "euler_maruyama",
+        "test_function": "call_payoff",
+        "theoretical_order": 1.0,
+        "verdict": "consistent",
+        "worst_resolution": 6.988791808121855
+      },
+      {
+        "asymptotic_fit": {
+          "confidence_level": 0.95,
+          "intercept": -2.030214198193871,
+          "observations": 4,
+          "r_squared": 0.9999999989479413,
+          "residual_standard_deviation": 3.554411050222438e-05,
+          "slope": 0.9998899605539351,
+          "slope_ci_lower": 0.9997912886558621,
+          "slope_ci_upper": 0.9999886324520081,
+          "slope_standard_error": 2.2932805473877077e-05
+        },
+        "asymptotic_level_count": 4,
+        "full_fit": {
+          "confidence_level": 0.95,
+          "intercept": -2.0322040698597688,
+          "observations": 7,
+          "r_squared": 0.9999999409833316,
+          "residual_standard_deviation": 0.00039830276976911304,
+          "slope": 0.9995545358029669,
+          "slope_ci_lower": 0.9992753840983738,
+          "slope_ci_upper": 0.9998336875075601,
+          "slope_standard_error": 0.00010859475497850553
+        },
+        "levels": [
+          {
+            "error": 0.008195665429099108,
+            "estimate": 105.11891397217332,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.008195665429099108,
+            "source": "analytic",
+            "step_size": 0.0625,
+            "steps": 16
+          },
+          {
+            "error": 0.004102175056317492,
+            "estimate": 105.1230074625461,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.004102175056317492,
+            "source": "analytic",
+            "step_size": 0.03125,
+            "steps": 32
+          },
+          {
+            "error": 0.0020521750479645107,
+            "estimate": 105.12505746255445,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.0020521750479645107,
+            "source": "analytic",
+            "step_size": 0.015625,
+            "steps": 64
+          },
+          {
+            "error": 0.001026359644882291,
+            "estimate": 105.12608327795753,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.001026359644882291,
+            "source": "analytic",
+            "step_size": 0.0078125,
+            "steps": 128
+          },
+          {
+            "error": 0.0005132478827363229,
+            "estimate": 105.12659638971968,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.0005132478827363229,
+            "source": "analytic",
+            "step_size": 0.00390625,
+            "steps": 256
+          },
+          {
+            "error": 0.0002566409657731583,
+            "estimate": 105.12685299663664,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.0002566409657731583,
+            "source": "analytic",
+            "step_size": 0.001953125,
+            "steps": 512
+          },
+          {
+            "error": 0.0001283247405012844,
+            "estimate": 105.12698131286191,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 105.12710963760242,
+            "signed_error": -0.0001283247405012844,
+            "source": "analytic",
+            "step_size": 0.0009765625,
+            "steps": 1024
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse_steps": 16,
+            "fine_steps": 32,
+            "order": 0.9984720318089696
+          },
+          {
+            "coarse_steps": 32,
+            "fine_steps": 64,
+            "order": 0.9992352624584583
+          },
+          {
+            "coarse_steps": 64,
+            "fine_steps": 128,
+            "order": 0.999617444501121
+          },
+          {
+            "coarse_steps": 128,
+            "fine_steps": 256,
+            "order": 0.9998086757596613
+          },
+          {
+            "coarse_steps": 256,
+            "fine_steps": 512,
+            "order": 0.9999042949388113
+          },
+          {
+            "coarse_steps": 512,
+            "fine_steps": 1024,
+            "order": 0.9999521328350418
+          }
+        ],
+        "method": "closed_form_scheme_moment",
+        "quantity": "weak_error:identity",
+        "scheme": "milstein",
+        "test_function": "identity",
+        "theoretical_order": 1.0,
+        "verdict": "consistent"
+      },
+      {
+        "asymptotic_fit": {
+          "confidence_level": 0.95,
+          "intercept": 4.932741001917288,
+          "observations": 4,
+          "r_squared": 0.99999999153569,
+          "residual_standard_deviation": 0.00010079888154882632,
+          "slope": 0.9996879654961994,
+          "slope_ci_lower": 0.9994081436965954,
+          "slope_ci_upper": 0.9999677872958035,
+          "slope_standard_error": 6.503471629706276e-05
+        },
+        "asymptotic_level_count": 4,
+        "full_fit": {
+          "confidence_level": 0.95,
+          "intercept": 4.92711142210557,
+          "observations": 7,
+          "r_squared": 0.9999995276107737,
+          "residual_standard_deviation": 0.001125956459839593,
+          "slope": 0.9987390428384907,
+          "slope_ci_lower": 0.997949912837602,
+          "slope_ci_upper": 0.9995281728393793,
+          "slope_standard_error": 0.00030698497513242235
+        },
+        "levels": [
+          {
+            "error": 8.639506165254716,
+            "estimate": 12083.85647040726,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -8.639506165254716,
+            "source": "analytic",
+            "step_size": 0.0625,
+            "steps": 16
+          },
+          {
+            "error": 4.3327020104206895,
+            "estimate": 12088.163274562094,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -4.3327020104206895,
+            "source": "analytic",
+            "step_size": 0.03125,
+            "steps": 32
+          },
+          {
+            "error": 2.1696050442569685,
+            "estimate": 12090.326371528257,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -2.1696050442569685,
+            "source": "analytic",
+            "step_size": 0.015625,
+            "steps": 64
+          },
+          {
+            "error": 1.085618146109482,
+            "estimate": 12091.410358426405,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -1.085618146109482,
+            "source": "analytic",
+            "step_size": 0.0078125,
+            "steps": 128
+          },
+          {
+            "error": 0.5430132441251772,
+            "estimate": 12091.95296332839,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -0.5430132441251772,
+            "source": "analytic",
+            "step_size": 0.00390625,
+            "steps": 256
+          },
+          {
+            "error": 0.27155769911405514,
+            "estimate": 12092.2244188734,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -0.27155769911405514,
+            "source": "analytic",
+            "step_size": 0.001953125,
+            "steps": 512
+          },
+          {
+            "error": 0.13579162375754095,
+            "estimate": 12092.360184948757,
+            "non_positive_states": 0,
+            "paths": 0,
+            "reference": 12092.495976572514,
+            "signed_error": -0.13579162375754095,
+            "source": "analytic",
+            "step_size": 0.0009765625,
+            "steps": 1024
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse_steps": 16,
+            "fine_steps": 32,
+            "order": 0.9956818341942871
+          },
+          {
+            "coarse_steps": 32,
+            "fine_steps": 64,
+            "order": 0.9978345781999532
+          },
+          {
+            "coarse_steps": 64,
+            "fine_steps": 128,
+            "order": 0.9989156970856148
+          },
+          {
+            "coarse_steps": 128,
+            "fine_steps": 256,
+            "order": 0.9994574497325719
+          },
+          {
+            "coarse_steps": 256,
+            "fine_steps": 512,
+            "order": 0.9997286192217097
+          },
+          {
+            "coarse_steps": 512,
+            "fine_steps": 1024,
+            "order": 0.9998642762924803
+          }
+        ],
+        "method": "closed_form_scheme_moment",
+        "quantity": "weak_error:square",
+        "scheme": "milstein",
+        "test_function": "square",
+        "theoretical_order": 1.0,
+        "verdict": "consistent"
+      },
+      {
+        "asymptotic_fit": {
+          "confidence_level": 0.95,
+          "intercept": -0.43049010927698994,
+          "observations": 3,
+          "r_squared": 0.9999971032300414,
+          "residual_standard_deviation": 0.00165123385387031,
+          "slope": 0.9897157742123734,
+          "slope_ci_lower": 0.9683123147722508,
+          "slope_ci_upper": 1.0111192336524961,
+          "slope_standard_error": 0.0016844887898891422
+        },
+        "asymptotic_level_count": 3,
+        "full_fit": {
+          "confidence_level": 0.95,
+          "intercept": -0.4456117963724804,
+          "observations": 4,
+          "r_squared": 0.9999873492915847,
+          "residual_standard_deviation": 0.003842089419727347,
+          "slope": 0.9856252774031475,
+          "slope_ci_lower": 0.974959480728142,
+          "slope_ci_upper": 0.9962910740781531,
+          "slope_standard_error": 0.002478888570592716
+        },
+        "levels": [
+          {
+            "error": 0.08224955834105402,
+            "error_standard_error": 0.0001050461413467782,
+            "estimate": 14.875076017472676,
+            "non_positive_states": 0,
+            "paths": 4000000,
+            "reference": 14.960906821669866,
+            "resolution": 782.9850510123154,
+            "signed_error": -0.08224955834105402,
+            "source": "simulated",
+            "step_size": 0.125,
+            "steps": 8
+          },
+          {
+            "error": 0.04178411579904739,
+            "error_standard_error": 5.336212285050448e-05,
+            "estimate": 14.912577800528942,
+            "non_positive_states": 0,
+            "paths": 4000000,
+            "reference": 14.960906821669866,
+            "resolution": 783.0294892147899,
+            "signed_error": -0.04178411579904739,
+            "source": "simulated",
+            "step_size": 0.0625,
+            "steps": 16
+          },
+          {
+            "error": 0.021084114808029644,
+            "error_standard_error": 2.6921141440010557e-05,
+            "estimate": 14.932986305729703,
+            "non_positive_states": 0,
+            "paths": 4000000,
+            "reference": 14.960906821669866,
+            "resolution": 783.1805666565888,
+            "signed_error": -0.021084114808029644,
+            "source": "simulated",
+            "step_size": 0.03125,
+            "steps": 32
+          },
+          {
+            "error": 0.01059602430927853,
+            "error_standard_error": 1.3524645444581455e-05,
+            "estimate": 14.958330858509223,
+            "non_positive_states": 0,
+            "paths": 4000000,
+            "reference": 14.960906821669866,
+            "resolution": 783.4604132653064,
+            "signed_error": -0.01059602430927853,
+            "source": "simulated",
+            "step_size": 0.015625,
+            "steps": 64
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse_steps": 8,
+            "fine_steps": 16,
+            "order": 0.9770533249045759
+          },
+          {
+            "coarse_steps": 16,
+            "fine_steps": 32,
+            "order": 0.9867981540435057
+          },
+          {
+            "coarse_steps": 32,
+            "fine_steps": 64,
+            "order": 0.992633394381241
+          }
+        ],
+        "method": "paired_simulation_common_random_numbers",
+        "paths": 4000000,
+        "quantity": "weak_error:call_payoff",
+        "scheme": "milstein",
+        "test_function": "call_payoff",
+        "theoretical_order": 1.0,
+        "verdict": "consistent_asymptotically",
+        "worst_resolution": 782.9850510123154
+      }
+    ]
+  },
+  "runtime_seconds": 56.972323333,
+  "status": "pass",
+  "table": {
+    "headers": [
+      "test_function",
+      "scheme",
+      "source",
+      "steps",
+      "step_size",
+      "error",
+      "signed_error",
+      "resolution"
+    ],
+    "rows": [
+      [
+        "identity",
+        "euler_maruyama",
+        "analytic",
+        "16",
+        "0.0625",
+        "0.0081956654290991082",
+        "-0.0081956654290991082",
+        "exact"
+      ],
+      [
+        "identity",
+        "euler_maruyama",
+        "analytic",
+        "32",
+        "0.03125",
+        "0.0041021750563174919",
+        "-0.0041021750563174919",
+        "exact"
+      ],
+      [
+        "identity",
+        "euler_maruyama",
+        "analytic",
+        "64",
+        "0.015625",
+        "0.0020521750479645107",
+        "-0.0020521750479645107",
+        "exact"
+      ],
+      [
+        "identity",
+        "euler_maruyama",
+        "analytic",
+        "128",
+        "0.0078125",
+        "0.0010263596448822909",
+        "-0.0010263596448822909",
+        "exact"
+      ],
+      [
+        "identity",
+        "euler_maruyama",
+        "analytic",
+        "256",
+        "0.00390625",
+        "0.00051324788273632294",
+        "-0.00051324788273632294",
+        "exact"
+      ],
+      [
+        "identity",
+        "euler_maruyama",
+        "analytic",
+        "512",
+        "0.001953125",
+        "0.00025664096577315831",
+        "-0.00025664096577315831",
+        "exact"
+      ],
+      [
+        "identity",
+        "euler_maruyama",
+        "analytic",
+        "1024",
+        "0.0009765625",
+        "0.0001283247405012844",
+        "-0.0001283247405012844",
+        "exact"
+      ],
+      [
+        "square",
+        "euler_maruyama",
+        "analytic",
+        "16",
+        "0.0625",
+        "11.661905382077748",
+        "-11.661905382077748",
+        "exact"
+      ],
+      [
+        "square",
+        "euler_maruyama",
+        "analytic",
+        "32",
+        "0.03125",
+        "5.8534776109117956",
+        "-5.8534776109117956",
+        "exact"
+      ],
+      [
+        "square",
+        "euler_maruyama",
+        "analytic",
+        "64",
+        "0.015625",
+        "2.9324064646916668",
+        "-2.9324064646916668",
+        "exact"
+      ],
+      [
+        "square",
+        "euler_maruyama",
+        "analytic",
+        "128",
+        "0.0078125",
+        "1.4676247369061457",
+        "-1.4676247369061457",
+        "exact"
+      ],
+      [
+        "square",
+        "euler_maruyama",
+        "analytic",
+        "256",
+        "0.00390625",
+        "0.73416832071416138",
+        "-0.73416832071416138",
+        "exact"
+      ],
+      [
+        "square",
+        "euler_maruyama",
+        "analytic",
+        "512",
+        "0.001953125",
+        "0.3671732212696952",
+        "-0.3671732212696952",
+        "exact"
+      ],
+      [
+        "square",
+        "euler_maruyama",
+        "analytic",
+        "1024",
+        "0.0009765625",
+        "0.1836088871332322",
+        "-0.1836088871332322",
+        "exact"
+      ],
+      [
+        "call_payoff",
+        "euler_maruyama",
+        "simulated",
+        "8",
+        "0.125",
+        "0.014031219812520772",
+        "0.014031219812520772",
+        "13.54993174156791"
+      ],
+      [
+        "call_payoff",
+        "euler_maruyama",
+        "simulated",
+        "16",
+        "0.0625",
+        "0.0092605776090582438",
+        "0.0092605776090582438",
+        "12.537392409089767"
+      ],
+      [
+        "call_payoff",
+        "euler_maruyama",
+        "simulated",
+        "32",
+        "0.03125",
+        "0.0052959894449668777",
+        "0.0052959894449668777",
+        "10.085071379134275"
+      ],
+      [
+        "call_payoff",
+        "euler_maruyama",
+        "simulated",
+        "64",
+        "0.015625",
+        "0.0026030842979194824",
+        "0.0026030842979194824",
+        "6.9887918081218547"
+      ],
+      [
+        "identity",
+        "milstein",
+        "analytic",
+        "16",
+        "0.0625",
+        "0.0081956654290991082",
+        "-0.0081956654290991082",
+        "exact"
+      ],
+      [
+        "identity",
+        "milstein",
+        "analytic",
+        "32",
+        "0.03125",
+        "0.0041021750563174919",
+        "-0.0041021750563174919",
+        "exact"
+      ],
+      [
+        "identity",
+        "milstein",
+        "analytic",
+        "64",
+        "0.015625",
+        "0.0020521750479645107",
+        "-0.0020521750479645107",
+        "exact"
+      ],
+      [
+        "identity",
+        "milstein",
+        "analytic",
+        "128",
+        "0.0078125",
+        "0.0010263596448822909",
+        "-0.0010263596448822909",
+        "exact"
+      ],
+      [
+        "identity",
+        "milstein",
+        "analytic",
+        "256",
+        "0.00390625",
+        "0.00051324788273632294",
+        "-0.00051324788273632294",
+        "exact"
+      ],
+      [
+        "identity",
+        "milstein",
+        "analytic",
+        "512",
+        "0.001953125",
+        "0.00025664096577315831",
+        "-0.00025664096577315831",
+        "exact"
+      ],
+      [
+        "identity",
+        "milstein",
+        "analytic",
+        "1024",
+        "0.0009765625",
+        "0.0001283247405012844",
+        "-0.0001283247405012844",
+        "exact"
+      ],
+      [
+        "square",
+        "milstein",
+        "analytic",
+        "16",
+        "0.0625",
+        "8.6395061652547156",
+        "-8.6395061652547156",
+        "exact"
+      ],
+      [
+        "square",
+        "milstein",
+        "analytic",
+        "32",
+        "0.03125",
+        "4.3327020104206895",
+        "-4.3327020104206895",
+        "exact"
+      ],
+      [
+        "square",
+        "milstein",
+        "analytic",
+        "64",
+        "0.015625",
+        "2.1696050442569685",
+        "-2.1696050442569685",
+        "exact"
+      ],
+      [
+        "square",
+        "milstein",
+        "analytic",
+        "128",
+        "0.0078125",
+        "1.085618146109482",
+        "-1.085618146109482",
+        "exact"
+      ],
+      [
+        "square",
+        "milstein",
+        "analytic",
+        "256",
+        "0.00390625",
+        "0.54301324412517715",
+        "-0.54301324412517715",
+        "exact"
+      ],
+      [
+        "square",
+        "milstein",
+        "analytic",
+        "512",
+        "0.001953125",
+        "0.27155769911405514",
+        "-0.27155769911405514",
+        "exact"
+      ],
+      [
+        "square",
+        "milstein",
+        "analytic",
+        "1024",
+        "0.0009765625",
+        "0.13579162375754095",
+        "-0.13579162375754095",
+        "exact"
+      ],
+      [
+        "call_payoff",
+        "milstein",
+        "simulated",
+        "8",
+        "0.125",
+        "0.082249558341054019",
+        "-0.082249558341054019",
+        "782.98505101231535"
+      ],
+      [
+        "call_payoff",
+        "milstein",
+        "simulated",
+        "16",
+        "0.0625",
+        "0.041784115799047387",
+        "-0.041784115799047387",
+        "783.02948921478992"
+      ],
+      [
+        "call_payoff",
+        "milstein",
+        "simulated",
+        "32",
+        "0.03125",
+        "0.021084114808029644",
+        "-0.021084114808029644",
+        "783.18056665658878"
+      ],
+      [
+        "call_payoff",
+        "milstein",
+        "simulated",
+        "64",
+        "0.015625",
+        "0.010596024309278531",
+        "-0.010596024309278531",
+        "783.46041326530644"
+      ]
+    ]
+  }
+}

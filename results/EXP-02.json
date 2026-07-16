@@ -1,0 +1,1362 @@
+{
+  "build_metadata": {
+    "build_flags": "-ffp-contract=off -O3 -DNDEBUG",
+    "build_type": "Release",
+    "compiler_id": "AppleClang",
+    "compiler_version": "21.0.0.21000101",
+    "cpu_brand": "Apple M1",
+    "cxx_standard": "20",
+    "git_branch": "main",
+    "git_commit": "b9b8cf867b94393704485e1d5366da15b12cff86",
+    "git_commit_short": "b9b8cf8",
+    "git_dirty": false,
+    "hostname": "MacBookPro",
+    "logical_cores": 8,
+    "os_name": "Darwin",
+    "os_version": "25.5.0",
+    "timestamp_utc": "2026-07-16T16:58:20Z",
+    "version": "0.1.0"
+  },
+  "configuration": {
+    "asymptotic_level_count": 4,
+    "call_payoff_paths": 4000000,
+    "dividend_yield": 0.0,
+    "master_seed": 20260715,
+    "maturity": 1.0,
+    "path_counts": [
+      1000,
+      4000,
+      16000,
+      64000,
+      256000,
+      1024000
+    ],
+    "rate": 0.05,
+    "seed_count": 32,
+    "spot": 100.0,
+    "step_counts": [
+      16,
+      32,
+      64,
+      128,
+      256,
+      512,
+      1024
+    ],
+    "strike": 100.0,
+    "strong_paths": 100000,
+    "volatility": 0.3
+  },
+  "configuration_document": {
+    "command": "experiment",
+    "convergence": {
+      "asymptotic_level_count": 4,
+      "call_payoff_paths": 4000000,
+      "dividend_yield": 0.0,
+      "master_seed": 20260715,
+      "maturity": 1.0,
+      "path_counts": [
+        1000,
+        4000,
+        16000,
+        64000,
+        256000,
+        1024000
+      ],
+      "rate": 0.05,
+      "seed_count": 32,
+      "spot": 100.0,
+      "step_counts": [
+        16,
+        32,
+        64,
+        128,
+        256,
+        512,
+        1024
+      ],
+      "strike": 100.0,
+      "strong_paths": 100000,
+      "volatility": 0.3
+    },
+    "schema_version": 1
+  },
+  "configuration_source": "configs/experiment/convergence.json",
+  "id": "EXP-02",
+  "interpretation": "Both schemes attain their theoretical strong orders. Measured on common Brownian paths -- the discretised and exact paths share every shock, differing only in the stepping rule -- Euler-Maruyama converges at order 1/2 and Milstein at order 1, with each asymptotic 95% interval covering the theoretical value. The practical consequence is the error ratio: Milstein's advantage grows without bound as the grid refines, so on fine grids it is not a marginal improvement but a different class of accuracy for the same number of shocks. Fitted over the full grid the slopes fall short of theory, because the error is C*dt^k only to leading order and the coarse levels still carry the neglected terms. That the local orders climb monotonically toward theory as the grid refines is what distinguishes this from a wrong order, and it is why the verdict rests on an asymptotic window fixed before the run.",
+  "limitations": [
+    "baseline / euler_maruyama: the full-range slope 0.4974 [0.4955, 0.4994] excludes the theoretical 0.5, while the asymptotic window gives 0.4996 [0.4936, 0.5055], which covers it. The coarse levels are pre-asymptotic; the local orders climb from 0.495 to 0.504 as the grid refines.",
+    "baseline / milstein: the full-range slope 0.9838 [0.9740, 0.9937] excludes the theoretical 1, while the asymptotic window gives 0.9957 [0.9845, 1.0068], which covers it. The coarse levels are pre-asymptotic; the local orders climb from 0.945 to 1.001 as the grid refines.",
+    "high_volatility / milstein: the full-range slope 0.9641 [0.9456, 0.9826] excludes the theoretical 1, while the asymptotic window gives 0.9884 [0.9713, 1.0056], which covers it. The coarse levels are pre-asymptotic; the local orders climb from 0.900 to 1.001 as the grid refines.",
+    "long_maturity / euler_maruyama: the full-range slope 0.4969 [0.4945, 0.4993] excludes the theoretical 0.5, while the asymptotic window gives 0.4997 [0.4925, 0.5069], which covers it. The coarse levels are pre-asymptotic; the local orders climb from 0.493 to 0.505 as the grid refines.",
+    "long_maturity / milstein: the full-range slope 0.9843 [0.9739, 0.9947] excludes the theoretical 1, while the asymptotic window gives 0.9956 [0.9826, 1.0087], which covers it. The coarse levels are pre-asymptotic; the local orders climb from 0.942 to 1.004 as the grid refines.",
+    "Only the terminal value is compared. A pathwise supremum error would be the stronger statement and is not measured here; it is what a barrier payoff would be sensitive to (EXP-09).",
+    "Levels are not coupled to one another: each grid draws its own Brownian path, so the error estimates across levels are independent rather than nested. This costs precision in the fit, not correctness -- each level's error is a valid expectation on its own grid.",
+    "GBM only. Both orders are theoretical results under global Lipschitz coefficients, which GBM satisfies and Heston's square-root diffusion does not; nothing here transfers to EXP-04's Heston arm."
+  ],
+  "name": "Strong SDE Convergence",
+  "question": "Do Euler-Maruyama and Milstein achieve their expected strong convergence orders?",
+  "reproduction_command": "diffusionworks experiment --id EXP-02",
+  "results": {
+    "studies": [
+      {
+        "asymptotic_fit": {
+          "confidence_level": 0.95,
+          "intercept": 1.6695522155788436,
+          "observations": 4,
+          "r_squared": 0.9999847131276071,
+          "residual_standard_deviation": 0.002140746903699448,
+          "slope": 0.49958250289595235,
+          "slope_ci_lower": 0.49363970232231913,
+          "slope_ci_upper": 0.5055253034695856,
+          "slope_standard_error": 0.0013811945669106507
+        },
+        "asymptotic_level_count": 4,
+        "full_fit": {
+          "confidence_level": 0.95,
+          "intercept": 1.6568749436362462,
+          "observations": 7,
+          "r_squared": 0.9999878477857741,
+          "residual_standard_deviation": 0.0028444373046122994,
+          "slope": 0.49744668826881605,
+          "slope_ci_lower": 0.49545315575421395,
+          "slope_ci_upper": 0.49944022078341815,
+          "slope_standard_error": 0.0007755180119012236
+        },
+        "levels": [
+          {
+            "error": 1.3165572054366497,
+            "error_standard_error": 0.0036050322411992656,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 365.1998421513917,
+            "source": "simulated",
+            "step_size": 0.0625,
+            "steps": 16
+          },
+          {
+            "error": 0.9339514659712279,
+            "error_standard_error": 0.0025158878480444555,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 371.22142256745184,
+            "source": "simulated",
+            "step_size": 0.03125,
+            "steps": 32
+          },
+          {
+            "error": 0.6646495348998451,
+            "error_standard_error": 0.0017869821437121298,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 371.9396622056653,
+            "source": "simulated",
+            "step_size": 0.015625,
+            "steps": 64
+          },
+          {
+            "error": 0.46955275054951556,
+            "error_standard_error": 0.0012642861094969478,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 371.39753970432207,
+            "source": "simulated",
+            "step_size": 0.0078125,
+            "steps": 128
+          },
+          {
+            "error": 0.3331592759884628,
+            "error_standard_error": 0.0008971030732655661,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 371.37234941768935,
+            "source": "simulated",
+            "step_size": 0.00390625,
+            "steps": 256
+          },
+          {
+            "error": 0.23561245342658924,
+            "error_standard_error": 0.0006340014491837918,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 371.62762597769256,
+            "source": "simulated",
+            "step_size": 0.001953125,
+            "steps": 512
+          },
+          {
+            "error": 0.16616436133075735,
+            "error_standard_error": 0.0004443198070909888,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 373.9746882288546,
+            "source": "simulated",
+            "step_size": 0.0009765625,
+            "steps": 1024
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse_steps": 16,
+            "fine_steps": 32,
+            "order": 0.49535072353885573
+          },
+          {
+            "coarse_steps": 32,
+            "fine_steps": 64,
+            "order": 0.4907537623240706
+          },
+          {
+            "coarse_steps": 64,
+            "fine_steps": 128,
+            "order": 0.5013065755970938
+          },
+          {
+            "coarse_steps": 128,
+            "fine_steps": 256,
+            "order": 0.49507517998949785
+          },
+          {
+            "coarse_steps": 256,
+            "fine_steps": 512,
+            "order": 0.49979626677934585
+          },
+          {
+            "coarse_steps": 512,
+            "fine_steps": 1024,
+            "order": 0.5038048072912158
+          }
+        ],
+        "maturity": 1.0,
+        "quantity": "strong_error",
+        "scheme": "euler_maruyama",
+        "theoretical_order": 0.5,
+        "variation": "baseline",
+        "verdict": "consistent_asymptotically",
+        "volatility": 0.3,
+        "worst_resolution": 365.1998421513917
+      },
+      {
+        "asymptotic_fit": {
+          "confidence_level": 0.95,
+          "intercept": 0.4153436095687102,
+          "observations": 4,
+          "r_squared": 0.9999863984593678,
+          "residual_standard_deviation": 0.004024393100299329,
+          "slope": 0.9956528132318792,
+          "slope_ci_lower": 0.9844809341163916,
+          "slope_ci_upper": 1.0068246923473667,
+          "slope_standard_error": 0.0025965095993554822
+        },
+        "asymptotic_level_count": 4,
+        "full_fit": {
+          "confidence_level": 0.95,
+          "intercept": 0.3452623619262951,
+          "observations": 7,
+          "r_squared": 0.9999235664272678,
+          "residual_standard_deviation": 0.014109324901282777,
+          "slope": 0.9838481687524224,
+          "slope_ci_lower": 0.9739596055894436,
+          "slope_ci_upper": 0.9937367319154012,
+          "slope_standard_error": 0.003846819045358661
+        },
+        "levels": [
+          {
+            "error": 0.09042008983692411,
+            "error_standard_error": 0.0003060904222071297,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 295.4031987833234,
+            "source": "simulated",
+            "step_size": 0.0625,
+            "steps": 16
+          },
+          {
+            "error": 0.04695312714750131,
+            "error_standard_error": 0.00015038057491851482,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 312.22867164155554,
+            "source": "simulated",
+            "step_size": 0.03125,
+            "steps": 32
+          },
+          {
+            "error": 0.023903813064307226,
+            "error_standard_error": 7.422122663065548e-05,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 322.0616816703791,
+            "source": "simulated",
+            "step_size": 0.015625,
+            "steps": 64
+          },
+          {
+            "error": 0.012049802500908506,
+            "error_standard_error": 3.6348514534056006e-05,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 331.50742624210096,
+            "source": "simulated",
+            "step_size": 0.0078125,
+            "steps": 128
+          },
+          {
+            "error": 0.006086400566816463,
+            "error_standard_error": 1.8207742823868707e-05,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 334.27540281586914,
+            "source": "simulated",
+            "step_size": 0.00390625,
+            "steps": 256
+          },
+          {
+            "error": 0.003044003328624043,
+            "error_standard_error": 9.127546281627067e-06,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 333.49634553498225,
+            "source": "simulated",
+            "step_size": 0.001953125,
+            "steps": 512
+          },
+          {
+            "error": 0.0015212964718662133,
+            "error_standard_error": 4.513146230471268e-06,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 337.08113900562836,
+            "source": "simulated",
+            "step_size": 0.0009765625,
+            "steps": 1024
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse_steps": 16,
+            "fine_steps": 32,
+            "order": 0.9454221043520442
+          },
+          {
+            "coarse_steps": 32,
+            "fine_steps": 64,
+            "order": 0.9739804757625006
+          },
+          {
+            "coarse_steps": 64,
+            "fine_steps": 128,
+            "order": 0.9882312703947709
+          },
+          {
+            "coarse_steps": 128,
+            "fine_steps": 256,
+            "order": 0.9853483097590754
+          },
+          {
+            "coarse_steps": 256,
+            "fine_steps": 512,
+            "order": 0.999619349234551
+          },
+          {
+            "coarse_steps": 512,
+            "fine_steps": 1024,
+            "order": 1.0006686020344535
+          }
+        ],
+        "maturity": 1.0,
+        "quantity": "strong_error",
+        "scheme": "milstein",
+        "theoretical_order": 1.0,
+        "variation": "baseline",
+        "verdict": "consistent_asymptotically",
+        "volatility": 0.3,
+        "worst_resolution": 295.4031987833234
+      },
+      {
+        "asymptotic_fit": {
+          "confidence_level": 0.95,
+          "intercept": 3.061672401618235,
+          "observations": 4,
+          "r_squared": 0.9999766953930711,
+          "residual_standard_deviation": 0.0026479962666084377,
+          "slope": 0.5004906302106126,
+          "slope_ci_lower": 0.49313968475088316,
+          "slope_ci_upper": 0.507841575670342,
+          "slope_standard_error": 0.0017084682221512836
+        },
+        "asymptotic_level_count": 4,
+        "full_fit": {
+          "confidence_level": 0.95,
+          "intercept": 3.0563393772299556,
+          "observations": 7,
+          "r_squared": 0.9999942662189176,
+          "residual_standard_deviation": 0.0019622921849900945,
+          "slope": 0.49959996686752844,
+          "slope_ci_lower": 0.4982246884363308,
+          "slope_ci_upper": 0.5009752452987261,
+          "slope_standard_error": 0.0005350066713037462
+        },
+        "levels": [
+          {
+            "error": 5.315301481578352,
+            "error_standard_error": 0.018337352453858664,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 289.8619904347136,
+            "source": "simulated",
+            "step_size": 0.0625,
+            "steps": 16
+          },
+          {
+            "error": 3.7575022041181287,
+            "error_standard_error": 0.012925710592379173,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 290.69985570723685,
+            "source": "simulated",
+            "step_size": 0.03125,
+            "steps": 32
+          },
+          {
+            "error": 2.6641565394230113,
+            "error_standard_error": 0.009292820643344255,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 286.6897620940468,
+            "source": "simulated",
+            "step_size": 0.015625,
+            "steps": 64
+          },
+          {
+            "error": 1.8805706141612841,
+            "error_standard_error": 0.006637015649957463,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 283.34581585224026,
+            "source": "simulated",
+            "step_size": 0.0078125,
+            "steps": 128
+          },
+          {
+            "error": 1.3334610794306663,
+            "error_standard_error": 0.0047613204273515945,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 280.0611930611824,
+            "source": "simulated",
+            "step_size": 0.00390625,
+            "steps": 256
+          },
+          {
+            "error": 0.9433896525061387,
+            "error_standard_error": 0.0033705076307707113,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 279.8954210616696,
+            "source": "simulated",
+            "step_size": 0.001953125,
+            "steps": 512
+          },
+          {
+            "error": 0.6640137664239737,
+            "error_standard_error": 0.0023358156189044396,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 284.2749063966847,
+            "source": "simulated",
+            "step_size": 0.0009765625,
+            "steps": 1024
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse_steps": 16,
+            "fine_steps": 32,
+            "order": 0.5003775726954248
+          },
+          {
+            "coarse_steps": 32,
+            "fine_steps": 64,
+            "order": 0.4960950962279487
+          },
+          {
+            "coarse_steps": 64,
+            "fine_steps": 128,
+            "order": 0.5025083745628814
+          },
+          {
+            "coarse_steps": 128,
+            "fine_steps": 256,
+            "order": 0.4959947629699154
+          },
+          {
+            "coarse_steps": 256,
+            "fine_steps": 512,
+            "order": 0.4992500346716144
+          },
+          {
+            "coarse_steps": 512,
+            "fine_steps": 1024,
+            "order": 0.5066406248366409
+          }
+        ],
+        "maturity": 1.0,
+        "quantity": "strong_error",
+        "scheme": "euler_maruyama",
+        "theoretical_order": 0.5,
+        "variation": "high_volatility",
+        "verdict": "consistent",
+        "volatility": 0.6,
+        "worst_resolution": 279.8954210616696
+      },
+      {
+        "asymptotic_fit": {
+          "confidence_level": 0.95,
+          "intercept": 1.972465801527882,
+          "observations": 4,
+          "r_squared": 0.9999675676053654,
+          "residual_standard_deviation": 0.006169313689210696,
+          "slope": 0.9884275395975641,
+          "slope_ci_lower": 0.971301273588347,
+          "slope_ci_upper": 1.0055538056067812,
+          "slope_standard_error": 0.0039803969980664435
+        },
+        "asymptotic_level_count": 4,
+        "full_fit": {
+          "confidence_level": 0.95,
+          "intercept": 1.8273612085637532,
+          "observations": 7,
+          "r_squared": 0.9997216891144949,
+          "residual_standard_deviation": 0.02638533079743248,
+          "slope": 0.9640898917492368,
+          "slope_ci_lower": 0.9455976526100855,
+          "slope_ci_upper": 0.982582130888388,
+          "slope_standard_error": 0.007193795148938958
+        },
+        "levels": [
+          {
+            "error": 0.41361007179427595,
+            "error_standard_error": 0.0019354930544104435,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 213.69752314624694,
+            "source": "simulated",
+            "step_size": 0.0625,
+            "steps": 16
+          },
+          {
+            "error": 0.22161820211290972,
+            "error_standard_error": 0.0009383505023961717,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 236.1784871932029,
+            "source": "simulated",
+            "step_size": 0.03125,
+            "steps": 32
+          },
+          {
+            "error": 0.11544265565580374,
+            "error_standard_error": 0.0004644782509783496,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 248.54265062495853,
+            "source": "simulated",
+            "step_size": 0.015625,
+            "steps": 64
+          },
+          {
+            "error": 0.05914657234488372,
+            "error_standard_error": 0.00022561837474543422,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 262.15317086482406,
+            "source": "simulated",
+            "step_size": 0.0078125,
+            "steps": 128
+          },
+          {
+            "error": 0.030067905653670148,
+            "error_standard_error": 0.0001140017549957593,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 263.74949802122455,
+            "source": "simulated",
+            "step_size": 0.00390625,
+            "steps": 256
+          },
+          {
+            "error": 0.015158611818924644,
+            "error_standard_error": 5.689325584285681e-05,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 266.43952071918335,
+            "source": "simulated",
+            "step_size": 0.001953125,
+            "steps": 512
+          },
+          {
+            "error": 0.007572797969873169,
+            "error_standard_error": 2.823887580870635e-05,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 268.1692437465373,
+            "source": "simulated",
+            "step_size": 0.0009765625,
+            "steps": 1024
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse_steps": 16,
+            "fine_steps": 32,
+            "order": 0.9001949382938554
+          },
+          {
+            "coarse_steps": 32,
+            "fine_steps": 64,
+            "order": 0.9408999855258521
+          },
+          {
+            "coarse_steps": 64,
+            "fine_steps": 128,
+            "order": 0.9648099240330706
+          },
+          {
+            "coarse_steps": 128,
+            "fine_steps": 256,
+            "order": 0.9760701819939416
+          },
+          {
+            "coarse_steps": 256,
+            "fine_steps": 512,
+            "order": 0.9880867403119057
+          },
+          {
+            "coarse_steps": 512,
+            "fine_steps": 1024,
+            "order": 1.0012392962487315
+          }
+        ],
+        "maturity": 1.0,
+        "quantity": "strong_error",
+        "scheme": "milstein",
+        "theoretical_order": 1.0,
+        "variation": "high_volatility",
+        "verdict": "consistent_asymptotically",
+        "volatility": 0.6,
+        "worst_resolution": 213.69752314624694
+      },
+      {
+        "asymptotic_fit": {
+          "confidence_level": 0.95,
+          "intercept": 2.319797275904749,
+          "observations": 4,
+          "r_squared": 0.9999775842016294,
+          "residual_standard_deviation": 0.0025931180969277334,
+          "slope": 0.4997408571188196,
+          "slope_ci_lower": 0.49254225569270516,
+          "slope_ci_upper": 0.506939458544934,
+          "slope_standard_error": 0.0016730612201960302
+        },
+        "asymptotic_level_count": 4,
+        "full_fit": {
+          "confidence_level": 0.95,
+          "intercept": 2.305991021280054,
+          "observations": 7,
+          "r_squared": 0.9999819447543558,
+          "residual_standard_deviation": 0.0034633236393761114,
+          "slope": 0.4968988381550909,
+          "slope_ci_lower": 0.4944715572751464,
+          "slope_ci_upper": 0.4993261190350354,
+          "slope_standard_error": 0.0009442534940124336
+        },
+        "levels": [
+          {
+            "error": 4.351656650154535,
+            "error_standard_error": 0.014368778456285744,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 302.85501745284864,
+            "source": "simulated",
+            "step_size": 0.1875,
+            "steps": 16
+          },
+          {
+            "error": 3.0926734897164483,
+            "error_standard_error": 0.010019306172242027,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 308.6714226065415,
+            "source": "simulated",
+            "step_size": 0.09375,
+            "steps": 32
+          },
+          {
+            "error": 2.2011530874570964,
+            "error_standard_error": 0.00714685636472553,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 307.98899196033165,
+            "source": "simulated",
+            "step_size": 0.046875,
+            "steps": 64
+          },
+          {
+            "error": 1.5562727238193939,
+            "error_standard_error": 0.005079966766702115,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 306.3549025596711,
+            "source": "simulated",
+            "step_size": 0.0234375,
+            "steps": 128
+          },
+          {
+            "error": 1.1044106403397713,
+            "error_standard_error": 0.003627823125715579,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 304.42791780868015,
+            "source": "simulated",
+            "step_size": 0.01171875,
+            "steps": 256
+          },
+          {
+            "error": 0.7813634871705659,
+            "error_standard_error": 0.0025634952312854706,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 304.80395580012424,
+            "source": "simulated",
+            "step_size": 0.005859375,
+            "steps": 512
+          },
+          {
+            "error": 0.5504546802992599,
+            "error_standard_error": 0.0017825165883945647,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 308.8076059898161,
+            "source": "simulated",
+            "step_size": 0.0029296875,
+            "steps": 1024
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse_steps": 16,
+            "fine_steps": 32,
+            "order": 0.4927102027279319
+          },
+          {
+            "coarse_steps": 32,
+            "fine_steps": 64,
+            "order": 0.4905950419779383
+          },
+          {
+            "coarse_steps": 64,
+            "fine_steps": 128,
+            "order": 0.5001645836065132
+          },
+          {
+            "coarse_steps": 128,
+            "fine_steps": 256,
+            "order": 0.494818210142049
+          },
+          {
+            "coarse_steps": 256,
+            "fine_steps": 512,
+            "order": 0.4992109470156345
+          },
+          {
+            "coarse_steps": 512,
+            "fine_steps": 1024,
+            "order": 0.5053700508998368
+          }
+        ],
+        "maturity": 3.0,
+        "quantity": "strong_error",
+        "scheme": "euler_maruyama",
+        "theoretical_order": 0.5,
+        "variation": "long_maturity",
+        "verdict": "consistent_asymptotically",
+        "volatility": 0.3,
+        "worst_resolution": 302.85501745284864
+      },
+      {
+        "asymptotic_fit": {
+          "confidence_level": 0.95,
+          "intercept": 1.0741603626344967,
+          "observations": 4,
+          "r_squared": 0.9999813923221053,
+          "residual_standard_deviation": 0.004707066182427328,
+          "slope": 0.9956454393877604,
+          "slope_ci_lower": 0.9825784319985552,
+          "slope_ci_upper": 1.0087124467769655,
+          "slope_standard_error": 0.00303696538157892
+        },
+        "asymptotic_level_count": 4,
+        "full_fit": {
+          "confidence_level": 0.95,
+          "intercept": 1.0196243815662442,
+          "observations": 7,
+          "r_squared": 0.9999157568198314,
+          "residual_standard_deviation": 0.014819627628609435,
+          "slope": 0.9843105643219405,
+          "slope_ci_lower": 0.9739241833375458,
+          "slope_ci_upper": 0.9946969453063352,
+          "slope_standard_error": 0.0040404786342169464
+        },
+        "levels": [
+          {
+            "error": 0.5219058082212081,
+            "error_standard_error": 0.0022692256278723307,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 229.9929111546995,
+            "source": "simulated",
+            "step_size": 0.1875,
+            "steps": 16
+          },
+          {
+            "error": 0.27165541557958617,
+            "error_standard_error": 0.0011429380958192248,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 237.68165272754467,
+            "source": "simulated",
+            "step_size": 0.09375,
+            "steps": 32
+          },
+          {
+            "error": 0.13828789327136878,
+            "error_standard_error": 0.0005776988781111477,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 239.37711931087145,
+            "source": "simulated",
+            "step_size": 0.046875,
+            "steps": 64
+          },
+          {
+            "error": 0.06949975196895784,
+            "error_standard_error": 0.0002817168064672703,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 246.70076606534403,
+            "source": "simulated",
+            "step_size": 0.0234375,
+            "steps": 128
+          },
+          {
+            "error": 0.035117302829414894,
+            "error_standard_error": 0.00014243598303139386,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 246.54797251390332,
+            "source": "simulated",
+            "step_size": 0.01171875,
+            "steps": 256
+          },
+          {
+            "error": 0.01758735384976811,
+            "error_standard_error": 7.16096541807741e-05,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 245.6003181550065,
+            "source": "simulated",
+            "step_size": 0.005859375,
+            "steps": 512
+          },
+          {
+            "error": 0.008770539942466534,
+            "error_standard_error": 3.5580254958603466e-05,
+            "non_positive_states": 0,
+            "paths": 100000,
+            "resolution": 246.5001994131517,
+            "source": "simulated",
+            "step_size": 0.0029296875,
+            "steps": 1024
+          }
+        ],
+        "local_orders": [
+          {
+            "coarse_steps": 16,
+            "fine_steps": 32,
+            "order": 0.942011649505449
+          },
+          {
+            "coarse_steps": 32,
+            "fine_steps": 64,
+            "order": 0.9741029501128831
+          },
+          {
+            "coarse_steps": 64,
+            "fine_steps": 128,
+            "order": 0.9925951237319965
+          },
+          {
+            "coarse_steps": 128,
+            "fine_steps": 256,
+            "order": 0.984825785643501
+          },
+          {
+            "coarse_steps": 256,
+            "fine_steps": 512,
+            "order": 0.9976436087334778
+          },
+          {
+            "coarse_steps": 512,
+            "fine_steps": 1024,
+            "order": 1.0038008673377299
+          }
+        ],
+        "maturity": 3.0,
+        "quantity": "strong_error",
+        "scheme": "milstein",
+        "theoretical_order": 1.0,
+        "variation": "long_maturity",
+        "verdict": "consistent_asymptotically",
+        "volatility": 0.3,
+        "worst_resolution": 229.9929111546995
+      }
+    ]
+  },
+  "runtime_seconds": 68.860771833,
+  "status": "warning",
+  "table": {
+    "headers": [
+      "variation",
+      "scheme",
+      "steps",
+      "step_size",
+      "error",
+      "standard_error",
+      "resolution",
+      "paths"
+    ],
+    "rows": [
+      [
+        "baseline",
+        "euler_maruyama",
+        "16",
+        "0.0625",
+        "1.3165572054366497",
+        "0.0036050322411992656",
+        "365.19984215139169",
+        "100000"
+      ],
+      [
+        "baseline",
+        "euler_maruyama",
+        "32",
+        "0.03125",
+        "0.93395146597122791",
+        "0.0025158878480444555",
+        "371.22142256745184",
+        "100000"
+      ],
+      [
+        "baseline",
+        "euler_maruyama",
+        "64",
+        "0.015625",
+        "0.66464953489984513",
+        "0.0017869821437121298",
+        "371.93966220566529",
+        "100000"
+      ],
+      [
+        "baseline",
+        "euler_maruyama",
+        "128",
+        "0.0078125",
+        "0.46955275054951556",
+        "0.0012642861094969478",
+        "371.39753970432207",
+        "100000"
+      ],
+      [
+        "baseline",
+        "euler_maruyama",
+        "256",
+        "0.00390625",
+        "0.33315927598846279",
+        "0.00089710307326556615",
+        "371.37234941768935",
+        "100000"
+      ],
+      [
+        "baseline",
+        "euler_maruyama",
+        "512",
+        "0.001953125",
+        "0.23561245342658924",
+        "0.00063400144918379176",
+        "371.62762597769256",
+        "100000"
+      ],
+      [
+        "baseline",
+        "euler_maruyama",
+        "1024",
+        "0.0009765625",
+        "0.16616436133075735",
+        "0.00044431980709098881",
+        "373.97468822885457",
+        "100000"
+      ],
+      [
+        "baseline",
+        "milstein",
+        "16",
+        "0.0625",
+        "0.090420089836924109",
+        "0.00030609042220712968",
+        "295.40319878332338",
+        "100000"
+      ],
+      [
+        "baseline",
+        "milstein",
+        "32",
+        "0.03125",
+        "0.046953127147501307",
+        "0.00015038057491851482",
+        "312.22867164155554",
+        "100000"
+      ],
+      [
+        "baseline",
+        "milstein",
+        "64",
+        "0.015625",
+        "0.023903813064307226",
+        "7.4221226630655479e-05",
+        "322.06168167037907",
+        "100000"
+      ],
+      [
+        "baseline",
+        "milstein",
+        "128",
+        "0.0078125",
+        "0.012049802500908506",
+        "3.6348514534056006e-05",
+        "331.50742624210096",
+        "100000"
+      ],
+      [
+        "baseline",
+        "milstein",
+        "256",
+        "0.00390625",
+        "0.0060864005668164632",
+        "1.8207742823868707e-05",
+        "334.27540281586914",
+        "100000"
+      ],
+      [
+        "baseline",
+        "milstein",
+        "512",
+        "0.001953125",
+        "0.0030440033286240429",
+        "9.1275462816270669e-06",
+        "333.49634553498225",
+        "100000"
+      ],
+      [
+        "baseline",
+        "milstein",
+        "1024",
+        "0.0009765625",
+        "0.0015212964718662133",
+        "4.5131462304712682e-06",
+        "337.08113900562836",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "euler_maruyama",
+        "16",
+        "0.0625",
+        "5.3153014815783521",
+        "0.018337352453858664",
+        "289.86199043471362",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "euler_maruyama",
+        "32",
+        "0.03125",
+        "3.7575022041181287",
+        "0.012925710592379173",
+        "290.69985570723685",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "euler_maruyama",
+        "64",
+        "0.015625",
+        "2.6641565394230113",
+        "0.0092928206433442549",
+        "286.68976209404678",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "euler_maruyama",
+        "128",
+        "0.0078125",
+        "1.8805706141612841",
+        "0.0066370156499574633",
+        "283.34581585224026",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "euler_maruyama",
+        "256",
+        "0.00390625",
+        "1.3334610794306663",
+        "0.0047613204273515945",
+        "280.06119306118239",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "euler_maruyama",
+        "512",
+        "0.001953125",
+        "0.94338965250613871",
+        "0.0033705076307707113",
+        "279.89542106166959",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "euler_maruyama",
+        "1024",
+        "0.0009765625",
+        "0.66401376642397369",
+        "0.0023358156189044396",
+        "284.27490639668468",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "milstein",
+        "16",
+        "0.0625",
+        "0.41361007179427595",
+        "0.0019354930544104435",
+        "213.69752314624694",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "milstein",
+        "32",
+        "0.03125",
+        "0.22161820211290972",
+        "0.00093835050239617166",
+        "236.1784871932029",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "milstein",
+        "64",
+        "0.015625",
+        "0.11544265565580374",
+        "0.00046447825097834959",
+        "248.54265062495853",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "milstein",
+        "128",
+        "0.0078125",
+        "0.05914657234488372",
+        "0.00022561837474543422",
+        "262.15317086482406",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "milstein",
+        "256",
+        "0.00390625",
+        "0.030067905653670148",
+        "0.00011400175499575931",
+        "263.74949802122455",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "milstein",
+        "512",
+        "0.001953125",
+        "0.015158611818924644",
+        "5.6893255842856807e-05",
+        "266.43952071918335",
+        "100000"
+      ],
+      [
+        "high_volatility",
+        "milstein",
+        "1024",
+        "0.0009765625",
+        "0.0075727979698731688",
+        "2.823887580870635e-05",
+        "268.16924374653729",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "euler_maruyama",
+        "16",
+        "0.1875",
+        "4.3516566501545348",
+        "0.014368778456285744",
+        "302.85501745284864",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "euler_maruyama",
+        "32",
+        "0.09375",
+        "3.0926734897164483",
+        "0.010019306172242027",
+        "308.67142260654151",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "euler_maruyama",
+        "64",
+        "0.046875",
+        "2.2011530874570964",
+        "0.0071468563647255302",
+        "307.98899196033165",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "euler_maruyama",
+        "128",
+        "0.0234375",
+        "1.5562727238193939",
+        "0.005079966766702115",
+        "306.35490255967107",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "euler_maruyama",
+        "256",
+        "0.01171875",
+        "1.1044106403397713",
+        "0.0036278231257155791",
+        "304.42791780868015",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "euler_maruyama",
+        "512",
+        "0.005859375",
+        "0.78136348717056592",
+        "0.0025634952312854706",
+        "304.80395580012424",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "euler_maruyama",
+        "1024",
+        "0.0029296875",
+        "0.55045468029925992",
+        "0.0017825165883945647",
+        "308.80760598981612",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "milstein",
+        "16",
+        "0.1875",
+        "0.52190580822120813",
+        "0.0022692256278723307",
+        "229.9929111546995",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "milstein",
+        "32",
+        "0.09375",
+        "0.27165541557958617",
+        "0.0011429380958192248",
+        "237.68165272754467",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "milstein",
+        "64",
+        "0.046875",
+        "0.13828789327136878",
+        "0.00057769887811114768",
+        "239.37711931087145",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "milstein",
+        "128",
+        "0.0234375",
+        "0.069499751968957843",
+        "0.0002817168064672703",
+        "246.70076606534403",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "milstein",
+        "256",
+        "0.01171875",
+        "0.035117302829414894",
+        "0.00014243598303139386",
+        "246.54797251390332",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "milstein",
+        "512",
+        "0.005859375",
+        "0.01758735384976811",
+        "7.1609654180774098e-05",
+        "245.60031815500651",
+        "100000"
+      ],
+      [
+        "long_maturity",
+        "milstein",
+        "1024",
+        "0.0029296875",
+        "0.0087705399424665344",
+        "3.5580254958603466e-05",
+        "246.50019941315171",
+        "100000"
+      ]
+    ]
+  }
+}
