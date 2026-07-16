@@ -152,6 +152,11 @@ add_dw_test(
     SOURCES engines/monte_carlo_engine_test.cpp)
 
 add_dw_test(
+    dw_test_finite_difference
+    LABEL unit
+    SOURCES engines/finite_difference_test.cpp)
+
+add_dw_test(
     dw_test_geometric_asian
     LABEL statistical
     SOURCES engines/geometric_asian_test.cpp)

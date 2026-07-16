@@ -15,6 +15,7 @@ target_sources(
             core/build_info.cpp
             core/config.cpp
             engines/black_scholes_analytic.cpp
+            engines/finite_difference_engine.cpp
             engines/geometric_asian_analytic.cpp
             engines/monte_carlo_engine.cpp
             experiments/convergence.cpp
@@ -28,6 +29,7 @@ target_sources(
             numerics/tridiagonal.cpp
             pde/asset_grid.cpp
             pde/black_scholes_operator.cpp
+            pde/boundary_conditions.cpp
             random/random_stream.cpp
             simulation/gbm_path_generator.cpp
             simulation/gbm_stepper.cpp
