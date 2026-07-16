@@ -121,7 +121,8 @@ add_dw_test(
     dw_test_pde
     LABEL unit
     SOURCES pde/asset_grid_test.cpp
-            pde/black_scholes_operator_test.cpp)
+            pde/black_scholes_operator_test.cpp
+            pde/interpolation_test.cpp)
 
 # --- Domain types -----------------------------------------------------------
 
