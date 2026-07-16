@@ -15,6 +15,7 @@ target_sources(
             core/build_info.cpp
             core/config.cpp
             engines/black_scholes_analytic.cpp
+            engines/geometric_asian_analytic.cpp
             engines/monte_carlo_engine.cpp
             instruments/asian_option.cpp
             instruments/european_option.cpp

@@ -133,6 +133,16 @@ add_dw_test(
     LABEL statistical
     SOURCES engines/monte_carlo_engine_test.cpp)
 
+add_dw_test(
+    dw_test_geometric_asian
+    LABEL statistical
+    SOURCES engines/geometric_asian_test.cpp)
+
+add_dw_test(
+    dw_test_variance_reduction
+    LABEL statistical
+    SOURCES engines/variance_reduction_test.cpp)
+
 # --- CLI --------------------------------------------------------------------
 
 add_dw_test(
