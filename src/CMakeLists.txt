@@ -27,6 +27,7 @@ target_sources(
             models/black_scholes.cpp
             numerics/tridiagonal.cpp
             pde/asset_grid.cpp
+            pde/black_scholes_operator.cpp
             random/random_stream.cpp
             simulation/gbm_path_generator.cpp
             simulation/gbm_stepper.cpp
