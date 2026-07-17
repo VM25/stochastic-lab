@@ -29,6 +29,7 @@ python3 python/plot_convergence.py results/*.json --outdir docs/figures
 | EXP-04 | pass | The bias floor exists and is located: on coarse grids more paths stop helping. |
 | EXP-06 | pass | Crank–Nicolson reaches order 2.0034 in space; Rannacher restores order 1.98 in time where plain CN oscillates. The explicit stability bound is sufficient, not necessary — stable to ratio 1.60, divergent at 1.70. |
 | EXP-07 | pass | Daily monitoring is not continuous monitoring: the bias reaches **67% of price** for an up-and-out call near the spot, and is biased high in all 42 resolved cells. The Brownian bridge removes it at every frequency, in both directions. A separate PDE arm prices the continuous contract directly and converges to the analytic reference at order ~2.0. |
+| EXP-08 | pass | No Greek estimator wins everywhere. Under common random numbers the finite-difference **delta** variance is bump-independent (fitted exponent ~0, not 1/h); **gamma** grows only as ~bump^(−0.5), not 1/h². Pathwise beats likelihood-ratio delta by 1.8–2.4× in standard error but has no gamma; likelihood-ratio is the one that survives a discontinuous payoff. |
 
 The EXP-02 warning is not a defect. It records that the full-range slopes (0.4974,
 0.9838) exclude their theoretical values while the asymptotic-window slopes
@@ -69,6 +70,20 @@ spot barriers are ragged at coarse grids but clear the second-order floor the ar
 enforces). It fails the whole record if any fitted order drops below 1.5, which is
 what a misplaced barrier boundary would look like — so it is a standing regression on
 the engine, not a one-time check. See `docs/BARRIER-MONITORING-METHODOLOGY.md` §8.
+
+EXP-08's headline is a correction to a textbook heuristic. The naive picture is that a
+finite-difference Greek's variance grows as 1/h (delta) or 1/h² (gamma) as the bump h
+shrinks, forcing a bias-variance compromise. **Under common random numbers that is not
+what happens.** The experiment fits the dispersion-versus-bump exponent per cell and
+finds a median near **0.0** for delta (its variance is essentially bump-independent,
+because the shared-draw estimator converges to the pathwise one) and near **0.5** for
+gamma — not 2.0, and not a universal law (it ranges 0.4–2.0 with moneyness). The
+rankings are equally regime-specific: pathwise delta beats likelihood-ratio delta by
+1.8–2.4× in standard error, but has no gamma, and likelihood-ratio is the only method
+that survives a discontinuous payoff. The experiment reports these per cell rather than
+declaring a winner, and marks its worst region (deep out-of-the-money, short maturity)
+explicitly. It fails the record only if a *theoretically unbiased* estimator (pathwise,
+likelihood-ratio) shows a resolved bias, which none does.
 
 ## Reading a record
 

@@ -2,6 +2,7 @@
 
 #include <diffusionworks/experiments/barrier_experiments.hpp>
 #include <diffusionworks/experiments/convergence_experiments.hpp>
+#include <diffusionworks/experiments/greek_experiments.hpp>
 #include <diffusionworks/experiments/pde_experiments.hpp>
 
 #include <fmt/format.h>
@@ -510,6 +511,133 @@ Result<BarrierExperimentConfig> parse_barrier_config(const ConfigNode& root) {
     return Result<BarrierExperimentConfig>::success(std::move(config));
 }
 
+/// Parses the `greeks` block for EXP-08.
+///
+/// Same contract as the other blocks: absent means the documented defaults that
+/// produced the published record, and an unknown key is rejected rather than
+/// silently ignored.
+Result<GreekExperimentConfig> parse_greek_config(const ConfigNode& root) {
+    GreekExperimentConfig config;
+
+    if (!root.contains("greeks")) {
+        return Result<GreekExperimentConfig>::success(config);
+    }
+
+    auto node = root.object("greeks");
+    if (!node) {
+        return Result<GreekExperimentConfig>::failure(std::move(node).error());
+    }
+
+    const Status unknown = node.value().reject_unknown_keys({"strike",
+                                                             "rate",
+                                                             "dividend_yield",
+                                                             "spots",
+                                                             "maturities",
+                                                             "volatilities",
+                                                             "spot_bump_fractions",
+                                                             "volatility_bumps",
+                                                             "paths",
+                                                             "seed_count",
+                                                             "master_seed"});
+    if (!unknown) {
+        return Result<GreekExperimentConfig>::failure(unknown.error());
+    }
+
+    std::optional<Error> first_error;
+    const auto read_number = [&](const char* key, double fallback) -> double {
+        auto v = node.value().number_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_integer = [&](const char* key, std::int64_t fallback) -> std::int64_t {
+        auto v = node.value().integer_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_doubles = [&](const char* key, std::vector<double> fallback) {
+        if (!node.value().contains(key)) {
+            return fallback;
+        }
+        auto array = node.value().array(key);
+        if (!array) {
+            if (!first_error.has_value()) {
+                first_error = array.error();
+            }
+            return fallback;
+        }
+        std::vector<double> out;
+        for (std::size_t i = 0; i < array.value().size(); ++i) {
+            auto v = array.value().number_at(i);
+            if (!v) {
+                if (!first_error.has_value()) {
+                    first_error = v.error();
+                }
+                return fallback;
+            }
+            out.push_back(v.value());
+        }
+        return out;
+    };
+
+    config.strike = read_number("strike", config.strike);
+    config.rate = read_number("rate", config.rate);
+    config.dividend_yield = read_number("dividend_yield", config.dividend_yield);
+    config.spots = read_doubles("spots", config.spots);
+    config.maturities = read_doubles("maturities", config.maturities);
+    config.volatilities = read_doubles("volatilities", config.volatilities);
+    config.spot_bump_fractions = read_doubles("spot_bump_fractions", config.spot_bump_fractions);
+    config.volatility_bumps = read_doubles("volatility_bumps", config.volatility_bumps);
+
+    const std::int64_t paths = read_integer("paths", config.paths);
+    const std::int64_t seed_count =
+        read_integer("seed_count", static_cast<std::int64_t>(config.seed_count));
+    const std::int64_t master_seed =
+        read_integer("master_seed", static_cast<std::int64_t>(config.master_seed));
+
+    if (first_error.has_value()) {
+        return Result<GreekExperimentConfig>::failure(*first_error);
+    }
+
+    if (paths < 2 || seed_count < 2 || master_seed < 0) {
+        return Result<GreekExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "paths must be at least 2; seed_count at least 2, since bias and variance are measured "
+            "across seeds and one seed cannot separate them; and master_seed non-negative",
+            kContext);
+    }
+    config.paths = paths;
+    config.seed_count = static_cast<std::uint64_t>(seed_count);
+    config.master_seed = static_cast<std::uint64_t>(master_seed);
+
+    if (config.spots.empty() || config.maturities.empty() || config.volatilities.empty()) {
+        return Result<GreekExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "spots, maturities, and volatilities must each be non-empty: the comparison exists to "
+            "sweep regimes, and a single one would license the universal ranking the experiment "
+            "refuses to make",
+            kContext);
+    }
+    if (config.spot_bump_fractions.size() < 3 || config.volatility_bumps.size() < 3) {
+        return Result<GreekExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "spot_bump_fractions and volatility_bumps each need at least 3 values to fit the "
+            "variance-versus-bump scaling",
+            kContext);
+    }
+
+    return Result<GreekExperimentConfig>::success(std::move(config));
+}
+
 nlohmann::json table_to_json(const CsvTable& table) {
     return nlohmann::json{{"headers", table.headers}, {"rows", table.rows}};
 }
@@ -542,7 +670,7 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
     Result<ExperimentRecord> record = Result<ExperimentRecord>::failure(
         ErrorCode::NotImplemented,
         fmt::format("experiment '{}' is not implemented in this build. Implemented: EXP-01, "
-                    "EXP-02, EXP-03, EXP-04, EXP-06, EXP-07.",
+                    "EXP-02, EXP-03, EXP-04, EXP-06, EXP-07, EXP-08.",
                     id),
         kContext);
 
@@ -572,6 +700,16 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
             barrier_config.master_seed = *options.seed;
         }
         record = run_barrier_monitoring_bias(barrier_config);
+    } else if (id == "EXP-08") {
+        auto greeks = parse_greek_config(config.root());
+        if (!greeks) {
+            return Result<nlohmann::json>::failure(std::move(greeks).error());
+        }
+        GreekExperimentConfig greek_config = std::move(greeks).value();
+        if (options.seed.has_value()) {
+            greek_config.master_seed = *options.seed;
+        }
+        record = run_greek_estimator_comparison(greek_config);
     }
 
     if (!record) {

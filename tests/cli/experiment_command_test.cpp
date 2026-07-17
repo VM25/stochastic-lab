@@ -81,6 +81,32 @@ ConfigDocument tiny_barrier_config() {
     return config_from(kTinyBarrierConfig);
 }
 
+/// The greeks block, cut to the smallest shape that still runs: one scenario, the
+/// minimum three bumps a scaling fit needs, two seeds, a few hundred paths. This
+/// exercises the wiring; the estimator physics is validated in
+/// tests/engines/greeks_monte_carlo_test.cpp.
+constexpr const char* kTinyGreekConfig = R"({
+  "schema_version": 1,
+  "command": "experiment",
+  "greeks": {
+    "strike": 100.0,
+    "rate": 0.05,
+    "dividend_yield": 0.0,
+    "spots": [100.0],
+    "maturities": [1.0],
+    "volatilities": [0.2],
+    "spot_bump_fractions": [0.05, 0.02, 0.01],
+    "volatility_bumps": [0.02, 0.01, 0.005],
+    "paths": 500,
+    "seed_count": 2,
+    "master_seed": 20260717
+  }
+})";
+
+ConfigDocument tiny_greek_config() {
+    return config_from(kTinyGreekConfig);
+}
+
 Options options_for(const std::string& id) {
     Options options;
     options.command = CommandKind::Experiment;
@@ -209,6 +235,48 @@ TEST(ExperimentCommandTest, BarrierMonitoringBiasProducesARecord) {
     EXPECT_EQ(arms.at(1).at("convention"), "brownian_bridge");
     EXPECT_EQ(arms.at(2).at("barrier_type"), "up_and_out");
     EXPECT_EQ(arms.at(0).at("levels").size(), 3U);
+}
+
+TEST(ExperimentCommandTest, GreekEstimatorComparisonProducesARecord) {
+    const auto document = run_experiment(tiny_greek_config(), options_for("EXP-08"));
+    ASSERT_TRUE(document.ok()) << document.error().describe();
+    EXPECT_EQ(document.value().at("id"), "EXP-08");
+
+    const std::string status = document.value().at("status");
+    EXPECT_TRUE(status == "pass" || status == "fail" || status == "warning" ||
+                status == "inconclusive")
+        << "unknown status: " << status;
+
+    // One scenario, so the cells are: delta by three methods (FD across 3 bumps,
+    // pathwise, likelihood-ratio) + gamma (FD across 3 bumps) + vega (FD across 3
+    // vol bumps, pathwise). The exact count matters less than that the structured
+    // comparison exists and carries the fields the exit gate requires.
+    const auto& cells = document.value().at("results").at("cells");
+    ASSERT_FALSE(cells.empty());
+    for (const char* field : {"greek",
+                              "method",
+                              "bump",
+                              "reference",
+                              "estimate",
+                              "bias",
+                              "across_seed_standard_error",
+                              "rmse",
+                              "mean_runtime_seconds"}) {
+        EXPECT_TRUE(cells.at(0).contains(field)) << "cell missing " << field;
+    }
+    EXPECT_TRUE(document.value().at("results").contains("finite_difference_variance_scaling"));
+    EXPECT_TRUE(document.value().at("results").contains("failure_regions"));
+}
+
+// A single regime is refused: the comparison exists to sweep, and one scenario would
+// license the universal ranking the experiment is built to avoid.
+TEST(ExperimentCommandTest, GreekExperimentRejectsAWiderConfigMistake) {
+    const auto document =
+        run_experiment(config_from(R"({"schema_version": 1, "command": "experiment",
+                        "greeks": {"spot_bump_fractions": [0.05, 0.02]}})"),
+                       options_for("EXP-08"));
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidArgument);
 }
 
 // Every bias here is a difference of two numbers, one of which carries sampling

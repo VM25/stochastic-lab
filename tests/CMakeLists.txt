@@ -166,6 +166,16 @@ add_dw_test(
     LABEL statistical
     SOURCES engines/barrier_monte_carlo_test.cpp)
 
+# The Greek estimators are validated against the analytic sensitivities at 200k
+# paths, so the suite is statistical: it measures bias against a reference and the
+# variance ordering of the estimators, neither of which resolves at unit-test path
+# counts.
+
+add_dw_test(
+    dw_test_greeks_monte_carlo
+    LABEL statistical
+    SOURCES engines/greeks_monte_carlo_test.cpp)
+
 add_dw_test(
     dw_test_finite_difference
     LABEL unit
