@@ -2,6 +2,7 @@
 #include <diffusionworks/engines/barrier_pde_engine.hpp>
 #include <diffusionworks/engines/black_scholes_analytic.hpp>
 #include <diffusionworks/engines/finite_difference_engine.hpp>
+#include <diffusionworks/engines/heston_analytic.hpp>
 
 #include <gtest/gtest.h>
 
@@ -11,9 +12,12 @@
 #include <ql/exercise.hpp>
 #include <ql/instruments/barrieroption.hpp>
 #include <ql/instruments/vanillaoption.hpp>
+#include <ql/models/equity/hestonmodel.hpp>
 #include <ql/pricingengines/barrier/analyticbarrierengine.hpp>
 #include <ql/pricingengines/vanilla/analyticeuropeanengine.hpp>
+#include <ql/pricingengines/vanilla/analytichestonengine.hpp>
 #include <ql/processes/blackscholesprocess.hpp>
+#include <ql/processes/hestonprocess.hpp>
 #include <ql/quotes/simplequote.hpp>
 #include <ql/termstructures/volatility/equityfx/blackconstantvol.hpp>
 #include <ql/termstructures/yield/flatforward.hpp>
@@ -506,6 +510,84 @@ TEST(QuantLibCrossValidation, BarrierPdeConvergesToQuantLib) {
         }
         EXPECT_LT(finest_error, 3e-4)
             << to_string(c.type) << ": PDE did not converge to QuantLib within tolerance";
+        ++compared;
+    }
+    EXPECT_EQ(compared, static_cast<int>(cases.size()));
+}
+
+// The Heston semi-analytic engine, against QuantLib's AnalyticHestonEngine. This is
+// the strongest available check on the characteristic-function integral: QuantLib's
+// implementation is independent production code, written by different people, using a
+// different quadrature and a different branch-handling convention. If both had
+// misread the little-trap formulation the same way, only a disagreement here would
+// reveal it. The maturities are whole years so both engines see the identical T under
+// Actual/365.
+TEST(QuantLibCrossValidation, HestonPricesAgree) {
+    struct Case {
+        std::string name;
+        double spot;
+        double strike;
+        double rate;
+        double dividend;
+        double v0;
+        double kappa;
+        double theta;
+        double xi;
+        double rho;
+        QuantLib::Natural years;
+    };
+
+    const std::vector<Case> cases{
+        {"fang_oosterlee", 100, 100, 0.00, 0.00, 0.0175, 1.5768, 0.0398, 0.5751, -0.5711, 1},
+        {"feller_violating", 100, 100, 0.05, 0.00, 0.09, 2.0, 0.09, 1.0, -0.3, 1},
+        {"in_the_money", 120, 100, 0.03, 0.01, 0.04, 2.0, 0.04, 0.5, -0.6, 1},
+        {"out_of_the_money", 80, 100, 0.03, 0.00, 0.04, 1.5, 0.05, 0.4, -0.5, 1},
+        {"long_dated", 100, 100, 0.04, 0.02, 0.04, 1.0, 0.04, 0.6, -0.7, 3},
+        {"positive_correlation", 100, 110, 0.05, 0.00, 0.06, 2.5, 0.05, 0.7, 0.4, 2},
+    };
+
+    int compared = 0;
+    for (const auto& c : cases) {
+        const double maturity =
+            static_cast<double>(c.years * kDaysPerYear) / static_cast<double>(kDaysPerYear);
+
+        const auto mk = MarketState::create(c.spot, c.rate, c.dividend).value();
+        const auto model = HestonModel::create(c.v0, c.kappa, c.theta, c.xi, c.rho).value();
+        const auto option = EuropeanOption::create(OptionType::Call, c.strike, maturity).value();
+        const auto ours = HestonAnalyticEngine::price(mk, option, model);
+        ASSERT_TRUE(ours.ok()) << c.name << ": " << ours.error().describe();
+
+        const QuantLib::Date today(1, QuantLib::January, 2026);
+        QuantLib::Settings::instance().evaluationDate() = today;
+        const QuantLib::DayCounter day_counter = QuantLib::Actual365Fixed();
+        const QuantLib::Date expiry =
+            today + QuantLib::Period(static_cast<QuantLib::Integer>(c.years * kDaysPerYear),
+                                     QuantLib::Days);
+
+        const QuantLib::Handle<QuantLib::YieldTermStructure> rate_curve(
+            QuantLib::ext::make_shared<QuantLib::FlatForward>(today, c.rate, day_counter));
+        const QuantLib::Handle<QuantLib::YieldTermStructure> dividend_curve(
+            QuantLib::ext::make_shared<QuantLib::FlatForward>(today, c.dividend, day_counter));
+        const QuantLib::Handle<QuantLib::Quote> spot(
+            QuantLib::ext::make_shared<QuantLib::SimpleQuote>(c.spot));
+
+        const auto process = QuantLib::ext::make_shared<QuantLib::HestonProcess>(
+            rate_curve, dividend_curve, spot, c.v0, c.kappa, c.theta, c.xi, c.rho);
+        const auto ql_model = QuantLib::ext::make_shared<QuantLib::HestonModel>(process);
+        const auto engine = QuantLib::ext::make_shared<QuantLib::AnalyticHestonEngine>(ql_model);
+
+        const auto payoff = QuantLib::ext::make_shared<QuantLib::PlainVanillaPayoff>(
+            QuantLib::Option::Call, c.strike);
+        const auto exercise = QuantLib::ext::make_shared<QuantLib::EuropeanExercise>(expiry);
+        QuantLib::VanillaOption ql_option(payoff, exercise);
+        ql_option.setPricingEngine(engine);
+        const double theirs = ql_option.NPV();
+
+        // A convergence tolerance, not a 1e-13 identity: the two engines use different
+        // quadratures, so they agree to the accuracy each targets rather than bit for
+        // bit. 1e-6 absolute is far tighter than any modelling difference.
+        EXPECT_NEAR(ours.value().value, theirs, 1e-6 + 1e-8 * std::abs(theirs))
+            << c.name << ": ours " << ours.value().value << " vs QuantLib " << theirs;
         ++compared;
     }
     EXPECT_EQ(compared, static_cast<int>(cases.size()));

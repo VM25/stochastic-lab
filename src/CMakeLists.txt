@@ -20,6 +20,7 @@ target_sources(
             engines/finite_difference_engine.cpp
             engines/geometric_asian_analytic.cpp
             engines/greeks_monte_carlo.cpp
+            engines/heston_analytic.cpp
             engines/monte_carlo_engine.cpp
             experiments/barrier_experiments.cpp
             experiments/convergence.cpp
@@ -33,6 +34,7 @@ target_sources(
             instruments/european_option.cpp
             market/market_state.cpp
             models/black_scholes.cpp
+            models/heston.cpp
             numerics/tridiagonal.cpp
             pde/asset_grid.cpp
             pde/black_scholes_operator.cpp

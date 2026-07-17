@@ -181,6 +181,11 @@ add_dw_test(
     LABEL unit
     SOURCES engines/finite_difference_test.cpp)
 
+add_dw_test(
+    dw_test_heston_analytic
+    LABEL unit
+    SOURCES engines/heston_analytic_test.cpp)
+
 # The barrier PDE convergence suite refines to 1601 nodes across several regimes, so
 # it is labelled statistical rather than unit: it is a convergence study, not a
 # millisecond smoke test, and belongs out of the fast developer loop.
