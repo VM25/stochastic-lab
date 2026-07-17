@@ -280,7 +280,10 @@ TEST(GreeksMonteCarloTest, OnePathIsRejected) {
 // ---------------------------------------------------------------------------
 
 TEST(GreeksMonteCarloTest, LikelihoodRatioAndPathwiseAreRefusedAtDegenerateBoundaries) {
-    for (const auto [spot, maturity, volatility] :
+    // Bind by const reference: the elements are const std::tuple in an
+    // initializer_list, and a by-value structured binding copies each -- which g++-13
+    // flags under -Werror=range-loop-construct.
+    for (const auto& [spot, maturity, volatility] :
          {std::tuple{100.0, 0.0, 0.2}, std::tuple{100.0, 1.0, 0.0}}) {
         const auto mk = market(spot);
         const auto md = model(volatility);
