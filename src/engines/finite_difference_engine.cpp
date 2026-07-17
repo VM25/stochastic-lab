@@ -187,6 +187,18 @@ FiniteDifferenceEngine::solve(const MarketState& market,
     const auto& b = coefficients.value().b;
     const auto& c = coefficients.value().c;
 
+    // The index range the PDE is actually solved on, and the two nodes that carry
+    // its boundary conditions.
+    //
+    // For a vanilla this is the whole grid -- first = 0, last = n-1 -- and every
+    // expression below reduces to what it was before the range existed. A knock-out
+    // barrier shrinks it to the live side: the barrier node becomes a Dirichlet
+    // boundary at zero, and the nodes past it are dead. Their value is not merely
+    // unused, it is *known*: a knocked-out contract is worth nothing, so writing
+    // zero there is the answer rather than a placeholder.
+    const std::size_t first = 0;
+    const std::size_t last = n - 1;
+
     std::vector<double> next(n, 0.0);
     double worst_pivot = std::numeric_limits<double>::infinity();
     double worst_residual = 0.0;
@@ -205,9 +217,10 @@ FiniteDifferenceEngine::solve(const MarketState& market,
             (step <= config.rannacher.count) ? PdeScheme::Implicit : config.scheme;
 
         if (step_scheme == PdeScheme::Explicit) {
-            next[0] = lower;
-            next[n - 1] = upper;
-            for (std::size_t i = 1; i + 1 < n; ++i) {
+            std::ranges::fill(next, 0.0);
+            next[first] = lower;
+            next[last] = upper;
+            for (std::size_t i = first + 1; i + 1 <= last; ++i) {
                 next[i] = current[i] + dtau * (a[i] * current[i - 1] + b[i] * current[i] +
                                                c[i] * current[i + 1]);
             }
@@ -224,12 +237,24 @@ FiniteDifferenceEngine::solve(const MarketState& market,
             // boundary value on the right. Written as rows of the system rather
             // than substituted into the neighbours, so the matrix the solver sees
             // is the matrix the scheme describes.
-            system.diagonal[0] = 1.0;
-            system.rhs[0] = lower;
-            system.diagonal[n - 1] = 1.0;
-            system.rhs[n - 1] = upper;
+            // Dead rows first: identity with a zero right-hand side, so the solver
+            // returns exactly zero there. They are rows of the system rather than a
+            // separate case because a tridiagonal solve of an identity row is free
+            // and perfectly conditioned, and because keeping one matrix means the
+            // residual check below covers the whole grid rather than part of it.
+            for (std::size_t i = 0; i < first; ++i) {
+                system.diagonal[i] = 1.0;
+            }
+            for (std::size_t i = last + 1; i < n; ++i) {
+                system.diagonal[i] = 1.0;
+            }
 
-            for (std::size_t i = 1; i + 1 < n; ++i) {
+            system.diagonal[first] = 1.0;
+            system.rhs[first] = lower;
+            system.diagonal[last] = 1.0;
+            system.rhs[last] = upper;
+
+            for (std::size_t i = first + 1; i + 1 <= last; ++i) {
                 // (I - theta*dtau*L) V^{n+1} = (I + (1-theta)*dtau*L) V^n
                 system.lower[i] = -theta * dtau * a[i];
                 system.diagonal[i] = 1.0 - theta * dtau * b[i];
