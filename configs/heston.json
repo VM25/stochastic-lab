@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "command": "price",
+  "market": {
+    "spot": 100.0,
+    "rate": 0.0,
+    "dividend_yield": 0.0
+  },
+  "instrument": {
+    "type": "european",
+    "option_type": "call",
+    "strike": 100.0,
+    "maturity": 1.0
+  },
+  "model": {
+    "type": "heston",
+    "initial_variance": 0.0175,
+    "mean_reversion": 1.5768,
+    "long_run_variance": 0.0398,
+    "vol_of_variance": 0.5751,
+    "correlation": -0.5711
+  },
+  "method": {
+    "type": "heston_analytic",
+    "quadrature_nodes": 1024,
+    "convergence_tolerance": 1e-8
+  }
+}

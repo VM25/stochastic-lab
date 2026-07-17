@@ -40,6 +40,27 @@ Result<nlohmann::json> run(const nlohmann::json& config, Options options = Optio
     return run_price(document.value(), options);
 }
 
+/// A Heston pricing configuration. The parameters are the Fang-Oosterlee benchmark
+/// (call 5.78515543437619), so the CLI end-to-end path is checked against the same
+/// published value as the engine's unit tests.
+nlohmann::json heston_config() {
+    return nlohmann::json{
+        {"schema_version", 1},
+        {"command", "price"},
+        {"market", {{"spot", 100.0}, {"rate", 0.0}, {"dividend_yield", 0.0}}},
+        {"instrument",
+         {{"type", "european"}, {"option_type", "call"}, {"strike", 100.0}, {"maturity", 1.0}}},
+        {"model",
+         {{"type", "heston"},
+          {"initial_variance", 0.0175},
+          {"mean_reversion", 1.5768},
+          {"long_run_variance", 0.0398},
+          {"vol_of_variance", 0.5751},
+          {"correlation", -0.5711}}},
+        {"method", {{"type", "heston_analytic"}}},
+    };
+}
+
 // ---------------------------------------------------------------------------
 // Happy path
 // ---------------------------------------------------------------------------
@@ -50,6 +71,48 @@ TEST(PriceCommandTest, PricesAgainstPublishedReference) {
     ASSERT_TRUE(result.ok()) << result.error().describe();
     EXPECT_EQ(result.value()["status"], "ok");
     EXPECT_NEAR(result.value()["result"]["value"].get<double>(), 4.76, 0.005);
+}
+
+// The Heston model reaches its engine through the same command, dispatched on
+// model.type, and reproduces the published benchmark end to end.
+TEST(PriceCommandTest, PricesHestonAgainstThePublishedBenchmark) {
+    const auto result = run(heston_config());
+    ASSERT_TRUE(result.ok()) << result.error().describe();
+    EXPECT_NEAR(result.value()["result"]["value"].get<double>(), 5.78515543437619, 1e-9);
+    EXPECT_EQ(result.value()["model"]["type"], "heston");
+    EXPECT_EQ(result.value()["method"], "heston_analytic");
+}
+
+// This benchmark violates the Feller condition, so the document carries the
+// diagnostic and its status is "warning" -- the violation reaching the artifact
+// rather than being swallowed by the engine.
+TEST(PriceCommandTest, HestonSurfacesAFellerViolation) {
+    const auto result = run(heston_config());
+    ASSERT_TRUE(result.ok());
+    EXPECT_EQ(result.value()["status"], "warning");
+    EXPECT_FALSE(result.value()["model"]["satisfies_feller"].get<bool>());
+    EXPECT_LT(result.value()["model"]["feller_ratio"].get<double>(), 1.0);
+    EXPECT_TRUE(result.value().contains("result"));
+    EXPECT_FALSE(result.value()["result"]["warnings"].empty());
+}
+
+// A Heston config that names the wrong method is refused rather than silently priced
+// by the Black-Scholes path.
+TEST(PriceCommandTest, HestonRejectsAMismatchedMethod) {
+    auto config = heston_config();
+    config["method"]["type"] = "analytic";
+    const auto result = run(config);
+    ASSERT_FALSE(result.ok());
+    EXPECT_EQ(result.error().code, ErrorCode::UnsupportedCombination);
+}
+
+// A typo in a Heston parameter name fails loudly rather than leaving a default in
+// place and pricing a different model.
+TEST(PriceCommandTest, HestonRejectsAnUnknownParameter) {
+    auto config = heston_config();
+    config["model"]["vol_of_vol"] = 0.5;  // misspelling of vol_of_variance
+    const auto result = run(config);
+    ASSERT_FALSE(result.ok());
 }
 
 // TECHNICAL-DESIGN section 19 fixes the output schema. These fields are what make
@@ -246,8 +309,10 @@ TEST(PriceCommandTest, AsianRequiresItsAveragingConvention) {
 }
 
 TEST(PriceCommandTest, RejectsUnsupportedModel) {
+    // black_scholes and heston are supported; a third type is not, and must be
+    // refused rather than silently priced as one of them.
     nlohmann::json config = base_config();
-    config["model"]["type"] = "heston";
+    config["model"]["type"] = "sabr";
 
     const auto result = run(config);
     ASSERT_FALSE(result.ok());

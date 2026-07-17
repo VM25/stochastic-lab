@@ -7,6 +7,7 @@
 #include <diffusionworks/instruments/european_option.hpp>
 #include <diffusionworks/market/market_state.hpp>
 #include <diffusionworks/models/black_scholes.hpp>
+#include <diffusionworks/models/heston.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -65,6 +66,16 @@ namespace diffusionworks {
 ///
 ///     "model": { "type": "black_scholes", "volatility": 0.2 }
 [[nodiscard]] Result<BlackScholesModel> parse_black_scholes_model(const ConfigNode& node);
+
+/// Parses a `model` section for Heston:
+///
+///     "model": { "type": "heston", "initial_variance": 0.04, "mean_reversion": 2.0,
+///                "long_run_variance": 0.04, "vol_of_variance": 0.5, "correlation": -0.6 }
+///
+/// The Feller condition is not a parse-time check: a violating set parses
+/// successfully and reports the violation through the model, mirroring the engine's
+/// posture that a Feller violation is a diagnostic, not an error.
+[[nodiscard]] Result<HestonModel> parse_heston_model(const ConfigNode& node);
 
 /// Parses a `method` section for Monte Carlo:
 ///

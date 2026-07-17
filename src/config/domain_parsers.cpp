@@ -185,6 +185,54 @@ Result<BlackScholesModel> parse_black_scholes_model(const ConfigNode& node) {
     return BlackScholesModel::create(volatility.value());
 }
 
+Result<HestonModel> parse_heston_model(const ConfigNode& node) {
+    const Status unknown = node.reject_unknown_keys({"type",
+                                                     "initial_variance",
+                                                     "mean_reversion",
+                                                     "long_run_variance",
+                                                     "vol_of_variance",
+                                                     "correlation"});
+    if (!unknown) {
+        return Result<HestonModel>::failure(unknown.error());
+    }
+
+    auto model_type = node.string("type");
+    if (!model_type) {
+        return Result<HestonModel>::failure(std::move(model_type).error());
+    }
+    if (model_type.value() != "heston") {
+        return Result<HestonModel>::failure(
+            ErrorCode::UnsupportedCombination,
+            fmt::format("'{}.type' is '{}' but this parser builds Heston models; expected 'heston'",
+                        node.path(),
+                        model_type.value()),
+            kContext);
+    }
+
+    auto v0 = node.number("initial_variance");
+    if (!v0) {
+        return Result<HestonModel>::failure(std::move(v0).error());
+    }
+    auto kappa = node.number("mean_reversion");
+    if (!kappa) {
+        return Result<HestonModel>::failure(std::move(kappa).error());
+    }
+    auto theta = node.number("long_run_variance");
+    if (!theta) {
+        return Result<HestonModel>::failure(std::move(theta).error());
+    }
+    auto xi = node.number("vol_of_variance");
+    if (!xi) {
+        return Result<HestonModel>::failure(std::move(xi).error());
+    }
+    auto rho = node.number("correlation");
+    if (!rho) {
+        return Result<HestonModel>::failure(std::move(rho).error());
+    }
+
+    return HestonModel::create(v0.value(), kappa.value(), theta.value(), xi.value(), rho.value());
+}
+
 Result<MonteCarloConfig> parse_monte_carlo_config(const ConfigNode& node,
                                                   std::optional<std::uint64_t> seed_override) {
     const Status unknown = node.reject_unknown_keys({"type",

@@ -3,6 +3,7 @@
 #include <diffusionworks/config/domain_parsers.hpp>
 #include <diffusionworks/core/build_info.hpp>
 #include <diffusionworks/engines/black_scholes_analytic.hpp>
+#include <diffusionworks/engines/heston_analytic.hpp>
 #include <diffusionworks/engines/monte_carlo_engine.hpp>
 
 #include "output.hpp"
@@ -52,6 +53,21 @@ constexpr const char* kContext = "price";
     return nlohmann::json{
         {"type", "black_scholes"},
         {"volatility", model.volatility()},
+    };
+}
+
+[[nodiscard]] nlohmann::json describe(const HestonModel& model) {
+    return nlohmann::json{
+        {"type", "heston"},
+        {"initial_variance", model.initial_variance()},
+        {"mean_reversion", model.mean_reversion()},
+        {"long_run_variance", model.long_run_variance()},
+        {"vol_of_variance", model.vol_of_variance()},
+        {"correlation", model.correlation()},
+        // The Feller diagnostic travels with the model description: a reader of the
+        // artifact sees whether the variance can reach zero without recomputing it.
+        {"feller_ratio", model.feller_ratio()},
+        {"satisfies_feller", model.satisfies_feller()},
     };
 }
 
@@ -163,6 +179,88 @@ Result<nlohmann::json> run_price(const ConfigDocument& config, const Options& op
     if (!model_node) {
         return Result<nlohmann::json>::failure(std::move(model_node).error());
     }
+    auto model_type = model_node.value().string("type");
+    if (!model_type) {
+        return Result<nlohmann::json>::failure(std::move(model_type).error());
+    }
+
+    // The Heston model has its own engine and its own supported instruments, so it
+    // takes a dedicated path here rather than flowing through the Black-Scholes
+    // pricing dispatch. Handled and returned in full; the Black-Scholes path below is
+    // left exactly as it was.
+    if (model_type.value() == "heston") {
+        auto heston = parse_heston_model(model_node.value());
+        if (!heston) {
+            return Result<nlohmann::json>::failure(std::move(heston).error());
+        }
+
+        auto instrument_node = root.object("instrument");
+        if (!instrument_node) {
+            return Result<nlohmann::json>::failure(std::move(instrument_node).error());
+        }
+        auto option = parse_european_option(instrument_node.value());
+        if (!option) {
+            return Result<nlohmann::json>::failure(
+                ErrorCode::UnsupportedCombination,
+                fmt::format("the Heston semi-analytic engine prices European options; the "
+                            "instrument could not be read as one ({})",
+                            option.error().message),
+                kContext);
+        }
+
+        auto method_node = root.object("method");
+        if (!method_node) {
+            return Result<nlohmann::json>::failure(std::move(method_node).error());
+        }
+        auto heston_method = method_node.value().string("type");
+        if (!heston_method) {
+            return Result<nlohmann::json>::failure(std::move(heston_method).error());
+        }
+        if (heston_method.value() != "heston_analytic") {
+            return Result<nlohmann::json>::failure(
+                ErrorCode::UnsupportedCombination,
+                fmt::format(
+                    "the Heston model is priced by 'heston_analytic'; 'method.type' is '{}'",
+                    heston_method.value()),
+                kContext);
+        }
+
+        HestonAnalyticConfig heston_config;
+        auto nodes =
+            method_node.value().integer_or("quadrature_nodes", heston_config.quadrature_nodes);
+        if (!nodes) {
+            return Result<nlohmann::json>::failure(std::move(nodes).error());
+        }
+        heston_config.quadrature_nodes = nodes.value();
+        auto tolerance = method_node.value().number_or("convergence_tolerance",
+                                                       heston_config.convergence_tolerance);
+        if (!tolerance) {
+            return Result<nlohmann::json>::failure(std::move(tolerance).error());
+        }
+        heston_config.convergence_tolerance = tolerance.value();
+
+        const auto priced = HestonAnalyticEngine::price(
+            market.value(), option.value(), heston.value(), heston_config);
+        if (!priced) {
+            return Result<nlohmann::json>::failure(priced.error());
+        }
+
+        nlohmann::json document;
+        document["status"] = priced.value().has_warnings() ? "warning" : "ok";
+        document["command"] = "price";
+        document["market"] = describe(market.value());
+        document["instrument"] = describe(option.value());
+        document["model"] = describe(heston.value());
+        document["method"] = heston_method.value();
+        document["result"] = to_json(priced.value());
+        document["configuration"] = config.json();
+        if (!config.source().empty()) {
+            document["configuration_source"] = config.source().string();
+        }
+        document["build_metadata"] = to_json(collect_build_info());
+        return Result<nlohmann::json>::success(std::move(document));
+    }
+
     auto model = parse_black_scholes_model(model_node.value());
     if (!model) {
         return Result<nlohmann::json>::failure(std::move(model).error());
