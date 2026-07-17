@@ -170,5 +170,70 @@ TEST(AssetGridTest, ReportsNoNodeForASpotOutsideTheGrid) {
     EXPECT_FALSE(grid.value().nearest_index(std::numeric_limits<double>::infinity()).has_value());
 }
 
+// ---------------------------------------------------------------------------
+// Barrier alignment
+//
+// The same arithmetic as strike alignment, and a different obligation. A strike
+// half a cell off its node is a slightly misplaced kink; a *barrier* half a cell
+// off its node is a Dirichlet boundary in the wrong place, which prices a
+// different contract. So these tests assert exactness rather than closeness.
+// ---------------------------------------------------------------------------
+
+TEST(AssetGridTest, PlacesTheBarrierExactlyOnANode) {
+    for (const double barrier : {50.0, 90.0, 95.0, 110.0, 137.0}) {
+        for (const std::int64_t nodes : {51, 101, 201, 401}) {
+            const auto grid = AssetGrid::with_barrier_on_node(400.0, nodes, barrier);
+            ASSERT_TRUE(grid.ok())
+                << "B=" << barrier << " nodes=" << nodes << ": " << grid.error().describe();
+
+            const auto index = grid.value().nearest_index(barrier);
+            ASSERT_TRUE(index.has_value());
+            // Exactly, not nearly. A barrier a rounding error from its node is a
+            // boundary condition applied at the wrong price.
+            EXPECT_EQ(grid.value().at(*index), barrier) << "B=" << barrier << " nodes=" << nodes;
+        }
+    }
+}
+
+// The two aligners share their arithmetic, so aligning to the same number by either
+// route must give the same grid. If they ever diverge, one of them has been changed
+// without the other.
+TEST(AssetGridTest, BarrierAndStrikeAlignmentAgreeOnTheSameLevel) {
+    for (const double level : {70.0, 100.0, 133.0}) {
+        const auto by_strike = AssetGrid::with_strike_on_node(400.0, 101, level);
+        const auto by_barrier = AssetGrid::with_barrier_on_node(400.0, 101, level);
+        ASSERT_TRUE(by_strike.ok());
+        ASSERT_TRUE(by_barrier.ok());
+
+        EXPECT_EQ(by_barrier.value().nodes(), by_strike.value().nodes()) << "level=" << level;
+        EXPECT_EQ(by_barrier.value().spacing(), by_strike.value().spacing()) << "level=" << level;
+        EXPECT_EQ(by_barrier.value().s_max(), by_strike.value().s_max()) << "level=" << level;
+    }
+}
+
+// The barrier must lie inside the domain, or the boundary it defines is not on the
+// grid at all and the solve would silently be a vanilla one.
+TEST(AssetGridTest, RefusesABarrierOutsideTheDomain) {
+    const auto beyond = AssetGrid::with_barrier_on_node(100.0, 101, 150.0);
+    ASSERT_FALSE(beyond.ok());
+    EXPECT_EQ(beyond.error().code, ErrorCode::InvalidArgument);
+    // The message must name the barrier, not the strike: they are different
+    // alignments with different consequences and a reader needs to know which failed.
+    EXPECT_NE(beyond.error().describe().find("barrier"), std::string::npos)
+        << beyond.error().describe();
+
+    for (const double bad : {0.0, -10.0}) {
+        EXPECT_FALSE(AssetGrid::with_barrier_on_node(400.0, 101, bad).ok()) << "B=" << bad;
+    }
+}
+
+// A grid too coarse to resolve the barrier would place it on the S=0 boundary,
+// where it would silently become the existing lower boundary rather than a barrier.
+TEST(AssetGridTest, RefusesAGridTooCoarseToResolveTheBarrier) {
+    const auto coarse = AssetGrid::with_barrier_on_node(10000.0, 3, 1.0);
+    ASSERT_FALSE(coarse.ok());
+    EXPECT_EQ(coarse.error().code, ErrorCode::InvalidArgument);
+}
+
 }  // namespace
 }  // namespace diffusionworks

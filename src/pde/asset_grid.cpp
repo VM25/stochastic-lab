@@ -54,20 +54,22 @@ Result<AssetGrid> AssetGrid::uniform(double s_max, std::int64_t nodes) {
     return Result<AssetGrid>::success(AssetGrid(s_max, spacing, std::move(values)));
 }
 
-Result<AssetGrid> AssetGrid::with_strike_on_node(double s_max, std::int64_t nodes, double strike) {
-    if (!(strike > 0.0) || !std::isfinite(strike)) {
+Result<AssetGrid>
+AssetGrid::aligned_to(double s_max, std::int64_t nodes, double level, const char* name) {
+    if (!(level > 0.0) || !std::isfinite(level)) {
         return Result<AssetGrid>::failure(
             ErrorCode::InvalidArgument,
-            fmt::format("strike must be positive and finite, got {}", strike),
+            fmt::format("{} must be positive and finite, got {}", name, level),
             kContext);
     }
-    if (!(s_max > strike)) {
+    if (!(s_max > level)) {
         return Result<AssetGrid>::failure(
             ErrorCode::InvalidArgument,
-            fmt::format("s_max ({}) must exceed the strike ({}), or the payoff's kink lies outside "
-                        "the grid and the solution near it is never resolved",
+            fmt::format("s_max ({}) must exceed the {} ({}), or it lies outside the grid and the "
+                        "solution near it is never resolved",
                         s_max,
-                        strike),
+                        name,
+                        level),
             kContext);
     }
     if (nodes < kMinimumNodes) {
@@ -78,34 +80,36 @@ Result<AssetGrid> AssetGrid::with_strike_on_node(double s_max, std::int64_t node
             kContext);
     }
 
-    // Choose the spacing so that both the strike and S_max land on nodes.
+    // Choose the spacing so that both the level and S_max land on nodes.
     //
-    // Aim for the requested spacing, then round the strike's node index to the
-    // nearest integer and recompute dS from it. The strike then sits exactly on
-    // node `strike_index`, and S_max on the last node, at the cost of a node count
-    // that differs slightly from the request.
+    // Aim for the requested spacing, then round the level's node index to the
+    // nearest integer and recompute dS from it. The level then sits exactly on node
+    // `level_index`, and S_max on the last node, at the cost of a node count that
+    // differs slightly from the request.
     const double target_spacing = s_max / static_cast<double>(nodes - 1);
-    const auto strike_index = static_cast<std::int64_t>(std::round(strike / target_spacing));
-    if (strike_index < 1) {
+    const auto level_index = static_cast<std::int64_t>(std::round(level / target_spacing));
+    if (level_index < 1) {
         return Result<AssetGrid>::failure(
             ErrorCode::InvalidArgument,
-            fmt::format("the grid is too coarse to place the strike ({}) on a node: at a spacing "
-                        "of {} the strike would fall on node {}, which is the S=0 boundary. Use "
-                        "more nodes or a smaller s_max.",
-                        strike,
+            fmt::format("the grid is too coarse to place the {} ({}) on a node: at a spacing of {} "
+                        "it would fall on node {}, which is the S=0 boundary. Use more nodes or a "
+                        "smaller s_max.",
+                        name,
+                        level,
                         target_spacing,
-                        strike_index),
+                        level_index),
             kContext);
     }
 
-    const double spacing = strike / static_cast<double>(strike_index);
+    const double spacing = level / static_cast<double>(level_index);
     const auto interval_count = static_cast<std::int64_t>(std::round(s_max / spacing));
     if (interval_count < kMinimumNodes - 1) {
         return Result<AssetGrid>::failure(
             ErrorCode::InvalidArgument,
-            fmt::format("aligning the strike ({}) yields a spacing of {}, which spans s_max ({}) "
-                        "in only {} intervals -- too few to step",
-                        strike,
+            fmt::format("aligning the {} ({}) yields a spacing of {}, which spans s_max ({}) in "
+                        "only {} intervals -- too few to step",
+                        name,
+                        level,
                         spacing,
                         s_max,
                         interval_count),
@@ -125,12 +129,21 @@ Result<AssetGrid> AssetGrid::with_strike_on_node(double s_max, std::int64_t node
     }
     values.front() = 0.0;
     values.back() = aligned_s_max;
-    // The strike is pinned exactly too. i*dS reproduces it to within an ulp, and
-    // the whole purpose of this grid is that the payoff's kink sits *exactly* on a
-    // node rather than a rounding error away from one.
-    values[static_cast<std::size_t>(strike_index)] = strike;
+    // The level is pinned exactly too. i*dS reproduces it to within an ulp, and the
+    // whole purpose of this grid is that it sits *exactly* on a node rather than a
+    // rounding error away from one.
+    values[static_cast<std::size_t>(level_index)] = level;
 
     return Result<AssetGrid>::success(AssetGrid(aligned_s_max, spacing, std::move(values)));
+}
+
+Result<AssetGrid> AssetGrid::with_strike_on_node(double s_max, std::int64_t nodes, double strike) {
+    return aligned_to(s_max, nodes, strike, "strike");
+}
+
+Result<AssetGrid>
+AssetGrid::with_barrier_on_node(double s_max, std::int64_t nodes, double barrier) {
+    return aligned_to(s_max, nodes, barrier, "barrier");
 }
 
 double AssetGrid::at(std::int64_t index) const noexcept {

@@ -73,6 +73,31 @@ public:
     [[nodiscard]] static Result<AssetGrid>
     with_strike_on_node(double s_max, std::int64_t nodes, double strike);
 
+    /// Builds a uniform grid that places `barrier` exactly on a node.
+    ///
+    /// Identical arithmetic to `with_strike_on_node`, and a categorically different
+    /// obligation. Aligning the *strike* is an option that removes one error term
+    /// among several: the payoff has a kink there, and a kink sampled half a cell
+    /// away is still a kink, merely a slightly misplaced one.
+    ///
+    /// The *barrier* is a Dirichlet boundary. A knock-out's value is zero at B and
+    /// the PDE is solved only on the live side of it, so a barrier half a cell from
+    /// the nearest node does not approximate the contract -- it prices a *different
+    /// contract*, one whose barrier sits at the node instead. That error is
+    /// first-order in dS in the barrier's *location*, which no amount of scheme
+    /// accuracy repairs and which the convergence study would report as a mysterious
+    /// order loss rather than as the misplacement it is.
+    ///
+    /// So alignment is mandatory here rather than a flag, and it is expressed by
+    /// construction: a caller cannot build a barrier grid with the barrier off-node,
+    /// because this is the only way to build one.
+    ///
+    /// As with the strike, the spacing is chosen so that S_max also lands on a node,
+    /// which generally adjusts the requested node count. The grid reports the S_max
+    /// it built.
+    [[nodiscard]] static Result<AssetGrid>
+    with_barrier_on_node(double s_max, std::int64_t nodes, double barrier);
+
     [[nodiscard]] double s_max() const noexcept { return s_max_; }
 
     [[nodiscard]] std::int64_t nodes() const noexcept {
@@ -96,6 +121,15 @@ public:
 
 private:
     AssetGrid(double s_max, double spacing, std::vector<double> values) noexcept;
+
+    /// Builds a uniform grid placing `level` exactly on a node.
+    ///
+    /// Shared by the strike- and barrier-aligned constructors. They differ in what
+    /// the alignment *means* -- optional for a kink, mandatory for a Dirichlet
+    /// boundary -- and in the name they report in errors, but the arithmetic is one
+    /// thing and is written once so the two cannot drift apart.
+    [[nodiscard]] static Result<AssetGrid>
+    aligned_to(double s_max, std::int64_t nodes, double level, const char* name);
 
     double s_max_{};
     double spacing_{};
