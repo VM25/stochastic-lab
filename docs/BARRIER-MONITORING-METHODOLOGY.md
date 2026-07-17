@@ -330,7 +330,60 @@ bridge cell shows a bias this run can resolve; the largest across all 48 is 2.4
 across-seed standard errors, against a discrete arm reaching 563. It holds at m = 5 as well as at
 m = 250: five observations with the bridge beat 250 without it.
 
-## 8. Limitations
+## 8. The PDE arm: pricing the continuous contract directly
+
+Everything above is about *monitoring* — the gap a discrete observation schedule
+opens against the continuously monitored contract, and the bridge that closes it.
+The PDE arm asks a different question and must not be confused with it: **it prices
+the continuous contract itself**, by solving the Black–Scholes equation with an
+absorbing Dirichlet boundary at the barrier (`V(B, τ) = 0`), and measures how fast
+that solve converges to the analytic reference as the grid refines.
+
+The distinction is the discretisation being studied. The Monte Carlo arm
+discretises the *observation* — how often the barrier is looked at. The PDE arm
+discretises the *solution* — the grid and the time step. One is a property of the
+contract; the other is numerical error against a fixed continuous price. Conflating
+"the monitoring is coarse" with "the grid is coarse" would be exactly the kind of
+category error `EXP-07` exists to prevent, so the two arms are labelled and reported
+separately, and anchored to one number: the same Reiner–Rubinstein value the
+monitoring arm measures its bias against.
+
+**Measured (Crank–Nicolson, Rannacher smoothing, node count and time steps refined
+together, so the fitted order is the joint spatial-and-temporal one):**
+
+| Barrier | Fitted order [95% CI] | Finest relative error |
+|---|---|---|
+| down 70 | 2.001 [2.000, 2.002] | 1.5e-5 |
+| down 80 | 2.000 [2.000, 2.001] | 1.7e-5 |
+| down 90 | 2.001 [1.999, 2.004] | 1.4e-5 |
+| down 95 | 2.525 [1.223, 3.826] | 8.8e-6 |
+| up 105  | 1.661 [−0.086, 3.409] | 8.5e-5 |
+| up 110  | 2.339 [1.490, 3.188] | 8.5e-6 |
+| up 120  | 2.000 [1.998, 2.003] | 3.9e-6 |
+| up 140  | 2.003 [1.827, 2.179] | 4.6e-6 |
+
+Six of the eight land on 2.000 with tight intervals — the barrier introduces no
+order loss, which is the point: a misplaced Dirichlet boundary would show up here as
+first-order convergence, and it does not. The barrier alignment being *mandatory*
+(section on `AssetGrid::with_barrier_on_node`) is what buys that.
+
+The two ragged fits, down 95 and up 105, are the barriers nearest the spot
+(0.26 and 0.24 σ√T), and the raggedness is in the *coarse* levels, not the fine
+ones — up 105's local orders run 0.07, 2.23, 2.49. An up-and-out struck at the spot
+with its barrier 5% above pays only on `S_T ∈ (100, 105)` and is worth 0.0088; that
+payoff window is a handful of cells wide on a coarse grid, so the coarse error is
+dominated by barely resolving it, and the order only settles once the grid is fine
+enough to see the window. Both still clear the second-order floor the arm enforces,
+and both reach relative errors below 1e-4. This is the PDE mirror of the
+monitoring arm's finding that the near-spot contracts are where every method is
+most strained.
+
+**The arm is a validation, not just a measurement.** It fails the whole `EXP-07`
+record if any fitted order drops below 1.5, because that is what a real defect —
+a barrier boundary half a cell out of place, a wrong live-index range — would look
+like. The arm passing is a standing regression on the engine, not a one-time check.
+
+## 9. Limitations
 
 * **Calls only.** Puts are a separate set of cases the analytic engine does not
   implement, so no trusted continuous reference exists for them.

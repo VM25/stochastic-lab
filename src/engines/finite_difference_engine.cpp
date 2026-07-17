@@ -1,3 +1,4 @@
+#include <diffusionworks/engines/barrier_pde_engine.hpp>
 #include <diffusionworks/engines/finite_difference_engine.hpp>
 #include <diffusionworks/numerics/tridiagonal.hpp>
 #include <diffusionworks/pde/black_scholes_operator.hpp>
@@ -10,6 +11,7 @@
 #include <chrono>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <ranges>
 #include <utility>
 
@@ -83,11 +85,28 @@ Result<double> interpolate_linear(const AssetGrid& grid, std::span<const double>
     return Result<double>::success(v_lower + weight * (v_upper - v_lower));
 }
 
-Result<FiniteDifferenceEngine::Solution>
-FiniteDifferenceEngine::solve(const MarketState& market,
-                              const EuropeanOption& option,
-                              const BlackScholesModel& model,
-                              const PdeConfig& config) {
+namespace {
+
+/// A knock-out barrier for the PDE solve: the level, and which side is live.
+struct BarrierSpec {
+    double level;  ///< the barrier B, aligned to a grid node
+    bool is_down;  ///< down-and-out (live above B) versus up-and-out (live below B)
+};
+
+/// The shared backward solve, parameterised by an optional knock-out barrier.
+///
+/// With no barrier this is the vanilla solve, byte for byte: `first`/`last` are
+/// 0 and n-1, no terminal node is forced to zero, and the boundary values are the
+/// vanilla ones, so every expression reduces to exactly what it was. That identity
+/// is the point. The barrier support is added without disturbing the validated
+/// vanilla path, and a regression test asserts the vanilla grid outputs are
+/// unchanged to the bit.
+Result<FiniteDifferenceEngine::Solution> solve_core(const MarketState& market,
+                                                    const EuropeanOption& option,
+                                                    const BlackScholesModel& model,
+                                                    const PdeConfig& config,
+                                                    const std::optional<BarrierSpec>& barrier) {
+    using Solution = FiniteDifferenceEngine::Solution;
     if (option.maturity() <= 0.0) {
         return Result<Solution>::failure(
             ErrorCode::UnsupportedCombination,
@@ -119,13 +138,69 @@ FiniteDifferenceEngine::solve(const MarketState& market,
             kContext);
     }
 
-    const double s_max = config.s_max.value_or(kDefaultSmaxMultiple * option.strike());
-
-    auto grid = config.align_strike_to_node
-                    ? AssetGrid::with_strike_on_node(s_max, config.asset_nodes, option.strike())
-                    : AssetGrid::uniform(s_max, config.asset_nodes);
+    // The grid, and the index range the PDE is solved on.
+    //
+    //   vanilla       : [0, S_max],   live [0, n-1]
+    //   down-and-out  : [0, S_max],   live [barrier_index, n-1], B on an interior
+    //                   node, S_max above it; the nodes below B are dead
+    //   up-and-out    : [0, B],       live [0, n-1], B on the last node
+    //
+    // The down-and-out keeps the [0, S_max] span rather than [B, S_max] on purpose:
+    // black_scholes_coefficients builds its rows from the node index as sigma^2 i^2
+    // exactly, which cancels the 1/dS^2 that would otherwise dominate the rounding
+    // at fine grids -- and that cancellation needs S_0 = 0. A grid starting at B
+    // would forfeit it. So B sits on an interior node and the sub-barrier nodes are
+    // carried as dead rows. The up-and-out's domain top *is* the barrier, so there
+    // are no dead nodes and the barrier lands on the last node.
+    Result<AssetGrid> grid =
+        Result<AssetGrid>::failure(ErrorCode::InvalidArgument, "grid not constructed", kContext);
+    if (!barrier.has_value()) {
+        const double s_max = config.s_max.value_or(kDefaultSmaxMultiple * option.strike());
+        grid = config.align_strike_to_node
+                   ? AssetGrid::with_strike_on_node(s_max, config.asset_nodes, option.strike())
+                   : AssetGrid::uniform(s_max, config.asset_nodes);
+    } else if (barrier->is_down) {
+        // The barrier must sit strictly below S_max, or it is not an interior node.
+        const double s_max = config.s_max.value_or(kDefaultSmaxMultiple * option.strike());
+        grid = AssetGrid::with_barrier_on_node(s_max, config.asset_nodes, barrier->level);
+    } else {
+        // Up-and-out: the domain is exactly [0, B], so the barrier is the top node.
+        // A uniform grid pins it there exactly. That alignment is mandatory -- the
+        // barrier is a Dirichlet boundary -- and takes precedence over strike
+        // alignment, which cannot generally be had at the same time on one uniform
+        // spacing. The strike therefore lands off-node in general, the same tradeoff
+        // the down-and-out makes, and the payoff-kink error that leaves is a spatial
+        // O(dS) term the convergence study measures rather than assumes away.
+        //
+        // Aligning the strike and putting the barrier at the *nearest multiple* to B
+        // instead was the first attempt and was wrong: the top node then sits a
+        // rounding error away from B, so the absorbing boundary prices a barrier that
+        // is not the one asked for. A permanent test pins the up-and-out barrier on
+        // its top node for exactly this reason.
+        grid = AssetGrid::uniform(barrier->level, config.asset_nodes);
+    }
     if (!grid.ok()) {
         return Result<Solution>::failure(grid.error());
+    }
+
+    // The live range and, for a down barrier, the node the barrier sits on.
+    std::size_t first = 0;
+    std::size_t last = static_cast<std::size_t>(grid.value().nodes()) - 1;
+    if (barrier.has_value()) {
+        const auto barrier_index = grid.value().nearest_index(barrier->level);
+        if (!barrier_index.has_value()) {
+            return Result<Solution>::failure(
+                ErrorCode::InvalidArgument,
+                fmt::format("the barrier at {} is not on the grid it was aligned to; this is an "
+                            "internal inconsistency in the barrier grid construction",
+                            barrier->level),
+                kContext);
+        }
+        if (barrier->is_down) {
+            first = static_cast<std::size_t>(*barrier_index);
+        } else {
+            last = static_cast<std::size_t>(*barrier_index);
+        }
     }
 
     const auto time = TimeGrid::uniform(option.maturity(), config.time_steps);
@@ -145,6 +220,23 @@ FiniteDifferenceEngine::solve(const MarketState& market,
         return Result<Solution>::failure(values.error());
     }
     std::vector<double> current = std::move(values).value();
+
+    // A knock-out is worth zero at and beyond its barrier at expiry, so the barrier
+    // node and every dead node carry zero rather than the vanilla payoff. This is
+    // not merely cosmetic: the first live interior node reads its neighbour across
+    // the barrier, so a non-zero payoff left there would leak into the solution on
+    // the first step.
+    if (barrier.has_value()) {
+        if (barrier->is_down) {
+            for (std::size_t i = 0; i <= first; ++i) {
+                current[i] = 0.0;
+            }
+        } else {
+            for (std::size_t i = last; i < current.size(); ++i) {
+                current[i] = 0.0;
+            }
+        }
+    }
 
     const double dtau = time.value().step_size();
     const auto stability_limit = explicit_stability_limit(coefficients.value());
@@ -187,18 +279,9 @@ FiniteDifferenceEngine::solve(const MarketState& market,
     const auto& b = coefficients.value().b;
     const auto& c = coefficients.value().c;
 
-    // The index range the PDE is actually solved on, and the two nodes that carry
-    // its boundary conditions.
-    //
-    // For a vanilla this is the whole grid -- first = 0, last = n-1 -- and every
-    // expression below reduces to what it was before the range existed. A knock-out
-    // barrier shrinks it to the live side: the barrier node becomes a Dirichlet
-    // boundary at zero, and the nodes past it are dead. Their value is not merely
-    // unused, it is *known*: a knocked-out contract is worth nothing, so writing
-    // zero there is the answer rather than a placeholder.
-    const std::size_t first = 0;
-    const std::size_t last = n - 1;
-
+    // `first` and `last` -- the live range and its two boundary nodes -- were
+    // computed above from the barrier (or 0 and n-1 for a vanilla). Everything below
+    // steps only the interior between them and pins the two ends each step.
     std::vector<double> next(n, 0.0);
     double worst_pivot = std::numeric_limits<double>::infinity();
     double worst_residual = 0.0;
@@ -207,8 +290,25 @@ FiniteDifferenceEngine::solve(const MarketState& market,
 
     for (std::int64_t step = 1; step <= config.time_steps; ++step) {
         const double tau = time.value().time_at(step);
-        const double lower = lower_boundary(option, market, tau);
-        const double upper = upper_boundary(option, market, grid.value(), tau);
+
+        // The two ends of the live range. For a vanilla these are the S=0 and S=S_max
+        // boundaries. A down-and-out replaces the lower end with the Dirichlet barrier
+        // (V(B, tau) = 0) and keeps the vanilla asymptotic at the top -- valid because
+        // far above both barrier and strike the down-and-out is nearly the vanilla. An
+        // up-and-out keeps the vanilla S=0 value (a call there is worthless) and
+        // replaces the top with the Dirichlet barrier.
+        double lower{};
+        double upper{};
+        if (!barrier.has_value()) {
+            lower = lower_boundary(option, market, tau);
+            upper = upper_boundary(option, market, grid.value(), tau);
+        } else if (barrier->is_down) {
+            lower = 0.0;
+            upper = upper_boundary(option, market, grid.value(), tau);
+        } else {
+            lower = lower_boundary(option, market, tau);
+            upper = 0.0;
+        }
 
         // The first `rannacher.count` steps run fully implicit; the rest run under
         // the configured scheme. With count = 0 this is exactly the configured
@@ -319,11 +419,22 @@ FiniteDifferenceEngine::solve(const MarketState& market,
     // The tolerance scales with the value: a strict > 0 test would count rounding
     // noise in the flat far-field region, where the second difference is
     // legitimately zero to many digits.
+    //
+    // Restricted to the live interior, and skipped entirely for an up-and-out. A
+    // down-and-out call is still convex, so the check applies over [first, last]. An
+    // up-and-out call is not: it rises off S = 0 and falls back to zero at the
+    // barrier, so it is genuinely concave near the top, and counting that as
+    // oscillation would be a false positive. For barriers the primary oscillation
+    // guard is non-negativity above -- a knock-out price cannot be negative, so
+    // most_negative_value < 0 is unambiguous ringing whichever direction the barrier.
     const double value_scale = std::max(1.0, *std::ranges::max_element(current));
-    for (std::size_t i = 1; i + 1 < n; ++i) {
-        const double second_difference = current[i + 1] - 2.0 * current[i] + current[i - 1];
-        if (second_difference < -1e-9 * value_scale) {
-            ++diagnostics.convexity_violations;
+    const bool check_convexity = !barrier.has_value() || barrier->is_down;
+    if (check_convexity) {
+        for (std::size_t i = first + 1; i + 1 <= last; ++i) {
+            const double second_difference = current[i + 1] - 2.0 * current[i] + current[i - 1];
+            if (second_difference < -1e-9 * value_scale) {
+                ++diagnostics.convexity_violations;
+            }
         }
     }
 
@@ -331,28 +442,14 @@ FiniteDifferenceEngine::solve(const MarketState& market,
         Solution{.grid = grid.value(), .values = std::move(current), .diagnostics = diagnostics});
 }
 
-Result<PricingResult> FiniteDifferenceEngine::price(const MarketState& market,
-                                                    const EuropeanOption& option,
-                                                    const BlackScholesModel& model,
-                                                    const PdeConfig& config) {
-    const auto start = std::chrono::steady_clock::now();
-
-    const auto solution = solve(market, option, model, config);
-    if (!solution.ok()) {
-        return Result<PricingResult>::failure(solution.error());
-    }
-
-    const auto value =
-        interpolate_linear(solution.value().grid, solution.value().values, market.spot());
-    if (!value.ok()) {
-        return Result<PricingResult>::failure(value.error());
-    }
-
-    PricingResult result;
-    result.method = fmt::format("finite_difference_{}", to_string(config.scheme));
-    result.value = value.value();
-
-    const PdeDiagnostics& d = solution.value().diagnostics;
+/// Copies the solve diagnostics onto a result and raises the same warnings for
+/// both the vanilla and the barrier engine.
+///
+/// `strike` only labels the Peclet message. The non-negativity and convexity
+/// warnings are worded for "the payoff" rather than "a vanilla payoff" because a
+/// knock-out price is non-negative too, and the down-and-out is convex; the
+/// up-and-out simply reports no convexity violations because its check is skipped.
+void annotate_pde_result(PricingResult& result, const PdeDiagnostics& d, double strike) {
     result.add_diagnostic("asset_nodes", d.asset_nodes);
     result.add_diagnostic("time_steps", d.time_steps);
     result.add_diagnostic("s_max", d.s_max);
@@ -387,21 +484,196 @@ Result<PricingResult> FiniteDifferenceEngine::price(const MarketState& market,
             "the spacing here is {}.",
             d.peclet_violating_nodes,
             d.peclet_violating_max_s,
-            option.strike(),
+            strike,
             d.asset_spacing));
     }
     if (d.most_negative_value < 0.0) {
         result.add_warning(fmt::format(
-            "the solution reached {} somewhere on the grid, but a vanilla payoff is non-negative "
-            "and so is its price; this indicates oscillation rather than rounding",
+            "the solution reached {} somewhere on the grid, but the payoff is non-negative and so "
+            "is its price; this indicates oscillation rather than rounding",
             d.most_negative_value));
     }
     if (d.convexity_violations > 0) {
         result.add_warning(
-            fmt::format("the final solution violates convexity at {} nodes; a vanilla European "
-                        "value function is convex in S, so this indicates spatial oscillation",
+            fmt::format("the final solution violates convexity at {} nodes; the value function is "
+                        "convex in S here, so this indicates spatial oscillation",
                         d.convexity_violations));
     }
+}
+
+}  // namespace
+
+Result<FiniteDifferenceEngine::Solution>
+FiniteDifferenceEngine::solve(const MarketState& market,
+                              const EuropeanOption& option,
+                              const BlackScholesModel& model,
+                              const PdeConfig& config) {
+    return solve_core(market, option, model, config, std::nullopt);
+}
+
+Result<PricingResult> FiniteDifferenceEngine::price(const MarketState& market,
+                                                    const EuropeanOption& option,
+                                                    const BlackScholesModel& model,
+                                                    const PdeConfig& config) {
+    const auto start = std::chrono::steady_clock::now();
+
+    const auto solution = solve(market, option, model, config);
+    if (!solution.ok()) {
+        return Result<PricingResult>::failure(solution.error());
+    }
+
+    const auto value =
+        interpolate_linear(solution.value().grid, solution.value().values, market.spot());
+    if (!value.ok()) {
+        return Result<PricingResult>::failure(value.error());
+    }
+
+    PricingResult result;
+    result.method = fmt::format("finite_difference_{}", to_string(config.scheme));
+    result.value = value.value();
+    annotate_pde_result(result, solution.value().diagnostics, option.strike());
+
+    result.runtime_seconds =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+    return Result<PricingResult>::success(std::move(result));
+}
+
+// ---------------------------------------------------------------------------
+// BarrierPdeEngine
+//
+// Defined in this translation unit rather than its own so it can share the
+// file-local solve_core and annotate_pde_result -- the barrier is the same PDE on a
+// smaller domain, and duplicating the stepper to give it a separate .cpp would
+// invite exactly the drift the sharing prevents.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+constexpr const char* kBarrierContext = "BarrierPdeEngine";
+
+/// The contracts the PDE barrier engine does not price, checked in one place so
+/// price() and solve() refuse identically -- and, critically, so price() refuses
+/// *before* its already-breached short-circuit. An up-and-in whose spot sits above
+/// the barrier is "breached", but a breached knock-in becomes the vanilla, not zero;
+/// refusing it first stops the engine reporting a plausible wrong price for a
+/// contract it does not implement.
+std::optional<Error> barrier_pde_refusal(const BarrierOption& option) {
+    if (option.convention() != MonitoringConvention::Continuous) {
+        return Error(
+            ErrorCode::UnsupportedCombination,
+            fmt::format("the PDE barrier engine prices continuous monitoring, but the "
+                        "option specifies {} monitoring. Discrete and bridge monitoring "
+                        "are the Monte Carlo engine's; returning this continuous price for "
+                        "them would answer a different question.",
+                        to_string(option.convention())),
+            kBarrierContext);
+    }
+    if (option.type() != OptionType::Call) {
+        return Error(ErrorCode::NotImplemented,
+                     "only barrier calls are implemented; the put terminal condition and "
+                     "boundaries are a separate set of cases",
+                     kBarrierContext);
+    }
+    if (!is_knock_out(option.barrier_type())) {
+        return Error(ErrorCode::NotImplemented,
+                     fmt::format("the PDE engine solves knock-outs directly; {} is a knock-in, "
+                                 "which is the vanilla less the knock-out by in-out parity rather "
+                                 "than a second solve here",
+                                 to_string(option.barrier_type())),
+                     kBarrierContext);
+    }
+    return std::nullopt;
+}
+
+}  // namespace
+
+Result<FiniteDifferenceEngine::Solution> BarrierPdeEngine::solve(const MarketState& market,
+                                                                 const BarrierOption& option,
+                                                                 const BlackScholesModel& model,
+                                                                 const PdeConfig& config) {
+    using Solution = FiniteDifferenceEngine::Solution;
+
+    if (const auto refusal = barrier_pde_refusal(option); refusal.has_value()) {
+        return Result<Solution>::failure(*refusal);
+    }
+
+    const double barrier = option.barrier();
+    const bool is_down = is_down_barrier(option.barrier_type());
+    const EuropeanOption vanilla = option.vanilla();
+
+    // An up-and-out call struck at or above its barrier cannot pay: any path
+    // finishing above the strike has finished above the barrier and knocked out. The
+    // domain [0, B] carries the zero payoff everywhere, so the price is exactly zero
+    // -- a price, returned on a real grid so a caller inspecting the solution sees a
+    // consistent object, not a special-cased scalar.
+    if (!is_down && vanilla.strike() >= barrier) {
+        const auto grid = AssetGrid::uniform(barrier, config.asset_nodes);
+        if (!grid.ok()) {
+            return Result<Solution>::failure(grid.error());
+        }
+        std::vector<double> values(static_cast<std::size_t>(grid.value().nodes()), 0.0);
+        PdeDiagnostics diagnostics;
+        diagnostics.asset_nodes = grid.value().nodes();
+        diagnostics.s_max = grid.value().s_max();
+        diagnostics.asset_spacing = grid.value().spacing();
+        return Result<Solution>::success(Solution{
+            .grid = grid.value(), .values = std::move(values), .diagnostics = diagnostics});
+    }
+
+    return solve_core(
+        market, vanilla, model, config, BarrierSpec{.level = barrier, .is_down = is_down});
+}
+
+Result<PricingResult> BarrierPdeEngine::price(const MarketState& market,
+                                              const BarrierOption& option,
+                                              const BlackScholesModel& model,
+                                              const PdeConfig& config) {
+    const auto start = std::chrono::steady_clock::now();
+
+    // Refuse before anything else, in particular before the breach check below: a
+    // breached knock-in is the vanilla rather than zero, so the engine must decline
+    // it rather than short-circuit it to a wrong price.
+    if (const auto refusal = barrier_pde_refusal(option); refusal.has_value()) {
+        return Result<PricingResult>::failure(*refusal);
+    }
+
+    // Already breached: a price, not an error. A knock-out whose spot sits past the
+    // barrier is dead and worth zero, exactly. Handled before the solve because for
+    // an up-and-out the breached spot lies above the grid's top, where interpolation
+    // would rightly refuse.
+    if (option.breaches(market.spot())) {
+        PricingResult result;
+        result.method = fmt::format("barrier_pde_{}", to_string(config.scheme));
+        result.value = 0.0;
+        result.add_diagnostic("already_breached", true);
+        result.add_warning(fmt::format(
+            "the spot {} already breaches the barrier {}, so this knock-out is worth exactly zero; "
+            "the price is exact rather than a grid approximation",
+            market.spot(),
+            option.barrier()));
+        result.runtime_seconds =
+            std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+        return Result<PricingResult>::success(std::move(result));
+    }
+
+    const auto solution = solve(market, option, model, config);
+    if (!solution.ok()) {
+        return Result<PricingResult>::failure(solution.error());
+    }
+
+    const auto value =
+        interpolate_linear(solution.value().grid, solution.value().values, market.spot());
+    if (!value.ok()) {
+        return Result<PricingResult>::failure(value.error());
+    }
+
+    PricingResult result;
+    result.method = fmt::format("barrier_pde_{}", to_string(config.scheme));
+    result.value = value.value();
+    result.add_diagnostic("barrier", option.barrier());
+    result.add_diagnostic("barrier_type", std::string(to_string(option.barrier_type())));
+    result.add_diagnostic("monitoring", std::string(to_string(option.convention())));
+    annotate_pde_result(result, solution.value().diagnostics, option.strike());
 
     result.runtime_seconds =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();

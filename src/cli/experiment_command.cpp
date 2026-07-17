@@ -359,7 +359,9 @@ Result<BarrierExperimentConfig> parse_barrier_config(const ConfigNode& root) {
                                                              "paths",
                                                              "seed_count",
                                                              "master_seed",
-                                                             "volatilities"});
+                                                             "volatilities",
+                                                             "pde_resolutions",
+                                                             "pde_rannacher_steps"});
     if (!unknown) {
         return Result<BarrierExperimentConfig>::failure(unknown.error());
     }
@@ -437,6 +439,17 @@ Result<BarrierExperimentConfig> parse_barrier_config(const ConfigNode& root) {
         config.monitoring_counts = std::move(counts);
     }
 
+    const std::vector<double> pde_resolutions = read_doubles("pde_resolutions", {});
+    if (!pde_resolutions.empty()) {
+        std::vector<std::int64_t> resolutions;
+        resolutions.reserve(pde_resolutions.size());
+        for (const double v : pde_resolutions) {
+            resolutions.push_back(static_cast<std::int64_t>(v));
+        }
+        config.pde_resolutions = std::move(resolutions);
+    }
+    config.pde_rannacher_steps = read_integer("pde_rannacher_steps", config.pde_rannacher_steps);
+
     if (first_error.has_value()) {
         return Result<BarrierExperimentConfig>::failure(*first_error);
     }
@@ -453,10 +466,11 @@ Result<BarrierExperimentConfig> parse_barrier_config(const ConfigNode& root) {
     config.seed_count = static_cast<std::uint64_t>(seed_count);
     config.master_seed = static_cast<std::uint64_t>(master_seed);
 
-    if (config.barriers.empty() || config.volatilities.empty()) {
+    if (config.barriers.empty() || config.up_barriers.empty() || config.volatilities.empty()) {
         return Result<BarrierExperimentConfig>::failure(
             ErrorCode::InvalidArgument,
-            "barriers and volatilities must each be non-empty",
+            "barriers, up_barriers, and volatilities must each be non-empty; the catalog asks for "
+            "both barrier directions and they are not redundant",
             kContext);
     }
     if (config.monitoring_counts.size() < 3) {
@@ -472,6 +486,23 @@ Result<BarrierExperimentConfig> parse_barrier_config(const ConfigNode& root) {
             return Result<BarrierExperimentConfig>::failure(
                 ErrorCode::InvalidArgument,
                 fmt::format("barrier.monitoring_counts entries must be at least 1, got {}", m),
+                kContext);
+        }
+    }
+    if (config.pde_resolutions.size() < 3) {
+        return Result<BarrierExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            fmt::format("barrier.pde_resolutions needs at least 3 levels to fit a convergence "
+                        "order, got {}",
+                        config.pde_resolutions.size()),
+            kContext);
+    }
+    for (const std::int64_t nodes : config.pde_resolutions) {
+        if (nodes < 3) {
+            return Result<BarrierExperimentConfig>::failure(
+                ErrorCode::InvalidArgument,
+                fmt::format("barrier.pde_resolutions entries must be at least 3 nodes, got {}",
+                            nodes),
                 kContext);
         }
     }

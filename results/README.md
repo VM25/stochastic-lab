@@ -28,7 +28,7 @@ python3 python/plot_convergence.py results/*.json --outdir docs/figures
 | EXP-03 | pass | Both schemes converge weakly at order 1. Euler and Milstein share their first moment *exactly*. |
 | EXP-04 | pass | The bias floor exists and is located: on coarse grids more paths stop helping. |
 | EXP-06 | pass | Crank–Nicolson reaches order 2.0034 in space; Rannacher restores order 1.98 in time where plain CN oscillates. The explicit stability bound is sufficient, not necessary — stable to ratio 1.60, divergent at 1.70. |
-| EXP-07 | pass | Daily monitoring is not continuous monitoring: the bias reaches **67% of price** for an up-and-out call near the spot, and is biased high in all 42 resolved cells. The Brownian bridge removes it at every frequency, in both directions. |
+| EXP-07 | pass | Daily monitoring is not continuous monitoring: the bias reaches **67% of price** for an up-and-out call near the spot, and is biased high in all 42 resolved cells. The Brownian bridge removes it at every frequency, in both directions. A separate PDE arm prices the continuous contract directly and converges to the analytic reference at order ~2.0. |
 
 The EXP-02 warning is not a defect. It records that the full-range slopes (0.4974,
 0.9838) exclude their theoretical values while the asymptotic-window slopes
@@ -60,6 +60,15 @@ across-seed standard errors. An earlier run fitted it anyway and published an or
 of −0.19 with a 95% interval of [−0.70, +0.33] — a confident-looking claim that the
 bias *grows* as the barrier is watched more often, fitted entirely to six draws from
 zero. The record now says the bias was not resolved, which is what happened.
+
+The **PDE arm** is a distinct question from the monitoring arms and is anchored to
+the same continuous price. It solves the Black–Scholes equation with an absorbing
+boundary at the barrier and converges to the analytic reference at order ~2.0 across
+both directions (six of eight cells land on 2.000 with tight intervals; the two near-
+spot barriers are ragged at coarse grids but clear the second-order floor the arm
+enforces). It fails the whole record if any fitted order drops below 1.5, which is
+what a misplaced barrier boundary would look like — so it is a standing regression on
+the engine, not a one-time check. See `docs/BARRIER-MONITORING-METHODOLOGY.md` §8.
 
 ## Reading a record
 

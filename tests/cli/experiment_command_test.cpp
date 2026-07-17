@@ -62,7 +62,8 @@ constexpr const char* kTinyBarrierConfig = R"({
     "paths": 400,
     "seed_count": 3,
     "master_seed": 20260716,
-    "volatilities": [0.2]
+    "volatilities": [0.2],
+    "pde_resolutions": [51, 101, 201]
   }
 })";
 

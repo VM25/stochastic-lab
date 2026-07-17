@@ -1,5 +1,7 @@
 #include <diffusionworks/engines/barrier_analytic.hpp>
 #include <diffusionworks/engines/barrier_monte_carlo.hpp>
+#include <diffusionworks/engines/barrier_pde_engine.hpp>
+#include <diffusionworks/engines/finite_difference_engine.hpp>
 #include <diffusionworks/experiments/barrier_experiments.hpp>
 #include <diffusionworks/statistics/multi_seed.hpp>
 #include <diffusionworks/statistics/online_moments.hpp>
@@ -7,10 +9,12 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <string>
 #include <utility>
@@ -217,7 +221,9 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
                                           {"paths", config.paths},
                                           {"seed_count", config.seed_count},
                                           {"master_seed", config.master_seed},
-                                          {"volatilities", config.volatilities}};
+                                          {"volatilities", config.volatilities},
+                                          {"pde_resolutions", config.pde_resolutions},
+                                          {"pde_rannacher_steps", config.pde_rannacher_steps}};
     record.table.headers = {"barrier_type",
                             "convention",
                             "barrier",
@@ -578,6 +584,136 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
         record.results["volatility_sensitivity"] = std::move(cells);
     }
 
+    // --- PDE arm: continuous-barrier pricing convergence -------------------
+    //
+    // A different question from the Monte Carlo arms above. Those measure the bias of
+    // discrete monitoring against the continuous contract and the bridge correction
+    // for it. This one prices the continuous contract *directly* -- solving the
+    // Black-Scholes PDE with an absorbing boundary at the barrier -- and measures how
+    // fast that solve converges to the analytic reference as the grid refines. Node
+    // count and time steps are refined together, so the fitted order is the joint
+    // spatial-and-temporal order, second for Crank-Nicolson with Rannacher smoothing.
+    //
+    // The reference is the same Reiner-Rubinstein value the discrete arm measures
+    // against, so the two arms are anchored to one continuous price and their results
+    // are directly comparable: the PDE's grid error and the Monte Carlo's monitoring
+    // bias are both errors against the same number.
+    bool pde_arm_converged = true;
+    {
+        nlohmann::json pde_cells = nlohmann::json::array();
+
+        struct PdeBarrier {
+            BarrierType type;
+            double barrier;
+        };
+
+        std::vector<PdeBarrier> pde_barriers;
+        pde_barriers.reserve(config.barriers.size() + config.up_barriers.size());
+        for (const double barrier : config.barriers) {
+            pde_barriers.push_back(PdeBarrier{.type = BarrierType::DownAndOut, .barrier = barrier});
+        }
+        for (const double barrier : config.up_barriers) {
+            pde_barriers.push_back(PdeBarrier{.type = BarrierType::UpAndOut, .barrier = barrier});
+        }
+
+        for (const auto& pde : pde_barriers) {
+            const auto reference = continuous_reference(market.value(),
+                                                        model.value(),
+                                                        pde.type,
+                                                        config.strike,
+                                                        pde.barrier,
+                                                        config.maturity);
+            if (!reference) {
+                return Result<ExperimentRecord>::failure(reference.error());
+            }
+            if (!(reference.value() > 0.0)) {
+                // A worthless contract (up-and-out struck above its barrier) has no
+                // relative error to converge, so it is skipped rather than divided by.
+                continue;
+            }
+
+            const auto option = BarrierOption::create(OptionType::Call,
+                                                      pde.type,
+                                                      config.strike,
+                                                      pde.barrier,
+                                                      config.maturity,
+                                                      MonitoringConvention::Continuous,
+                                                      std::nullopt);
+            if (!option) {
+                return Result<ExperimentRecord>::failure(option.error());
+            }
+
+            std::vector<double> spacings;
+            std::vector<double> errors;
+            nlohmann::json levels = nlohmann::json::array();
+            for (const std::int64_t nodes : config.pde_resolutions) {
+                PdeConfig pde_config;
+                pde_config.asset_nodes = nodes;
+                pde_config.time_steps = nodes;
+                pde_config.scheme = PdeScheme::CrankNicolson;
+                pde_config.rannacher = RannacherSteps{config.pde_rannacher_steps};
+
+                const auto priced = BarrierPdeEngine::price(
+                    market.value(), option.value(), model.value(), pde_config);
+                if (!priced) {
+                    return Result<ExperimentRecord>::failure(priced.error());
+                }
+                const double error = std::abs(priced.value().value - reference.value());
+                // The refinement parameter is 1/(nodes-1), proportional to dS on a
+                // fixed domain and to dtau at fixed maturity, so the fitted slope is
+                // the order in the joint refinement.
+                const double h = 1.0 / static_cast<double>(nodes - 1);
+                spacings.push_back(h);
+                errors.push_back(error);
+
+                levels.push_back(nlohmann::json{{"asset_nodes", nodes},
+                                                {"time_steps", nodes},
+                                                {"refinement_parameter", h},
+                                                {"price", priced.value().value},
+                                                {"continuous_reference", reference.value()},
+                                                {"absolute_error", error},
+                                                {"relative_error", error / reference.value()}});
+            }
+
+            nlohmann::json cell{{"barrier_type", std::string(to_string(pde.type))},
+                                {"barrier", pde.barrier},
+                                {"continuous_reference", reference.value()},
+                                {"scheme", "crank_nicolson"},
+                                {"rannacher_steps", config.pde_rannacher_steps},
+                                {"expected_order", 2.0},
+                                {"levels", levels}};
+
+            const bool all_positive =
+                std::ranges::all_of(errors, [](double error) { return error > 0.0; });
+            if (all_positive && spacings.size() >= 3) {
+                cell["order_fit"] = fit_json(spacings, errors);
+                cell["local_orders"] = local_orders_json(spacings, errors);
+                // The PDE arm is a validation: it passes when the finest error is
+                // small and the fitted order is consistent with the scheme's second.
+                // A first-order bug -- a misplaced boundary, a wrong live index --
+                // would break the order conspicuously, which is exactly what this
+                // guards against.
+                const auto& fit = cell["order_fit"];
+                if (fit.contains("order") && fit["order"].get<double>() < 1.5) {
+                    pde_arm_converged = false;
+                    record.limitations.push_back(fmt::format(
+                        "FAILURE: the PDE arm's convergence order for the {} barrier at B={:g} is "
+                        "{:.3f}, below the 1.5 floor for a second-order scheme. A misplaced "
+                        "barrier "
+                        "boundary or a wrong live-index range would produce exactly this; the PDE "
+                        "price should not be trusted until it is diagnosed.",
+                        to_string(pde.type),
+                        pde.barrier,
+                        fit["order"].get<double>()));
+                }
+            }
+
+            pde_cells.push_back(std::move(cell));
+        }
+        record.results["pde_convergence"] = std::move(pde_cells);
+        record.results["pde_arm_converged"] = pde_arm_converged;
+    }
+
     record.results["resolution_threshold"] = kResolutionThreshold;
     record.results["bridge_defect_threshold"] = kBridgeDefectThreshold;
     record.results["continuity_correction_beta"] = kContinuityCorrectionBeta;
@@ -585,7 +721,10 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
     record.runtime_seconds =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 
-    if (bridge_defect) {
+    if (bridge_defect || !pde_arm_converged) {
+        // Either arm failing is a failure of the whole record: a bridge that does not
+        // reproduce the continuous price, or a PDE that does not converge to it, is a
+        // defect the reader must see before quoting any number here.
         record.status = ExperimentStatus::Fail;
     } else if (!coarse_bias_resolved) {
         // No resolved bias at the coarsest monitoring means the experiment did not
@@ -663,6 +802,17 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
         "standard errors, against a discrete arm reaching 563. It holds at m=5 as well as m=250, "
         "which is the point -- it is a correction, not a refinement, and five observations with "
         "the bridge beat 250 without it.\n\n"
+        "The PDE arm answers a different question and anchors the whole record. It prices the "
+        "*continuous* contract directly -- solving the Black-Scholes equation with an absorbing "
+        "boundary at the barrier -- rather than measuring a monitoring bias, and it converges to "
+        "the same analytic reference the discrete arm measures against, at the second order "
+        "Crank-Nicolson with Rannacher smoothing predicts. Two independent routes therefore reach "
+        "one continuous price: the closed form the analytic engine evaluates, and the grid the PDE "
+        "refines toward it. The Monte Carlo bias and the PDE's grid error are then errors against "
+        "the same number, which is what lets the two arms sit in one experiment without conflating "
+        "the discretisation of a path with the discretisation of an observation. The fitted orders "
+        "are in `pde_convergence`; the arm fails the record if any falls below a second-order "
+        "floor, since a misplaced barrier boundary would show up there first.\n\n"
         "The practical reading is that the monitoring convention is a contract term worth more "
         "than most modelling choices, and that its cost is not uniform: it concentrates in the "
         "cheap, nearly-knocked-out contracts where a relative error is largest and a trader's "

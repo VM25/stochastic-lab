@@ -1,9 +1,13 @@
 #include <diffusionworks/engines/barrier_analytic.hpp>
+#include <diffusionworks/engines/barrier_pde_engine.hpp>
 #include <diffusionworks/engines/black_scholes_analytic.hpp>
+#include <diffusionworks/engines/finite_difference_engine.hpp>
 
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstdint>
+#include <limits>
 #include <ql/exercise.hpp>
 #include <ql/instruments/barrieroption.hpp>
 #include <ql/instruments/vanillaoption.hpp>
@@ -417,6 +421,94 @@ TEST(QuantLibCrossValidation, BarrierCallsAgreeWithQuantLib) {
     }
 
     EXPECT_EQ(compared, static_cast<int>(2 * (cases.size() + up_cases.size())));
+}
+
+// The PDE barrier engine, against QuantLib rather than against this project's own
+// analytic engine. barrier_pde_test.cpp already checks convergence to the native
+// closed form; this closes the loop against a third-party solver that shares no
+// code with either, so an error common to both native engines cannot hide here.
+//
+// A convergence tolerance, not a 1e-9 identity: the PDE carries grid, time, and
+// truncation error that the closed forms do not, so the test asserts the finest
+// grid lands close and refining got it there rather than demanding exactness.
+TEST(QuantLibCrossValidation, BarrierPdeConvergesToQuantLib) {
+    const QuantLib::Date today(1, QuantLib::January, 2026);
+    const QuantLib::DayCounter day_counter = QuantLib::Actual365Fixed();
+    const QuantLib::Calendar calendar = QuantLib::NullCalendar();
+
+    struct Case {
+        BarrierType type;
+        QuantLib::Barrier::Type ql_type;
+        double barrier;
+    };
+
+    const std::vector<Case> cases{
+        {BarrierType::DownAndOut, QuantLib::Barrier::DownOut, 90.0},
+        {BarrierType::UpAndOut, QuantLib::Barrier::UpOut, 120.0},
+    };
+
+    const double spot = 100.0;
+    const double strike = 100.0;
+    const double rate = 0.05;
+    const double dividend = 0.0;
+    const double volatility = 0.2;
+    const QuantLib::Natural days = 365;
+    const double maturity = static_cast<double>(days) / static_cast<double>(kDaysPerYear);
+
+    int compared = 0;
+    for (const auto& c : cases) {
+        QuantLib::Settings::instance().evaluationDate() = today;
+        const auto spot_quote = QuantLib::ext::make_shared<QuantLib::SimpleQuote>(spot);
+        const QuantLib::Handle<QuantLib::YieldTermStructure> rate_curve(
+            QuantLib::ext::make_shared<QuantLib::FlatForward>(today, rate, day_counter));
+        const QuantLib::Handle<QuantLib::YieldTermStructure> dividend_curve(
+            QuantLib::ext::make_shared<QuantLib::FlatForward>(today, dividend, day_counter));
+        const QuantLib::Handle<QuantLib::BlackVolTermStructure> vol_surface(
+            QuantLib::ext::make_shared<QuantLib::BlackConstantVol>(
+                today, calendar, volatility, day_counter));
+        const auto process = QuantLib::ext::make_shared<QuantLib::BlackScholesMertonProcess>(
+            QuantLib::Handle<QuantLib::Quote>(spot_quote), dividend_curve, rate_curve, vol_surface);
+        const auto payoff = QuantLib::ext::make_shared<QuantLib::PlainVanillaPayoff>(
+            QuantLib::Option::Call, strike);
+        const auto exercise = QuantLib::ext::make_shared<QuantLib::EuropeanExercise>(today + days);
+        QuantLib::BarrierOption ql_option(c.ql_type, c.barrier, 0.0, payoff, exercise);
+        ql_option.setPricingEngine(
+            QuantLib::ext::make_shared<QuantLib::AnalyticBarrierEngine>(process));
+        const double theirs = ql_option.NPV();
+
+        const auto mk = MarketState::create(spot, rate, dividend).value();
+        const auto md = BlackScholesModel::create(volatility).value();
+        const auto option = BarrierOption::create(OptionType::Call,
+                                                  c.type,
+                                                  strike,
+                                                  c.barrier,
+                                                  maturity,
+                                                  MonitoringConvention::Continuous,
+                                                  std::nullopt)
+                                .value();
+
+        double previous_error = std::numeric_limits<double>::infinity();
+        double finest_error = 0.0;
+        for (const std::int64_t nodes : {201, 401, 801, 1601}) {
+            PdeConfig config;
+            config.asset_nodes = nodes;
+            config.time_steps = nodes;
+            config.scheme = PdeScheme::CrankNicolson;
+            config.rannacher = RannacherSteps{2};
+            const auto priced = BarrierPdeEngine::price(mk, option, md, config);
+            ASSERT_TRUE(priced.ok())
+                << to_string(c.type) << " nodes=" << nodes << ": " << priced.error().describe();
+            const double error = std::abs(priced.value().value - theirs);
+            EXPECT_LT(error, previous_error)
+                << to_string(c.type) << ": error did not shrink at nodes=" << nodes;
+            previous_error = error;
+            finest_error = error;
+        }
+        EXPECT_LT(finest_error, 3e-4)
+            << to_string(c.type) << ": PDE did not converge to QuantLib within tolerance";
+        ++compared;
+    }
+    EXPECT_EQ(compared, static_cast<int>(cases.size()));
 }
 
 }  // namespace

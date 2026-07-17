@@ -171,6 +171,15 @@ add_dw_test(
     LABEL unit
     SOURCES engines/finite_difference_test.cpp)
 
+# The barrier PDE convergence suite refines to 1601 nodes across several regimes, so
+# it is labelled statistical rather than unit: it is a convergence study, not a
+# millisecond smoke test, and belongs out of the fast developer loop.
+
+add_dw_test(
+    dw_test_barrier_pde
+    LABEL statistical
+    SOURCES engines/barrier_pde_test.cpp)
+
 add_dw_test(
     dw_test_geometric_asian
     LABEL statistical

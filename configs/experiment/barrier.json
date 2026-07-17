@@ -35,6 +35,13 @@
       0.1,
       0.2,
       0.4
-    ]
+    ],
+    "pde_resolutions": [
+      201,
+      401,
+      801,
+      1601
+    ],
+    "pde_rannacher_steps": 2
   }
 }

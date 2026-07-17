@@ -47,6 +47,26 @@ struct BarrierExperimentConfig {
     /// Volatilities for the sensitivity arm. The bias scales with sigma*sqrt(dt),
     /// so volatility moves it as directly as monitoring frequency does.
     std::vector<double> volatilities{0.1, 0.2, 0.4};
+
+    /// Grid resolutions for the PDE arm.
+    ///
+    /// The PDE arm answers a *different question* from the Monte Carlo arms. Those
+    /// measure how far discrete monitoring biases the price from the continuous
+    /// contract, and how the Brownian bridge corrects it. This one prices the
+    /// continuous contract directly, by solving the Black-Scholes PDE with an
+    /// absorbing boundary at the barrier, and measures how fast that solve converges
+    /// to the analytic reference as the grid refines. The two must not be conflated:
+    /// one is about a monitoring convention, the other about a discretisation.
+    ///
+    /// Node count and time steps are refined together, so the fitted order is the
+    /// joint spatial-and-temporal order rather than either alone -- second order for
+    /// Crank-Nicolson with Rannacher smoothing.
+    std::vector<std::int64_t> pde_resolutions{201, 401, 801, 1601};
+
+    /// Rannacher smoothing steps for the PDE arm. Two damps the highest modes the
+    /// barrier and payoff kink excite, without letting the first-order local error
+    /// of those steps dominate the global second-order behaviour.
+    std::int64_t pde_rannacher_steps{2};
 };
 
 /// EXP-07: how much error results from discrete barrier monitoring?
