@@ -265,9 +265,11 @@ m = 250: five observations with the bridge beat 250 without it.
 
 ## 8. Limitations
 
-* **Down-and-out calls with B ≤ K only.** The analytic engine does not implement
-  up-barriers or the B > K branch, so no trusted continuous reference exists for
-  them.
+* **EXP-07's measurements are down-and-out calls with B ≤ K only.** The analytic
+  engine now covers all four call cases on both branches of the strike-versus-barrier
+  split (validated against QuantLib at 1e-9 and mpmath at 1e-14), so the reference
+  exists — but the published record predates that and has not been re-run across
+  up-barriers. The catalog asks for both directions; this is the outstanding gap.
 * **The reference is a formula, not a market.** Reiner–Rubinstein agrees with
   mpmath to 1e-15 and QuantLib to 1e-9, so it is a trustworthy statement about the
   model — but every bias here is measured against a model output.

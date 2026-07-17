@@ -113,11 +113,12 @@ nlohmann::json local_orders_json(const std::vector<double>& x, const std::vector
 /// The continuously monitored price, from the closed form.
 Result<double> continuous_reference(const MarketState& market,
                                     const BlackScholesModel& model,
+                                    BarrierType barrier_type,
                                     double strike,
                                     double barrier,
                                     double maturity) {
     const auto option = BarrierOption::create(OptionType::Call,
-                                              BarrierType::DownAndOut,
+                                              barrier_type,
                                               strike,
                                               barrier,
                                               maturity,
@@ -151,14 +152,20 @@ Result<double> continuous_reference(const MarketState& market,
 /// expected here and is itself worth measuring.
 Result<double> continuity_corrected_reference(const MarketState& market,
                                               const BlackScholesModel& model,
+                                              BarrierType barrier_type,
                                               double strike,
                                               double barrier,
                                               double maturity,
                                               std::int64_t monitoring_dates) {
     const double dt = maturity / static_cast<double>(monitoring_dates);
-    const double shifted =
-        barrier * std::exp(-kContinuityCorrectionBeta * model.volatility() * std::sqrt(dt));
-    return continuous_reference(market, model, strike, shifted, maturity);
+    // Away from the spot in both cases: down for a lower barrier, up for an upper
+    // one. The sign is the whole content of the correction's direction, and getting
+    // it backwards would predict a bias of the right size with the wrong sign --
+    // which the residual check would catch, but only after reporting it.
+    const double direction = is_down_barrier(barrier_type) ? -1.0 : 1.0;
+    const double shifted = barrier * std::exp(direction * kContinuityCorrectionBeta *
+                                              model.volatility() * std::sqrt(dt));
+    return continuous_reference(market, model, barrier_type, strike, shifted, maturity);
 }
 
 /// One (convention, barrier, monitoring frequency) cell, priced across every seed.
@@ -205,12 +212,14 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
                                           {"volatility", config.volatility},
                                           {"maturity", config.maturity},
                                           {"barriers", config.barriers},
+                                          {"up_barriers", config.up_barriers},
                                           {"monitoring_counts", config.monitoring_counts},
                                           {"paths", config.paths},
                                           {"seed_count", config.seed_count},
                                           {"master_seed", config.master_seed},
                                           {"volatilities", config.volatilities}};
-    record.table.headers = {"convention",
+    record.table.headers = {"barrier_type",
+                            "convention",
                             "barrier",
                             "monitoring",
                             "price",
@@ -282,13 +291,44 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
     bool coarse_bias_resolved = false;
     nlohmann::json arms = nlohmann::json::array();
 
+    // Both directions. They are not redundant: an up-and-out call knocks out in
+    // exactly the states where it would have paid, so its bias is driven by a
+    // different part of the distribution than a down-and-out's, whose knock-outs are
+    // mostly paths that would have expired worthless anyway.
+    struct Sweep {
+        BarrierType type;
+        double barrier;
+    };
+
+    std::vector<Sweep> sweeps;
+    sweeps.reserve(config.barriers.size() + config.up_barriers.size());
     for (const double barrier : config.barriers) {
+        sweeps.push_back(Sweep{.type = BarrierType::DownAndOut, .barrier = barrier});
+    }
+    for (const double barrier : config.up_barriers) {
+        sweeps.push_back(Sweep{.type = BarrierType::UpAndOut, .barrier = barrier});
+    }
+
+    for (const auto& sweep : sweeps) {
+        const BarrierType barrier_type = sweep.type;
+        const double barrier = sweep.barrier;
         const auto reference = continuous_reference(
-            market.value(), model.value(), config.strike, barrier, config.maturity);
+            market.value(), model.value(), barrier_type, config.strike, barrier, config.maturity);
         if (!reference) {
             return Result<ExperimentRecord>::failure(reference.error());
         }
         const double continuous = reference.value();
+        if (!(continuous > 0.0)) {
+            // An up-and-out struck above its barrier is worth exactly zero, so a
+            // relative bias against it is undefined and the arm measures nothing.
+            // Skipped rather than divided by, and named so the omission is visible.
+            record.limitations.push_back(fmt::format(
+                "the {} arm at B={:g} was skipped: its continuous reference is exactly zero, so "
+                "there is no bias to measure relative to it",
+                to_string(barrier_type),
+                barrier));
+            continue;
+        }
 
         for (const auto convention :
              {MonitoringConvention::Discrete, MonitoringConvention::BrownianBridge}) {
@@ -299,7 +339,7 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
 
             for (const std::int64_t dates : config.monitoring_counts) {
                 const auto option = BarrierOption::create(OptionType::Call,
-                                                          BarrierType::DownAndOut,
+                                                          barrier_type,
                                                           config.strike,
                                                           barrier,
                                                           config.maturity,
@@ -345,6 +385,7 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
                 if (convention == MonitoringConvention::Discrete) {
                     const auto corrected = continuity_corrected_reference(market.value(),
                                                                           model.value(),
+                                                                          barrier_type,
                                                                           config.strike,
                                                                           barrier,
                                                                           config.maturity,
@@ -400,7 +441,8 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
                         summary.seed_count));
                 }
 
-                record.table.rows.push_back({std::string(to_string(convention)),
+                record.table.rows.push_back({std::string(to_string(barrier_type)),
+                                             std::string(to_string(convention)),
                                              number(barrier),
                                              std::to_string(dates),
                                              number(summary.mean),
@@ -414,9 +456,12 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
             }
 
             nlohmann::json arm{{"convention", std::string(to_string(convention))},
+                               {"barrier_type", std::string(to_string(barrier_type))},
                                {"barrier", barrier},
+                               // Unsigned: how far the barrier is, in the units the
+                               // bias actually scales in. Direction is barrier_type.
                                {"barrier_distance_in_sigma_sqrt_t",
-                                std::log(config.spot / barrier) /
+                                std::abs(std::log(config.spot / barrier)) /
                                     (config.volatility * std::sqrt(config.maturity))},
                                {"continuous_reference", continuous},
                                {"resolved_level_count", resolved_levels},
@@ -445,13 +490,13 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
                         "the bias cleared {} standard errors at only {} of {} monitoring "
                         "frequencies, so there is no measured decay to fit. A power law fitted to "
                         "unresolved levels would report an order and an interval for what is "
-                        "sampling noise. The barrier is {:.2f} sigma*sqrt(T) below the spot, far "
+                        "sampling noise. The barrier is {:.2f} sigma*sqrt(T) from the spot, far "
                         "enough that discrete monitoring misses almost nothing: the bias is real "
                         "but smaller than this run can see.",
                         kResolutionThreshold,
                         resolved_levels,
                         config.monitoring_counts.size(),
-                        std::log(config.spot / barrier) /
+                        std::abs(std::log(config.spot / barrier)) /
                             (config.volatility * std::sqrt(config.maturity)));
                 } else {
                     arm["fit_vs_monitoring_interval"] =
@@ -494,6 +539,7 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
             }
             const auto reference = continuous_reference(market.value(),
                                                         cell_model.value(),
+                                                        BarrierType::DownAndOut,
                                                         config.strike,
                                                         kSensitivityBarrier,
                                                         config.maturity);

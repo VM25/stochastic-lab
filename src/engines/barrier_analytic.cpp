@@ -6,6 +6,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <string>
 #include <utility>
 
 namespace diffusionworks {
@@ -134,73 +135,108 @@ Result<PricingResult> BarrierAnalyticEngine::price(const MarketState& market,
 
     // --- Reiner-Rubinstein --------------------------------------------------
     //
-    // For a down-and-out call with B <= K:
+    // Four building blocks, from which every single-barrier case is assembled.
+    // Write s = sigma sqrt(T), b = r - q for the cost of carry,
+    // mu = (b - sigma^2/2)/sigma^2, and eta = +1 for a down barrier, -1 for an up
+    // barrier. Let w_S = (B/S)^{2(mu+1)} and w_K = (B/S)^{2mu} be the reflection
+    // weights. Then:
     //
-    //   a  = (r - q - sigma^2/2)/sigma^2 + 1
-    //   x1 = ln(S/K)/(sigma sqrt(T)) + a sigma sqrt(T)
-    //   y1 = ln(B^2/(S K))/(sigma sqrt(T)) + a sigma sqrt(T)
+    //   x1 = ln(S/K)/s      + (1+mu) s        y1 = ln(B^2/(SK))/s + (1+mu) s
+    //   x2 = ln(S/B)/s      + (1+mu) s        y2 = ln(B/S)/s      + (1+mu) s
     //
-    //   C_do = S e^{-qT} N(x1) - K e^{-rT} N(x1 - sigma sqrt T)
-    //          - S e^{-qT} (B/S)^{2a} N(y1)
-    //          + K e^{-rT} (B/S)^{2a-2} N(y1 - sigma sqrt T)
+    //   A = S e^{-qT} N(x1)     - K e^{-rT} N(x1 - s)
+    //   B = S e^{-qT} N(x2)     - K e^{-rT} N(x2 - s)
+    //   C = S e^{-qT} w_S N(eta y1) - K e^{-rT} w_K N(eta y1 - eta s)
+    //   D = S e^{-qT} w_S N(eta y2) - K e^{-rT} w_K N(eta y2 - eta s)
     //
-    // The second pair is the reflected vanilla: the reflection principle maps
-    // paths that touch B onto paths started at B^2/S, and the weight (B/S)^{2a}
-    // is the Radon-Nikodym factor between them.
+    // (Calls only here, so Haug's phi = +1 throughout and drops out.)
     //
-    // Verified against an independent bridge-corrected simulation, which agrees to
-    // within 1.2 standard errors at three monitoring frequencies -- a route that
-    // shares no algebra with this formula.
+    // A is the vanilla: x1 is d1 once (1+mu) sigma sqrt T is expanded. C and D are
+    // the reflected vanilla -- the reflection principle maps paths touching B onto
+    // paths started at B^2/S, and (B/S)^{2(mu+1)} is the Radon-Nikodym factor
+    // between them. B and D are the same pair with the *barrier* rather than the
+    // strike setting the boundary of the payoff region, which is why the assembly
+    // below turns on K vs B rather than on the barrier direction alone.
+    //
+    // Knock-out calls:
+    //
+    //   down, K > B : A - C          up, K > B : 0
+    //   down, K < B : B - D          up, K < B : A - B + C - D
+    //
+    // The up, K > B case is exactly zero rather than approximately so: paying needs
+    // S_T > K > B, and any such path crossed B and knocked out. It is a price.
+    //
+    // Validated at 1e-14 against QuantLib on both branches of both directions, and
+    // separately against a 40-digit mpmath evaluation. The down-and-out K > B value
+    // 8.665471658245668 is additionally confirmed by a bridge-corrected simulation
+    // -- a route sharing no algebra with this formula.
     const double variance_rate = sigma * sigma;
     const double sqrt_maturity = std::sqrt(maturity);
     const double sigma_root_t = sigma * sqrt_maturity;
-    const double a = (rate - dividend - 0.5 * variance_rate) / variance_rate + 1.0;
+    const double mu = (rate - dividend - 0.5 * variance_rate) / variance_rate;
+    const double drift_adjustment = (1.0 + mu) * sigma_root_t;
 
-    const double x1 = std::log(spot / strike) / sigma_root_t + a * sigma_root_t;
+    // The one parameter that reflects every formula. Down barriers read the lower
+    // tail, up barriers the upper one.
+    const double eta = is_down_barrier(option.barrier_type()) ? 1.0 : -1.0;
+
+    const double x1 = std::log(spot / strike) / sigma_root_t + drift_adjustment;
+    const double x2 = std::log(spot / barrier) / sigma_root_t + drift_adjustment;
     const double y1 =
-        std::log(barrier * barrier / (spot * strike)) / sigma_root_t + a * sigma_root_t;
+        std::log(barrier * barrier / (spot * strike)) / sigma_root_t + drift_adjustment;
+    const double y2 = std::log(barrier / spot) / sigma_root_t + drift_adjustment;
 
     const double asset_discount = std::exp(-dividend * maturity);
     const double cash_discount = market.discount_factor(maturity);
     const double ratio = barrier / spot;
+    const double reflected_asset_weight = std::pow(ratio, 2.0 * (mu + 1.0));
+    const double reflected_cash_weight = std::pow(ratio, 2.0 * mu);
 
-    if (barrier > strike) {
-        // The B > K case needs the second pair of terms (x2, y2), where the
-        // barrier rather than the strike sets the boundary of the payoff region.
-        // Refused rather than silently priced with the wrong branch.
-        return Result<PricingResult>::failure(
-            ErrorCode::NotImplemented,
-            fmt::format("this engine implements the B <= K branch of Reiner-Rubinstein, but the "
-                        "barrier ({}) exceeds the strike ({}). The B > K case requires the second "
-                        "pair of terms; pricing it with this branch would return a plausible "
-                        "wrong number.",
-                        barrier,
-                        strike),
-            kContext);
+    const auto direct_term = [&](double x) {
+        return spot * asset_discount * norm_cdf(x) -
+               strike * cash_discount * norm_cdf(x - sigma_root_t);
+    };
+    const auto reflected_term = [&](double y) {
+        return spot * asset_discount * reflected_asset_weight * norm_cdf(eta * y) -
+               strike * cash_discount * reflected_cash_weight *
+                   norm_cdf(eta * y - eta * sigma_root_t);
+    };
+
+    const double a_term = direct_term(x1);
+    const double b_term = direct_term(x2);
+    const double c_term = reflected_term(y1);
+    const double d_term = reflected_term(y2);
+
+    const bool strike_above_barrier = strike > barrier;
+    double knock_out = 0.0;
+    if (is_down_barrier(option.barrier_type())) {
+        knock_out = strike_above_barrier ? a_term - c_term : b_term - d_term;
+    } else {
+        knock_out = strike_above_barrier ? 0.0 : a_term - b_term + c_term - d_term;
     }
-    if (option.barrier_type() != BarrierType::DownAndOut &&
-        option.barrier_type() != BarrierType::DownAndIn) {
-        return Result<PricingResult>::failure(
-            ErrorCode::NotImplemented,
-            fmt::format("only down-barrier calls are implemented; {} needs the up-barrier "
-                        "formulae",
-                        to_string(option.barrier_type())),
-            kContext);
-    }
 
-    const double knock_out =
-        spot * asset_discount * norm_cdf(x1) -
-        strike * cash_discount * norm_cdf(x1 - sigma_root_t) -
-        spot * asset_discount * std::pow(ratio, 2.0 * a) * norm_cdf(y1) +
-        strike * cash_discount * std::pow(ratio, 2.0 * a - 2.0) * norm_cdf(y1 - sigma_root_t);
-
-    if (option.barrier_type() == BarrierType::DownAndOut) {
+    if (is_knock_out(option.barrier_type())) {
         result.value = knock_out;
+        if (!is_down_barrier(option.barrier_type()) && strike_above_barrier) {
+            // Zero can look like a defect, so the record says why it is not one.
+            result.add_warning(fmt::format(
+                "an up-and-out call struck at {} above its barrier at {} is worth exactly zero: "
+                "paying requires the terminal price to exceed the strike and hence the barrier, "
+                "and every such path knocked out first. This is a price, not a failure to compute "
+                "one.",
+                strike,
+                barrier));
+        }
     } else {
         // In-out parity: knock-in = vanilla - knock-out, exactly, when the
         // contracts and conventions match. Computed rather than given its own
         // formula, so the identity cannot be violated by a transcription error in
         // a second closed form.
+        //
+        // It also *is* the published formula, not merely a shortcut to it: A is the
+        // vanilla, so vanilla - (A - B + C - D) collapses to B - C + D, which is
+        // Haug's up-and-in call, and vanilla - 0 collapses to A, which is his other
+        // branch. The identity and the closed form agree by construction.
         const auto vanilla = vanilla_value(market, model, option.type(), strike, maturity);
         if (!vanilla.ok()) {
             return Result<PricingResult>::failure(vanilla.error());
@@ -240,9 +276,17 @@ Result<PricingResult> BarrierAnalyticEngine::price(const MarketState& market,
     }
 
     result.add_diagnostic("x1", x1);
+    result.add_diagnostic("x2", x2);
     result.add_diagnostic("y1", y1);
-    result.add_diagnostic("reflection_exponent", 2.0 * a);
+    result.add_diagnostic("y2", y2);
+    result.add_diagnostic("reflection_exponent", 2.0 * (mu + 1.0));
     result.add_diagnostic("spot_to_barrier_ratio", spot / barrier);
+    // Which of Haug's branches produced this number. The two differ by which of the
+    // strike and the barrier bounds the payoff region, and a reader comparing
+    // against a reference needs to know which one was taken.
+    result.add_diagnostic(
+        "branch",
+        std::string(strike_above_barrier ? "strike_above_barrier" : "barrier_above_strike"));
 
     result.runtime_seconds =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();

@@ -354,6 +354,7 @@ Result<BarrierExperimentConfig> parse_barrier_config(const ConfigNode& root) {
                                                              "volatility",
                                                              "maturity",
                                                              "barriers",
+                                                             "up_barriers",
                                                              "monitoring_counts",
                                                              "paths",
                                                              "seed_count",
@@ -423,6 +424,7 @@ Result<BarrierExperimentConfig> parse_barrier_config(const ConfigNode& root) {
         read_integer("master_seed", static_cast<std::int64_t>(config.master_seed));
 
     config.barriers = read_doubles("barriers", config.barriers);
+    config.up_barriers = read_doubles("up_barriers", config.up_barriers);
     config.volatilities = read_doubles("volatilities", config.volatilities);
 
     const std::vector<double> monitoring = read_doubles("monitoring_counts", {});

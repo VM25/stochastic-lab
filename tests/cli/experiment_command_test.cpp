@@ -57,6 +57,7 @@ constexpr const char* kTinyBarrierConfig = R"({
     "volatility": 0.20,
     "maturity": 1.0,
     "barriers": [90.0],
+    "up_barriers": [120.0],
     "monitoring_counts": [4, 8, 16],
     "paths": 400,
     "seed_count": 3,
@@ -199,10 +200,13 @@ TEST(ExperimentCommandTest, BarrierMonitoringBiasProducesARecord) {
         << "unknown status: " << status;
 
     const auto& arms = document.value().at("results").at("arms");
-    // One arm per (barrier, convention) pair: one barrier, two conventions.
-    ASSERT_EQ(arms.size(), 2U);
+    // One arm per (barrier, convention) pair: one down-barrier and one up-barrier,
+    // two conventions each. Both directions, because the catalog asks for both.
+    ASSERT_EQ(arms.size(), 4U);
+    EXPECT_EQ(arms.at(0).at("barrier_type"), "down_and_out");
     EXPECT_EQ(arms.at(0).at("convention"), "discrete");
     EXPECT_EQ(arms.at(1).at("convention"), "brownian_bridge");
+    EXPECT_EQ(arms.at(2).at("barrier_type"), "up_and_out");
     EXPECT_EQ(arms.at(0).at("levels").size(), 3U);
 }
 

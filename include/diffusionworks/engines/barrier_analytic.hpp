@@ -11,9 +11,12 @@ namespace diffusionworks {
 /// Closed-form barrier pricing under Black-Scholes, continuous monitoring.
 ///
 /// The Reiner-Rubinstein formulae, which follow from the reflection principle: a
-/// geometric Brownian motion's running minimum has a known joint law with its
+/// geometric Brownian motion's running extremum has a known joint law with its
 /// terminal value, so the knock-out value is the vanilla less a reflected vanilla
-/// weighted by (B/S)^(2a).
+/// weighted by (B/S)^(2(mu+1)).
+///
+/// Covers all four call cases -- down and up, knock-out and knock-in -- on both
+/// branches of the strike-versus-barrier split. Puts are not implemented.
 ///
 /// **This prices continuous monitoring, and almost no traded barrier is
 /// continuously monitored.** A real contract observes the barrier at fixes,
@@ -38,6 +41,11 @@ public:
     /// is past the barrier is worth zero; a knock-in past its barrier is worth the
     /// vanilla. Both are correct prices for a real situation
     /// (MATHEMATICAL-SPEC section 18).
+    ///
+    /// An up-and-out call struck above its barrier is likewise priced, at exactly
+    /// zero: paying requires the terminal price to exceed the strike and hence the
+    /// barrier, so every path that would pay knocked out first. Exact, and carries
+    /// a warning, because a zero price otherwise reads as a defect.
     [[nodiscard]] static Result<PricingResult>
     price(const MarketState& market, const BarrierOption& option, const BlackScholesModel& model);
 };

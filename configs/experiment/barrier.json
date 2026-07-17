@@ -6,13 +6,35 @@
     "strike": 100.0,
     "rate": 0.05,
     "dividend_yield": 0.0,
-    "volatility": 0.20,
+    "volatility": 0.2,
     "maturity": 1.0,
-    "barriers": [70.0, 80.0, 90.0, 95.0],
-    "monitoring_counts": [5, 12, 25, 50, 100, 250],
+    "barriers": [
+      70.0,
+      80.0,
+      90.0,
+      95.0
+    ],
+    "up_barriers": [
+      105.0,
+      110.0,
+      120.0,
+      140.0
+    ],
+    "monitoring_counts": [
+      5,
+      12,
+      25,
+      50,
+      100,
+      250
+    ],
     "paths": 200000,
     "seed_count": 16,
     "master_seed": 20260716,
-    "volatilities": [0.1, 0.2, 0.4]
+    "volatilities": [
+      0.1,
+      0.2,
+      0.4
+    ]
   }
 }

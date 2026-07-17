@@ -16,10 +16,19 @@ struct BarrierExperimentConfig {
     double volatility{0.20};
     double maturity{1.0};
 
-    /// Barriers, as distances below the spot. The bias grows as the barrier
-    /// approaches the spot, so a single barrier would measure one point of a
-    /// curve and imply it was the whole story.
+    /// Down-barriers, below the spot. The bias grows as the barrier approaches the
+    /// spot, so a single barrier would measure one point of a curve and imply it was
+    /// the whole story.
     std::vector<double> barriers{70.0, 80.0, 90.0, 95.0};
+
+    /// Up-barriers, above the spot, for the up-and-out arm.
+    ///
+    /// The catalog asks for both directions, and they are not redundant: an
+    /// up-and-out call knocks out in exactly the states where it would have paid,
+    /// so its bias is driven by a different part of the distribution than a
+    /// down-and-out's. Kept below the strike-versus-barrier split (B > K = 100), the
+    /// branch where the contract is not identically zero.
+    std::vector<double> up_barriers{105.0, 110.0, 120.0, 140.0};
 
     /// Monitoring frequencies. 250 is roughly daily.
     std::vector<std::int64_t> monitoring_counts{5, 12, 25, 50, 100, 250};

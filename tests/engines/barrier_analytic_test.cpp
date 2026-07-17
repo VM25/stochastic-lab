@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <limits>
 #include <string>
 
 namespace diffusionworks {
@@ -275,29 +276,67 @@ TEST(BarrierAnalyticTest, RefusesDiscretelyMonitoredContracts) {
 // The spot must be above the barrier for this to be reachable at all: a
 // down-and-out with S below B is already breached and resolves before the branch
 // matters.
-TEST(BarrierAnalyticTest, RefusesTheUnimplementedBranchWhereBarrierExceedsStrike) {
+// The B > K branch, where the barrier rather than the strike bounds the payoff
+// region. 16.621957422147563 is a 40-digit mpmath evaluation of Reiner-Rubinstein's
+// B - D assembly; QuantLib independently gives 16.621957422147567.
+TEST(BarrierAnalyticTest, MatchesTheReferenceOnTheBranchWhereBarrierExceedsStrike) {
     const auto market = MarketState::create(120.0, 0.05, 0.0).value();
     const auto model = BlackScholesModel::create(0.2).value();
 
     const auto priced = BarrierAnalyticEngine::price(
         market, continuous(BarrierType::DownAndOut, 100.0, 110.0), model);
-    ASSERT_FALSE(priced.ok());
-    EXPECT_EQ(priced.error().code, ErrorCode::NotImplemented);
+    ASSERT_TRUE(priced.ok()) << priced.error().describe();
+    EXPECT_NEAR(priced.value().value, 16.621957422147563, 1e-12);
 }
 
-TEST(BarrierAnalyticTest, RefusesUpBarriersAndPuts) {
+// 1.1760653996503634 is a 40-digit mpmath evaluation of the A - B + C - D assembly;
+// QuantLib independently gives 1.176065399650374. Two oracles, neither of which is
+// this engine.
+TEST(BarrierAnalyticTest, MatchesTheReferenceForAnUpAndOutCall) {
     const auto market = MarketState::create(100.0, 0.05, 0.0).value();
     const auto model = BlackScholesModel::create(0.2).value();
 
-    const auto up = BarrierOption::create(OptionType::Call,
-                                          BarrierType::UpAndOut,
-                                          100.0,
-                                          120.0,
-                                          1.0,
-                                          MonitoringConvention::Continuous,
-                                          std::nullopt)
-                        .value();
-    EXPECT_FALSE(BarrierAnalyticEngine::price(market, up, model).ok());
+    const auto priced = BarrierAnalyticEngine::price(
+        market, continuous(BarrierType::UpAndOut, 100.0, 120.0), model);
+    ASSERT_TRUE(priced.ok()) << priced.error().describe();
+    EXPECT_NEAR(priced.value().value, 1.1760653996503634, 1e-12);
+}
+
+TEST(BarrierAnalyticTest, MatchesTheReferenceForAnUpAndInCall) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto model = BlackScholesModel::create(0.2).value();
+
+    const auto priced =
+        BarrierAnalyticEngine::price(market, continuous(BarrierType::UpAndIn, 100.0, 120.0), model);
+    ASSERT_TRUE(priced.ok()) << priced.error().describe();
+    EXPECT_NEAR(priced.value().value, 9.2745181725352044, 1e-12);
+}
+
+// An up-and-out call struck above its barrier is worth exactly zero, and the zero is
+// a price rather than a failure to compute one: paying needs S_T > K > B, and every
+// such path crossed B and knocked out. Asserted as an exact equality because the
+// argument is combinatorial, not numerical -- there is no cancellation to tolerate.
+TEST(BarrierAnalyticTest, AnUpAndOutCallStruckAboveItsBarrierIsWorthlessExactly) {
+    const auto market = MarketState::create(80.0, 0.05, 0.0).value();
+    const auto model = BlackScholesModel::create(0.2).value();
+
+    const auto priced =
+        BarrierAnalyticEngine::price(market, continuous(BarrierType::UpAndOut, 100.0, 90.0), model);
+    ASSERT_TRUE(priced.ok()) << priced.error().describe();
+    EXPECT_EQ(priced.value().value, 0.0);
+    // A zero price reads as a defect unless the record says otherwise.
+    EXPECT_TRUE(priced.value().has_warnings());
+
+    // Its knock-in partner is therefore the whole vanilla, by the same argument.
+    const auto knock_in =
+        BarrierAnalyticEngine::price(market, continuous(BarrierType::UpAndIn, 100.0, 90.0), model);
+    ASSERT_TRUE(knock_in.ok()) << knock_in.error().describe();
+    EXPECT_NEAR(knock_in.value().value, vanilla_price(market, model, 100.0), 1e-13);
+}
+
+TEST(BarrierAnalyticTest, RefusesPuts) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto model = BlackScholesModel::create(0.2).value();
 
     const auto put = BarrierOption::create(OptionType::Put,
                                            BarrierType::DownAndOut,
@@ -307,7 +346,62 @@ TEST(BarrierAnalyticTest, RefusesUpBarriersAndPuts) {
                                            MonitoringConvention::Continuous,
                                            std::nullopt)
                          .value();
-    EXPECT_FALSE(BarrierAnalyticEngine::price(market, put, model).ok());
+    const auto priced = BarrierAnalyticEngine::price(market, put, model);
+    ASSERT_FALSE(priced.ok());
+    EXPECT_EQ(priced.error().code, ErrorCode::NotImplemented);
+}
+
+// In-out parity for up barriers, on both branches of the strike-versus-barrier
+// split. It is an identity, so it holds exactly and independently of the model --
+// and it is the sharpest check available on the new up-barrier assembly.
+TEST(BarrierAnalyticTest, UpKnockInPlusUpKnockOutEqualsVanilla) {
+    const auto model = BlackScholesModel::create(0.2).value();
+
+    for (const double spot : {70.0, 90.0, 100.0, 105.0}) {
+        for (const double strike : {80.0, 100.0, 130.0}) {
+            const auto market = MarketState::create(spot, 0.05, 0.0).value();
+            const auto out = BarrierAnalyticEngine::price(
+                market, continuous(BarrierType::UpAndOut, strike, 110.0), model);
+            const auto in = BarrierAnalyticEngine::price(
+                market, continuous(BarrierType::UpAndIn, strike, 110.0), model);
+            ASSERT_TRUE(out.ok()) << out.error().describe();
+            ASSERT_TRUE(in.ok()) << in.error().describe();
+
+            EXPECT_NEAR(
+                out.value().value + in.value().value, vanilla_price(market, model, strike), 1e-11)
+                << "S=" << spot << " K=" << strike;
+        }
+    }
+}
+
+// A barrier the price cannot plausibly reach leaves the vanilla untouched. The
+// up-barrier mirror of the existing down-barrier limiting case.
+TEST(BarrierAnalyticTest, ADistantUpBarrierReproducesTheVanilla) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto model = BlackScholesModel::create(0.2).value();
+
+    const auto priced = BarrierAnalyticEngine::price(
+        market, continuous(BarrierType::UpAndOut, 100.0, 100000.0), model);
+    ASSERT_TRUE(priced.ok()) << priced.error().describe();
+    EXPECT_NEAR(priced.value().value, vanilla_price(market, model, 100.0), 1e-10);
+}
+
+// A knock-out is worth less the closer its barrier sits to the spot, because more
+// paths reach it. Monotonicity is a structural property of the contract, so it must
+// hold across the branch boundary rather than only within one branch.
+TEST(BarrierAnalyticTest, UpAndOutValueDecreasesAsTheBarrierApproachesTheSpot) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto model = BlackScholesModel::create(0.2).value();
+
+    double previous = std::numeric_limits<double>::infinity();
+    for (const double barrier : {1000.0, 200.0, 150.0, 130.0, 120.0, 110.0, 105.0, 101.0}) {
+        const auto priced = BarrierAnalyticEngine::price(
+            market, continuous(BarrierType::UpAndOut, 100.0, barrier), model);
+        ASSERT_TRUE(priced.ok()) << "B=" << barrier << ": " << priced.error().describe();
+        EXPECT_LT(priced.value().value, previous) << "B=" << barrier;
+        EXPECT_GE(priced.value().value, 0.0) << "B=" << barrier;
+        previous = priced.value().value;
+    }
 }
 
 // ---------------------------------------------------------------------------

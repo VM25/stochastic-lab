@@ -293,6 +293,10 @@ TEST(QuantLibCrossValidation, BarrierCallsAgreeWithQuantLib) {
         QuantLib::Natural days;
     };
 
+    // Both directions and both branches of the strike-versus-barrier split. The
+    // branch matters: B and D replace A and C when the barrier rather than the
+    // strike bounds the payoff region, and a scenario set that stayed on one side
+    // of K = B would exercise half the formula while looking thorough.
     const std::vector<BarrierScenario> cases{
         {"down_out_atm", 100.0, 100.0, 90.0, 0.05, 0.00, 0.20, 365},
         {"down_out_near_barrier", 92.0, 100.0, 90.0, 0.05, 0.00, 0.20, 365},
@@ -300,10 +304,31 @@ TEST(QuantLibCrossValidation, BarrierCallsAgreeWithQuantLib) {
         {"down_out_with_dividend", 100.0, 100.0, 80.0, 0.05, 0.03, 0.25, 365},
         {"down_out_long_dated", 110.0, 100.0, 85.0, 0.03, 0.00, 0.20, 730},
         {"down_out_high_vol", 100.0, 100.0, 75.0, 0.05, 0.00, 0.45, 365},
+        // Barrier above strike: the B - D branch for a down barrier.
+        {"down_barrier_above_strike", 120.0, 100.0, 110.0, 0.05, 0.00, 0.20, 365},
+        {"down_barrier_above_strike_dividend", 130.0, 90.0, 105.0, 0.04, 0.02, 0.30, 365},
     };
 
-    for (const auto& c : cases) {
-        for (const auto barrier_type : {BarrierType::DownAndOut, BarrierType::DownAndIn}) {
+    const std::vector<BarrierScenario> up_cases{
+        {"up_out_atm", 100.0, 100.0, 120.0, 0.05, 0.00, 0.20, 365},
+        {"up_out_near_barrier", 108.0, 100.0, 110.0, 0.05, 0.00, 0.20, 365},
+        {"up_out_far_barrier", 100.0, 100.0, 200.0, 0.05, 0.00, 0.20, 365},
+        {"up_out_with_dividend", 100.0, 100.0, 130.0, 0.05, 0.03, 0.25, 365},
+        {"up_out_long_dated", 90.0, 100.0, 125.0, 0.03, 0.00, 0.20, 730},
+        {"up_out_high_vol", 100.0, 100.0, 140.0, 0.05, 0.00, 0.45, 365},
+        // Strike above barrier: the branch where the up-and-out is exactly zero.
+        {"up_barrier_below_strike", 80.0, 100.0, 90.0, 0.05, 0.00, 0.20, 365},
+        {"up_barrier_below_strike_high_vol", 70.0, 120.0, 95.0, 0.05, 0.00, 0.40, 365},
+    };
+
+    // Counted, because a comparison loop that silently runs zero scenarios passes.
+    // Phase 6 shipped exactly that hole once; the count is the cheapest way to make
+    // "the branch was exercised" a thing the test asserts rather than assumes.
+    int compared = 0;
+
+    const auto check = [&compared](const BarrierScenario& c, BarrierType barrier_type) {
+        {
+            ++compared;
             const double maturity = static_cast<double>(c.days) / static_cast<double>(kDaysPerYear);
 
             const auto market = MarketState::create(c.spot, c.rate, c.dividend_yield).value();
@@ -347,9 +372,21 @@ TEST(QuantLibCrossValidation, BarrierCallsAgreeWithQuantLib) {
                 QuantLib::Option::Call, c.strike);
             const auto exercise = QuantLib::ext::make_shared<QuantLib::EuropeanExercise>(expiry);
 
-            QuantLib::BarrierOption ql_option(barrier_type == BarrierType::DownAndOut
-                                                  ? QuantLib::Barrier::DownOut
-                                                  : QuantLib::Barrier::DownIn,
+            const QuantLib::Barrier::Type ql_barrier = [barrier_type] {
+                switch (barrier_type) {
+                    case BarrierType::DownAndOut:
+                        return QuantLib::Barrier::DownOut;
+                    case BarrierType::DownAndIn:
+                        return QuantLib::Barrier::DownIn;
+                    case BarrierType::UpAndOut:
+                        return QuantLib::Barrier::UpOut;
+                    case BarrierType::UpAndIn:
+                        return QuantLib::Barrier::UpIn;
+                }
+                return QuantLib::Barrier::DownOut;
+            }();
+
+            QuantLib::BarrierOption ql_option(ql_barrier,
                                               c.barrier,
                                               0.0,  // no rebate
                                               payoff,
@@ -366,7 +403,20 @@ TEST(QuantLibCrossValidation, BarrierCallsAgreeWithQuantLib) {
                 << c.name << " / " << to_string(barrier_type) << ": ours " << ours.value().value
                 << " vs QuantLib " << theirs;
         }
+    };
+
+    for (const auto& c : cases) {
+        for (const auto barrier_type : {BarrierType::DownAndOut, BarrierType::DownAndIn}) {
+            check(c, barrier_type);
+        }
     }
+    for (const auto& c : up_cases) {
+        for (const auto barrier_type : {BarrierType::UpAndOut, BarrierType::UpAndIn}) {
+            check(c, barrier_type);
+        }
+    }
+
+    EXPECT_EQ(compared, static_cast<int>(2 * (cases.size() + up_cases.size())));
 }
 
 }  // namespace

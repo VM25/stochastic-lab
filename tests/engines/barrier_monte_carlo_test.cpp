@@ -277,6 +277,72 @@ TEST(BarrierMonteCarloTest, BridgeAgreesWithTheAnalyticContinuousPriceAtEveryFre
     }
 }
 
+// The up-barrier analytic formulae, checked by a route that shares no algebra with
+// them. The bridge simulation reaches the continuous price through the reflection
+// principle applied per-interval; Reiner-Rubinstein reaches it through the closed
+// form. Agreement is evidence about both, and this is the only check on the
+// up-barrier assembly that is not another evaluation of the same expression.
+TEST(BarrierMonteCarloTest, BridgeAgreesWithTheAnalyticUpAndOutPrice) {
+    const auto up_option = [](double strike, double barrier, std::int64_t dates) {
+        return BarrierOption::create(OptionType::Call,
+                                     BarrierType::UpAndOut,
+                                     strike,
+                                     barrier,
+                                     1.0,
+                                     MonitoringConvention::BrownianBridge,
+                                     dates)
+            .value();
+    };
+    const auto analytic = [](double strike, double barrier) {
+        const auto option = BarrierOption::create(OptionType::Call,
+                                                  BarrierType::UpAndOut,
+                                                  strike,
+                                                  barrier,
+                                                  1.0,
+                                                  MonitoringConvention::Continuous,
+                                                  std::nullopt)
+                                .value();
+        return BarrierAnalyticEngine::price(market(), option, model()).value().value;
+    };
+
+    for (const double barrier : {110.0, 120.0, 140.0}) {
+        for (const std::int64_t dates : {12, 100}) {
+            const auto priced = BarrierMonteCarloEngine::price(
+                market(), up_option(100.0, barrier, dates), model(), with_paths(200000));
+            ASSERT_TRUE(priced.ok()) << priced.error().describe();
+            ASSERT_TRUE(priced.value().standard_error.has_value());
+
+            const double reference = analytic(100.0, barrier);
+            EXPECT_LT(std::abs(priced.value().value - reference),
+                      4.0 * *priced.value().standard_error)
+                << "B=" << barrier << " m=" << dates << " mc=" << priced.value().value
+                << " analytic=" << reference;
+        }
+    }
+}
+
+// The combinatorial case, through the simulation rather than the formula. An
+// up-and-out call struck above its barrier cannot pay: every path that finishes
+// above the strike passed the barrier on the way. The simulation must find zero
+// paying paths, not merely few.
+TEST(BarrierMonteCarloTest, AnUpAndOutCallStruckAboveItsBarrierNeverPays) {
+    const auto breached_market = MarketState::create(80.0, 0.05, 0.0).value();
+    const auto option = BarrierOption::create(OptionType::Call,
+                                              BarrierType::UpAndOut,
+                                              100.0,
+                                              90.0,
+                                              1.0,
+                                              MonitoringConvention::BrownianBridge,
+                                              50)
+                            .value();
+
+    const auto priced =
+        BarrierMonteCarloEngine::price(breached_market, option, model(), with_paths(50000));
+    ASSERT_TRUE(priced.ok()) << priced.error().describe();
+    EXPECT_EQ(priced.value().value, 0.0);
+    EXPECT_EQ(integer_diagnostic(priced.value(), "paid"), 0);
+}
+
 // The bias has a direction, and it is not the intuitive one. A barrier unobserved
 // between fixes lets a knock-out survive paths that would have killed it, so the
 // discretely monitored contract is worth *more* than the continuous one. Asserted
