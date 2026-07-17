@@ -4,6 +4,7 @@
 #include <diffusionworks/core/build_info.hpp>
 #include <diffusionworks/engines/black_scholes_analytic.hpp>
 #include <diffusionworks/engines/heston_analytic.hpp>
+#include <diffusionworks/engines/heston_monte_carlo.hpp>
 #include <diffusionworks/engines/monte_carlo_engine.hpp>
 
 #include "output.hpp"
@@ -216,31 +217,81 @@ Result<nlohmann::json> run_price(const ConfigDocument& config, const Options& op
         if (!heston_method) {
             return Result<nlohmann::json>::failure(std::move(heston_method).error());
         }
-        if (heston_method.value() != "heston_analytic") {
+
+        Result<PricingResult> priced = Result<PricingResult>::failure(
+            ErrorCode::NotImplemented, "no Heston method was dispatched", kContext);
+
+        if (heston_method.value() == "heston_analytic") {
+            const Status method_unknown = method_node.value().reject_unknown_keys(
+                {"type", "quadrature_nodes", "convergence_tolerance"});
+            if (!method_unknown) {
+                return Result<nlohmann::json>::failure(method_unknown.error());
+            }
+
+            HestonAnalyticConfig heston_config;
+            auto nodes =
+                method_node.value().integer_or("quadrature_nodes", heston_config.quadrature_nodes);
+            if (!nodes) {
+                return Result<nlohmann::json>::failure(std::move(nodes).error());
+            }
+            heston_config.quadrature_nodes = nodes.value();
+            auto tolerance = method_node.value().number_or("convergence_tolerance",
+                                                           heston_config.convergence_tolerance);
+            if (!tolerance) {
+                return Result<nlohmann::json>::failure(std::move(tolerance).error());
+            }
+            heston_config.convergence_tolerance = tolerance.value();
+
+            priced = HestonAnalyticEngine::price(
+                market.value(), option.value(), heston.value(), heston_config);
+        } else if (heston_method.value() == "heston_monte_carlo") {
+            const Status method_unknown = method_node.value().reject_unknown_keys(
+                {"type", "paths", "steps", "seed", "confidence_level"});
+            if (!method_unknown) {
+                return Result<nlohmann::json>::failure(method_unknown.error());
+            }
+
+            // The naive scheme is a diagnostic baseline studied in EXP-10, never a way
+            // to price, so the CLI pricing path always uses full truncation.
+            HestonMonteCarloConfig heston_config;
+            auto paths = method_node.value().integer_or("paths", heston_config.paths);
+            if (!paths) {
+                return Result<nlohmann::json>::failure(std::move(paths).error());
+            }
+            heston_config.paths = paths.value();
+            auto steps = method_node.value().integer_or("steps", heston_config.steps);
+            if (!steps) {
+                return Result<nlohmann::json>::failure(std::move(steps).error());
+            }
+            heston_config.steps = steps.value();
+            auto confidence =
+                method_node.value().number_or("confidence_level", heston_config.confidence_level);
+            if (!confidence) {
+                return Result<nlohmann::json>::failure(std::move(confidence).error());
+            }
+            heston_config.confidence_level = confidence.value();
+            // The command-line seed overrides the file, matching every other engine.
+            auto seed = method_node.value().integer_or(
+                "seed", static_cast<std::int64_t>(heston_config.seed));
+            if (!seed) {
+                return Result<nlohmann::json>::failure(std::move(seed).error());
+            }
+            if (seed.value() < 0) {
+                return Result<nlohmann::json>::failure(
+                    ErrorCode::InvalidArgument, "method.seed must be non-negative", kContext);
+            }
+            heston_config.seed = options.seed.value_or(static_cast<std::uint64_t>(seed.value()));
+
+            priced = HestonMonteCarloEngine::price(
+                market.value(), option.value(), heston.value(), heston_config);
+        } else {
             return Result<nlohmann::json>::failure(
                 ErrorCode::UnsupportedCombination,
-                fmt::format(
-                    "the Heston model is priced by 'heston_analytic'; 'method.type' is '{}'",
-                    heston_method.value()),
+                fmt::format("the Heston model is priced by 'heston_analytic' or "
+                            "'heston_monte_carlo'; 'method.type' is '{}'",
+                            heston_method.value()),
                 kContext);
         }
-
-        HestonAnalyticConfig heston_config;
-        auto nodes =
-            method_node.value().integer_or("quadrature_nodes", heston_config.quadrature_nodes);
-        if (!nodes) {
-            return Result<nlohmann::json>::failure(std::move(nodes).error());
-        }
-        heston_config.quadrature_nodes = nodes.value();
-        auto tolerance = method_node.value().number_or("convergence_tolerance",
-                                                       heston_config.convergence_tolerance);
-        if (!tolerance) {
-            return Result<nlohmann::json>::failure(std::move(tolerance).error());
-        }
-        heston_config.convergence_tolerance = tolerance.value();
-
-        const auto priced = HestonAnalyticEngine::price(
-            market.value(), option.value(), heston.value(), heston_config);
         if (!priced) {
             return Result<nlohmann::json>::failure(priced.error());
         }

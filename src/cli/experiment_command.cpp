@@ -3,6 +3,7 @@
 #include <diffusionworks/experiments/barrier_experiments.hpp>
 #include <diffusionworks/experiments/convergence_experiments.hpp>
 #include <diffusionworks/experiments/greek_experiments.hpp>
+#include <diffusionworks/experiments/heston_simulation_experiments.hpp>
 #include <diffusionworks/experiments/pde_experiments.hpp>
 
 #include <fmt/format.h>
@@ -638,6 +639,171 @@ Result<GreekExperimentConfig> parse_greek_config(const ConfigNode& root) {
     return Result<GreekExperimentConfig>::success(std::move(config));
 }
 
+/// Parses the `heston_simulation` block for EXP-10.
+///
+/// Same contract as the other blocks: absent means the documented defaults that
+/// produced the published record, and an unknown key is rejected rather than
+/// silently ignored.
+Result<HestonSimulationExperimentConfig> parse_heston_simulation_config(const ConfigNode& root) {
+    HestonSimulationExperimentConfig config;
+
+    if (!root.contains("heston_simulation")) {
+        return Result<HestonSimulationExperimentConfig>::success(config);
+    }
+
+    auto node = root.object("heston_simulation");
+    if (!node) {
+        return Result<HestonSimulationExperimentConfig>::failure(std::move(node).error());
+    }
+
+    const Status unknown = node.value().reject_unknown_keys({"spot",
+                                                             "strike",
+                                                             "rate",
+                                                             "dividend_yield",
+                                                             "maturity",
+                                                             "initial_variance",
+                                                             "mean_reversion",
+                                                             "long_run_variance",
+                                                             "correlation",
+                                                             "vol_of_variance",
+                                                             "step_counts",
+                                                             "paths",
+                                                             "seed_count",
+                                                             "master_seed",
+                                                             "bias_resolution"});
+    if (!unknown) {
+        return Result<HestonSimulationExperimentConfig>::failure(unknown.error());
+    }
+
+    std::optional<Error> first_error;
+    const auto read_number = [&](const char* key, double fallback) -> double {
+        auto v = node.value().number_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_integer = [&](const char* key, std::int64_t fallback) -> std::int64_t {
+        auto v = node.value().integer_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_doubles = [&](const char* key, std::vector<double> fallback) {
+        if (!node.value().contains(key)) {
+            return fallback;
+        }
+        auto array = node.value().array(key);
+        if (!array) {
+            if (!first_error.has_value()) {
+                first_error = array.error();
+            }
+            return fallback;
+        }
+        std::vector<double> out;
+        for (std::size_t i = 0; i < array.value().size(); ++i) {
+            auto v = array.value().number_at(i);
+            if (!v) {
+                if (!first_error.has_value()) {
+                    first_error = v.error();
+                }
+                return fallback;
+            }
+            out.push_back(v.value());
+        }
+        return out;
+    };
+
+    config.spot = read_number("spot", config.spot);
+    config.strike = read_number("strike", config.strike);
+    config.rate = read_number("rate", config.rate);
+    config.dividend_yield = read_number("dividend_yield", config.dividend_yield);
+    config.maturity = read_number("maturity", config.maturity);
+    config.initial_variance = read_number("initial_variance", config.initial_variance);
+    config.mean_reversion = read_number("mean_reversion", config.mean_reversion);
+    config.long_run_variance = read_number("long_run_variance", config.long_run_variance);
+    config.correlation = read_number("correlation", config.correlation);
+    config.bias_resolution = read_number("bias_resolution", config.bias_resolution);
+
+    config.vol_of_variance = read_doubles("vol_of_variance", config.vol_of_variance);
+
+    const std::int64_t paths = read_integer("paths", config.paths);
+    const std::int64_t seed_count =
+        read_integer("seed_count", static_cast<std::int64_t>(config.seed_count));
+    const std::int64_t master_seed =
+        read_integer("master_seed", static_cast<std::int64_t>(config.master_seed));
+
+    const std::vector<double> steps = read_doubles(
+        "step_counts", std::vector<double>(config.step_counts.begin(), config.step_counts.end()));
+
+    if (first_error.has_value()) {
+        return Result<HestonSimulationExperimentConfig>::failure(*first_error);
+    }
+
+    if (paths < 2 || seed_count < 2 || master_seed < 0) {
+        return Result<HestonSimulationExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "paths must be at least 2; seed_count at least 2, since the bias is measured across "
+            "seeds and one seed cannot separate it from a lucky draw; and master_seed non-negative",
+            kContext);
+    }
+    if (config.bias_resolution <= 0.0) {
+        return Result<HestonSimulationExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "bias_resolution must be positive: it is the number of standard errors a bias must "
+            "clear to be fitted rather than treated as noise",
+            kContext);
+    }
+    config.paths = paths;
+    config.seed_count = static_cast<std::uint64_t>(seed_count);
+    config.master_seed = static_cast<std::uint64_t>(master_seed);
+
+    if (config.vol_of_variance.empty()) {
+        return Result<HestonSimulationExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "vol_of_variance must be non-empty: each entry is a regime, and the experiment needs "
+            "at least one -- the catalog asks for both a stable and a difficult one",
+            kContext);
+    }
+    for (const double xi : config.vol_of_variance) {
+        if (xi < 0.0) {
+            return Result<HestonSimulationExperimentConfig>::failure(
+                ErrorCode::InvalidArgument,
+                fmt::format("vol_of_variance entries must be non-negative, got {}", xi),
+                kContext);
+        }
+    }
+    if (steps.size() < 3) {
+        return Result<HestonSimulationExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            fmt::format("heston_simulation.step_counts needs at least 3 levels to see the bias "
+                        "decay, got {}",
+                        steps.size()),
+            kContext);
+    }
+    std::vector<std::int64_t> step_counts;
+    step_counts.reserve(steps.size());
+    for (const double s : steps) {
+        if (s < 1.0) {
+            return Result<HestonSimulationExperimentConfig>::failure(
+                ErrorCode::InvalidArgument,
+                fmt::format("heston_simulation.step_counts entries must be at least 1, got {}", s),
+                kContext);
+        }
+        step_counts.push_back(static_cast<std::int64_t>(s));
+    }
+    config.step_counts = std::move(step_counts);
+
+    return Result<HestonSimulationExperimentConfig>::success(std::move(config));
+}
+
 nlohmann::json table_to_json(const CsvTable& table) {
     return nlohmann::json{{"headers", table.headers}, {"rows", table.rows}};
 }
@@ -670,7 +836,7 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
     Result<ExperimentRecord> record = Result<ExperimentRecord>::failure(
         ErrorCode::NotImplemented,
         fmt::format("experiment '{}' is not implemented in this build. Implemented: EXP-01, "
-                    "EXP-02, EXP-03, EXP-04, EXP-06, EXP-07, EXP-08.",
+                    "EXP-02, EXP-03, EXP-04, EXP-06, EXP-07, EXP-08, EXP-10.",
                     id),
         kContext);
 
@@ -710,6 +876,16 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
             greek_config.master_seed = *options.seed;
         }
         record = run_greek_estimator_comparison(greek_config);
+    } else if (id == "EXP-10") {
+        auto heston = parse_heston_simulation_config(config.root());
+        if (!heston) {
+            return Result<nlohmann::json>::failure(std::move(heston).error());
+        }
+        HestonSimulationExperimentConfig heston_config = std::move(heston).value();
+        if (options.seed.has_value()) {
+            heston_config.master_seed = *options.seed;
+        }
+        record = run_heston_variance_discretization(heston_config);
     }
 
     if (!record) {

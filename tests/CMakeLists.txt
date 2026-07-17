@@ -186,6 +186,15 @@ add_dw_test(
     LABEL unit
     SOURCES engines/heston_analytic_test.cpp)
 
+# The Heston simulation suite prices at hundreds of steps and hundreds of thousands
+# of paths to resolve the Euler bias against the semi-analytic reference, so it is
+# labelled statistical rather than unit.
+
+add_dw_test(
+    dw_test_heston_monte_carlo
+    LABEL statistical
+    SOURCES engines/heston_monte_carlo_test.cpp)
+
 # The barrier PDE convergence suite refines to 1601 nodes across several regimes, so
 # it is labelled statistical rather than unit: it is a convergence study, not a
 # millisecond smoke test, and belongs out of the fast developer loop.

@@ -107,6 +107,37 @@ ConfigDocument tiny_greek_config() {
     return config_from(kTinyGreekConfig);
 }
 
+/// The Heston-simulation block, cut to the smallest shape that still runs: two
+/// regimes, the minimum three step levels, two seeds, a few hundred paths. This
+/// exercises the wiring; the discretization physics is validated in
+/// tests/engines/heston_monte_carlo_test.cpp against its own acceptance rules. At
+/// this path count the bias cannot resolve, so the decay order is left unfitted --
+/// which is itself the behaviour the "never fit unresolved data" rule requires.
+constexpr const char* kTinyHestonSimulationConfig = R"({
+  "schema_version": 1,
+  "command": "experiment",
+  "heston_simulation": {
+    "spot": 100.0,
+    "strike": 100.0,
+    "rate": 0.05,
+    "dividend_yield": 0.0,
+    "maturity": 1.0,
+    "initial_variance": 0.04,
+    "mean_reversion": 2.0,
+    "long_run_variance": 0.04,
+    "correlation": -0.7,
+    "vol_of_variance": [0.3, 1.0],
+    "step_counts": [5, 10, 20],
+    "paths": 400,
+    "seed_count": 2,
+    "master_seed": 20260717
+  }
+})";
+
+ConfigDocument tiny_heston_simulation_config() {
+    return config_from(kTinyHestonSimulationConfig);
+}
+
 Options options_for(const std::string& id) {
     Options options;
     options.command = CommandKind::Experiment;
@@ -268,6 +299,45 @@ TEST(ExperimentCommandTest, GreekEstimatorComparisonProducesARecord) {
     EXPECT_TRUE(document.value().at("results").contains("failure_regions"));
 }
 
+TEST(ExperimentCommandTest, HestonVarianceDiscretizationProducesARecord) {
+    const auto document = run_experiment(tiny_heston_simulation_config(), options_for("EXP-10"));
+    ASSERT_TRUE(document.ok()) << document.error().describe();
+    EXPECT_EQ(document.value().at("id"), "EXP-10");
+
+    const std::string status = document.value().at("status");
+    EXPECT_TRUE(status == "pass" || status == "fail" || status == "warning" ||
+                status == "inconclusive")
+        << "unknown status: " << status;
+
+    // The two schemes are compared across both regimes, so the results carry a
+    // per-regime breakdown and the decay-order fits the catalog asks for.
+    const auto& results = document.value().at("results");
+    ASSERT_TRUE(results.contains("regimes"));
+    ASSERT_TRUE(results.contains("bias_decay_order_fits"));
+    EXPECT_TRUE(results.contains("full_truncation_produced_non_finite_paths"));
+    EXPECT_TRUE(results.contains("naive_euler_produced_non_finite_paths"));
+
+    // Full truncation must never produce a silent invalid state, at any path count.
+    // That is the load-bearing exit criterion and it does not depend on resolving the
+    // bias, so it holds even in this tiny run.
+    EXPECT_FALSE(results.at("full_truncation_produced_non_finite_paths").get<bool>());
+
+    const auto& regimes = results.at("regimes");
+    ASSERT_EQ(regimes.size(), 2U);
+    // Each regime reports every step level for both schemes.
+    const auto& cells = regimes.at(0).at("cells");
+    ASSERT_FALSE(cells.empty());
+    for (const char* field : {"regime",
+                              "scheme",
+                              "steps",
+                              "bias",
+                              "negative_fraction",
+                              "minimum_variance",
+                              "path_failures"}) {
+        EXPECT_TRUE(cells.at(0).contains(field)) << "cell missing " << field;
+    }
+}
+
 // A single regime is refused: the comparison exists to sweep, and one scenario would
 // license the universal ranking the experiment is built to avoid.
 TEST(ExperimentCommandTest, GreekExperimentRejectsAWiderConfigMistake) {
@@ -316,6 +386,52 @@ TEST(ExperimentCommandTest, BarrierExperimentRejectsAnUnknownKey) {
     // block: the document parsed fine and was rejected on meaning.
     EXPECT_EQ(document.error().code, ErrorCode::InvalidConfiguration);
     EXPECT_NE(document.error().describe().find("volatilty"), std::string::npos)
+        << document.error().describe();
+}
+
+// A bias is a difference against the reference, carrying sampling error; one seed
+// cannot tell a real discretization bias from a lucky draw, so it is refused.
+TEST(ExperimentCommandTest, HestonSimulationRejectsASingleSeed) {
+    const auto document =
+        run_experiment(config_from(R"({"schema_version": 1, "command": "experiment",
+                        "heston_simulation": {"seed_count": 1}})"),
+                       options_for("EXP-10"));
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidArgument);
+}
+
+// Fewer than three step levels cannot show a decay, so the block is refused rather
+// than run to produce a two-point line.
+TEST(ExperimentCommandTest, HestonSimulationRejectsTooFewStepLevels) {
+    const auto document =
+        run_experiment(config_from(R"({"schema_version": 1, "command": "experiment",
+                        "heston_simulation": {"step_counts": [10, 20]}})"),
+                       options_for("EXP-10"));
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidArgument);
+}
+
+// An empty regime list is refused: the catalog asks for both a stable and a difficult
+// regime, and a sweep over nothing measures nothing.
+TEST(ExperimentCommandTest, HestonSimulationRejectsNoRegimes) {
+    const auto document =
+        run_experiment(config_from(R"({"schema_version": 1, "command": "experiment",
+                        "heston_simulation": {"vol_of_variance": []}})"),
+                       options_for("EXP-10"));
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidArgument);
+}
+
+// A typo must fail loudly rather than leave a default in place and study a model the
+// author did not configure.
+TEST(ExperimentCommandTest, HestonSimulationRejectsAnUnknownKey) {
+    const auto document =
+        run_experiment(config_from(R"({"schema_version": 1, "command": "experiment",
+                        "heston_simulation": {"vol_of_varianc": [0.3, 1.0]}})"),
+                       options_for("EXP-10"));
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidConfiguration);
+    EXPECT_NE(document.error().describe().find("vol_of_varianc"), std::string::npos)
         << document.error().describe();
 }
 

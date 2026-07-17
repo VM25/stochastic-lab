@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "command": "experiment",
+  "heston_simulation": {
+    "spot": 100.0,
+    "strike": 100.0,
+    "rate": 0.05,
+    "dividend_yield": 0.0,
+    "maturity": 1.0,
+    "initial_variance": 0.04,
+    "mean_reversion": 2.0,
+    "long_run_variance": 0.04,
+    "correlation": -0.7,
+    "vol_of_variance": [0.3, 1.0],
+    "step_counts": [5, 10, 20, 40, 80, 160, 320],
+    "paths": 40000,
+    "seed_count": 8,
+    "master_seed": 20260717,
+    "bias_resolution": 3.0
+  }
+}

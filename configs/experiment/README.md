@@ -44,3 +44,20 @@ The defaults run to `M = 1024` because Milstein needs it. A higher-order scheme
 enters its asymptotic regime *later*: at `M = 256` Milstein still measures 0.985.
 Truncating the grid to save time produces an honest measurement of a
 pre-asymptotic slope and an apparent contradiction with theory.
+
+## `heston_simulation.json`
+
+Drives EXP-10, the Heston variance-discretization study. Fields fall back to the
+defaults in `HestonSimulationExperimentConfig`; unknown keys are rejected. The
+methodology is `docs/HESTON-SIMULATION-METHODOLOGY.md`.
+
+| Field | Meaning |
+| --- | --- |
+| `spot`, `strike`, `rate`, `dividend_yield`, `maturity` | The market and instrument. |
+| `initial_variance`, `mean_reversion`, `long_run_variance`, `correlation` | The Heston parameters shared by every regime. |
+| `vol_of_variance` | One regime per entry. Everything else is held fixed, so this is the single knob that moves the Feller ratio across 1; the default `[0.3, 1.0]` straddles it (ratios 1.78 and 0.16). |
+| `step_counts` | Time steps per path, coarse to fine. At least three, to see the bias decay. |
+| `paths` | Paths per cell. |
+| `seed_count` | Independent replications. The bias is measured across seeds, so one seed cannot separate it from a lucky draw. |
+| `master_seed` | Base seed; `--seed` overrides it. |
+| `bias_resolution` | How many across-seed standard errors a bias must clear before its decay order is fitted rather than treated as noise. |

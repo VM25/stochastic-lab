@@ -21,11 +21,13 @@ target_sources(
             engines/geometric_asian_analytic.cpp
             engines/greeks_monte_carlo.cpp
             engines/heston_analytic.cpp
+            engines/heston_monte_carlo.cpp
             engines/monte_carlo_engine.cpp
             experiments/barrier_experiments.cpp
             experiments/convergence.cpp
             experiments/convergence_experiments.cpp
             experiments/greek_experiments.cpp
+            experiments/heston_simulation_experiments.cpp
             experiments/experiment.cpp
             experiments/pde_experiments.cpp
             experiments/scheme_moments.cpp

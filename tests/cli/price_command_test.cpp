@@ -115,6 +115,56 @@ TEST(PriceCommandTest, HestonRejectsAnUnknownParameter) {
     ASSERT_FALSE(result.ok());
 }
 
+// The Heston model is also priceable by simulation through the same command,
+// dispatched on method.type. The simulated price reproduces the semi-analytic
+// benchmark to within the sampling noise and carries its uncertainty and the
+// variance diagnostics rather than a bare number.
+TEST(PriceCommandTest, PricesHestonByMonteCarlo) {
+    auto config = heston_config();
+    config["method"] = {
+        {"type", "heston_monte_carlo"}, {"paths", 40000}, {"steps", 120}, {"seed", 20260717}};
+    const auto result = run(config);
+    ASSERT_TRUE(result.ok()) << result.error().describe();
+    EXPECT_EQ(result.value()["method"], "heston_monte_carlo");
+
+    // The published benchmark is 5.78515543437619; at these settings the full-
+    // truncation bias and the sampling error are both small, so the CLI path lands
+    // close to it. The tight numerical validation lives in the engine unit tests;
+    // this pins the wiring and that the number is right end to end.
+    EXPECT_NEAR(result.value()["result"]["value"].get<double>(), 5.78515543437619, 0.15);
+
+    // Simulation carries its uncertainty and its variance diagnostics.
+    EXPECT_TRUE(result.value()["result"].contains("standard_error"));
+    EXPECT_TRUE(result.value()["result"].contains("confidence_interval"));
+    EXPECT_TRUE(result.value()["result"]["diagnostics"].contains("negative_variance_fraction"));
+}
+
+// The command-line seed overrides the method's seed, so a run can be reseeded
+// without editing the file -- and a different seed gives a different draw.
+TEST(PriceCommandTest, HestonMonteCarloSeedOverrideChangesTheDraw) {
+    auto config = heston_config();
+    config["method"] = {{"type", "heston_monte_carlo"}, {"paths", 8000}, {"steps", 20}};
+
+    Options first;
+    first.seed = 1;
+    Options second;
+    second.seed = 2;
+    const auto a = run(config, first);
+    const auto b = run(config, second);
+    ASSERT_TRUE(a.ok()) << a.error().describe();
+    ASSERT_TRUE(b.ok()) << b.error().describe();
+    EXPECT_NE(a.value()["result"]["value"].get<double>(),
+              b.value()["result"]["value"].get<double>());
+}
+
+// A typo in the Monte Carlo method block fails loudly rather than leaving a default.
+TEST(PriceCommandTest, HestonMonteCarloRejectsAnUnknownMethodKey) {
+    auto config = heston_config();
+    config["method"] = {{"type", "heston_monte_carlo"}, {"path", 40000}};  // "path" not "paths"
+    const auto result = run(config);
+    ASSERT_FALSE(result.ok());
+}
+
 // TECHNICAL-DESIGN section 19 fixes the output schema. These fields are what make
 // a published number auditable, so their presence is pinned rather than assumed.
 TEST(PriceCommandTest, DocumentCarriesRequiredMetadata) {
