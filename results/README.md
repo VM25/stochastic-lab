@@ -27,6 +27,8 @@ python3 python/plot_convergence.py results/*.json --outdir docs/figures
 | EXP-02 | **warning** | Euler–Maruyama attains strong order ½ and Milstein order 1 in the asymptotic window. The full-range fits fall short — the coarse levels are pre-asymptotic. |
 | EXP-03 | pass | Both schemes converge weakly at order 1. Euler and Milstein share their first moment *exactly*. |
 | EXP-04 | pass | The bias floor exists and is located: on coarse grids more paths stop helping. |
+| EXP-06 | pass | Crank–Nicolson reaches order 2.0034 in space; Rannacher restores order 1.98 in time where plain CN oscillates. The explicit stability bound is sufficient, not necessary — stable to ratio 1.60, divergent at 1.70. |
+| EXP-07 | pass | Daily monitoring is not continuous monitoring: the bias reaches 10.1% of price at a barrier 0.26 σ√T away. The Brownian bridge removes it at every frequency tested. |
 
 The EXP-02 warning is not a defect. It records that the full-range slopes (0.4974,
 0.9838) exclude their theoretical values while the asymptotic-window slopes
@@ -34,6 +36,21 @@ The EXP-02 warning is not a defect. It records that the full-range slopes (0.497
 The local orders climb monotonically toward theory as the grid refines, which is
 what distinguishes this from a wrong order. Both fits are published; the reasoning
 is in `docs/CONVERGENCE-METHODOLOGY.md` §3.
+
+EXP-07 passes while reporting fitted orders that *exclude* their theoretical 0.5
+(0.395 at B=90, 0.437 at B=95). The same pre-asymptotic reading as EXP-02 applies —
+but here it is not left resting on the climbing local orders alone. The
+Broadie–Glasserman–Kou continuity correction predicts the bias's *magnitude* in
+closed form, and it accounts for 94–101% of the measured bias without having been
+fitted to it. A theory with the rate wrong could not predict the size to within a
+percent, which is what distinguishes a contaminated fitting range from a wrong
+order. See `docs/BARRIER-MONITORING-METHODOLOGY.md` §5–6.
+
+EXP-07 also **refuses to fit** the B=70 arm, where the bias never clears 2.1
+across-seed standard errors. An earlier run fitted it anyway and published an order
+of −0.19 with a 95% interval of [−0.70, +0.33] — a confident-looking claim that the
+bias *grows* as the barrier is watched more often, fitted entirely to six draws from
+zero. The record now says the bias was not resolved, which is what happened.
 
 ## Reading a record
 

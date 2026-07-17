@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstddef>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <variant>
@@ -18,6 +19,8 @@
 
 namespace diffusionworks {
 namespace {
+
+constexpr const char* kContext = "EXP-07";
 
 /// A bias is "resolved" once it clears this many across-seed standard errors.
 ///
@@ -61,7 +64,16 @@ std::vector<std::uint64_t> seeds_from(std::uint64_t master, std::uint64_t count)
     return out;
 }
 
-nlohmann::json fit_json(const std::vector<double>& x, const std::vector<double>& y) {
+/// Number of finest levels used for the asymptotic-window fit.
+///
+/// The theoretical order is an asymptotic statement, so the coarse levels -- where
+/// the higher-order terms are largest -- are precisely the ones that drag a
+/// full-range slope away from it. Both fits are published: the full-range one is what
+/// the whole sweep says, the window is what the resolved tail says, and where they
+/// disagree the disagreement is the finding.
+constexpr std::size_t kAsymptoticWindow = 3;
+
+nlohmann::json fit_json(std::span<const double> x, std::span<const double> y) {
     const auto fit = fit_power_law(x, y);
     if (!fit) {
         return nlohmann::json{{"error", fit.error().message}};
@@ -74,7 +86,9 @@ nlohmann::json fit_json(const std::vector<double>& x, const std::vector<double>&
                           {"ci_lower", interval.value().lower},
                           {"ci_upper", interval.value().upper},
                           {"r_squared", fit.value().r_squared},
-                          {"observations", fit.value().observations}};
+                          {"observations", fit.value().observations},
+                          {"consistent_with_expected_order",
+                           interval.value().lower <= 0.5 && 0.5 <= interval.value().upper}};
 }
 
 /// Order between each consecutive pair of levels.
@@ -148,8 +162,18 @@ Result<double> continuity_corrected_reference(const MarketState& market,
 }
 
 /// One (convention, barrier, monitoring frequency) cell, priced across every seed.
+///
+/// `bias` and `rmse` are plain doubles rather than the optionals MultiSeedSummary
+/// carries. Those are optional because RMSE against no reference is an unanswerable
+/// question rather than zero -- so they are resolved once, at construction, where an
+/// absent value can still be reported as the error it is. Reading them unchecked
+/// downstream would turn a missing reference into a plausible-looking bias of
+/// whatever happened to be in the slot, which is the whole class of failure this
+/// project exists to distrust.
 struct Cell {
     MultiSeedSummary summary;
+    double bias{};
+    double rmse{};
     double mean_knock_fraction{};
     double runtime_seconds{};
 };
@@ -235,7 +259,21 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
         if (!summary) {
             return Result<Cell>::failure(summary.error());
         }
+        if (!summary.value().bias.has_value() || !summary.value().rmse.has_value()) {
+            // Unreachable: a reference was supplied. Checked anyway, because the
+            // alternative is dereferencing on the belief that it was, and this whole
+            // experiment is a statement about a bias.
+            return Result<Cell>::failure(
+                ErrorCode::InvalidArgument,
+                "the multi-seed summary carries no bias despite a reference being supplied, so "
+                "there is nothing to measure against",
+                kContext);
+        }
+        const double bias = *summary.value().bias;
+        const double rmse = *summary.value().rmse;
         return Result<Cell>::success(Cell{.summary = std::move(summary).value(),
+                                          .bias = bias,
+                                          .rmse = rmse,
                                           .mean_knock_fraction = knock_fractions.mean(),
                                           .runtime_seconds = runtime});
     };
@@ -256,6 +294,7 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
              {MonitoringConvention::Discrete, MonitoringConvention::BrownianBridge}) {
             std::vector<double> monitoring_intervals;
             std::vector<double> absolute_biases;
+            std::size_t resolved_levels = 0;
             nlohmann::json levels = nlohmann::json::array();
 
             for (const std::int64_t dates : config.monitoring_counts) {
@@ -276,31 +315,32 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
                 }
 
                 const MultiSeedSummary& summary = cell.value().summary;
-                const double bias = *summary.bias;
+                const double bias = cell.value().bias;
                 const double across_seed_se = summary.standard_error;
                 const double significance = across_seed_se > 0.0 ? bias / across_seed_se : 0.0;
                 const double dt = config.maturity / static_cast<double>(dates);
+                const bool resolved = std::abs(significance) > kResolutionThreshold;
 
                 monitoring_intervals.push_back(dt);
                 absolute_biases.push_back(std::abs(bias));
+                resolved_levels += resolved ? 1 : 0;
 
-                nlohmann::json level{
-                    {"monitoring_dates", dates},
-                    {"monitoring_interval", dt},
-                    {"price", summary.mean},
-                    {"continuous_reference", continuous},
-                    {"bias", bias},
-                    {"relative_bias", bias / continuous},
-                    {"rmse", *summary.rmse},
-                    {"across_seed_standard_deviation", summary.standard_deviation},
-                    {"across_seed_standard_error", across_seed_se},
-                    {"bias_over_standard_error", significance},
-                    {"bias_is_resolved", std::abs(significance) > kResolutionThreshold},
-                    {"minimum_estimate", summary.minimum},
-                    {"maximum_estimate", summary.maximum},
-                    {"mean_knock_fraction", cell.value().mean_knock_fraction},
-                    {"seed_count", summary.seed_count},
-                    {"runtime_seconds", cell.value().runtime_seconds}};
+                nlohmann::json level{{"monitoring_dates", dates},
+                                     {"monitoring_interval", dt},
+                                     {"price", summary.mean},
+                                     {"continuous_reference", continuous},
+                                     {"bias", bias},
+                                     {"relative_bias", bias / continuous},
+                                     {"rmse", cell.value().rmse},
+                                     {"across_seed_standard_deviation", summary.standard_deviation},
+                                     {"across_seed_standard_error", across_seed_se},
+                                     {"bias_over_standard_error", significance},
+                                     {"bias_is_resolved", resolved},
+                                     {"minimum_estimate", summary.minimum},
+                                     {"maximum_estimate", summary.maximum},
+                                     {"mean_knock_fraction", cell.value().mean_knock_fraction},
+                                     {"seed_count", summary.seed_count},
+                                     {"runtime_seconds", cell.value().runtime_seconds}};
 
                 if (convention == MonitoringConvention::Discrete) {
                     const auto corrected = continuity_corrected_reference(market.value(),
@@ -313,13 +353,26 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
                         return Result<ExperimentRecord>::failure(corrected.error());
                     }
                     const double residual = summary.mean - corrected.value();
+                    const double residual_significance =
+                        across_seed_se > 0.0 ? residual / across_seed_se : 0.0;
                     level["continuity_corrected_reference"] = corrected.value();
                     level["continuity_corrected_residual"] = residual;
-                    level["continuity_corrected_residual_over_se"] =
-                        across_seed_se > 0.0 ? residual / across_seed_se : 0.0;
-                    // How much of the raw bias the closed-form correction accounts
-                    // for: whether the O(sqrt(dt)) story is right about the *size* of
-                    // the effect, not merely about its rate.
+                    level["continuity_corrected_residual_over_se"] = residual_significance;
+
+                    // Whether the closed-form correction and the measurement actually
+                    // disagree. This, not the fraction below, is the statistic to
+                    // read: the correction is an o(1/sqrt(m)) approximation, so its
+                    // residual is expected to be resolved somewhere, and where that
+                    // happens is itself a measurement of the correction's own error.
+                    level["continuity_corrected_residual_is_resolved"] =
+                        std::abs(residual_significance) > kResolutionThreshold;
+
+                    // How much of the raw bias the correction accounts for. Intuitive,
+                    // and unreliable wherever the bias is small: it divides by the
+                    // bias, so at a distant barrier a residual well inside the noise
+                    // still reads as a large unexplained fraction. Reported because a
+                    // reader will want it, but the residual above is what decides
+                    // whether the correction is right.
                     level["bias_explained_fraction"] = bias != 0.0 ? 1.0 - (residual / bias) : 0.0;
 
                     if (dates == config.monitoring_counts.front() &&
@@ -366,13 +419,56 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
                                 std::log(config.spot / barrier) /
                                     (config.volatility * std::sqrt(config.maturity))},
                                {"continuous_reference", continuous},
+                               {"resolved_level_count", resolved_levels},
+                               {"level_count", levels.size()},
                                {"levels", std::move(levels)}};
 
             if (convention == MonitoringConvention::Discrete) {
                 // Broadie-Glasserman-Kou: the bias is O(sqrt(dt)), so fitted against
                 // the monitoring interval the expected order is +0.5.
                 arm["expected_order"] = 0.5;
-                arm["fit_vs_monitoring_interval"] = fit_json(monitoring_intervals, absolute_biases);
+
+                if (resolved_levels < config.monitoring_counts.size()) {
+                    // No order is reported unless every level's bias cleared its own
+                    // noise, because a power law fitted to unresolved levels returns a
+                    // number and an interval regardless -- and both are meaningless.
+                    //
+                    // This is not hypothetical. At B=70 the bias never clears 2.1
+                    // standard errors at any frequency, and fitting all six levels
+                    // anyway gave an order of -0.19 with a 95% interval of
+                    // [-0.70, +0.33]: a confident-looking claim that the bias *grows*
+                    // as the barrier is watched more often, fitted entirely to six
+                    // draws from zero. A reader has no way to tell that from a
+                    // measurement, so the fit is refused and the record says what
+                    // actually happened instead.
+                    arm["fit_refused"] = fmt::format(
+                        "the bias cleared {} standard errors at only {} of {} monitoring "
+                        "frequencies, so there is no measured decay to fit. A power law fitted to "
+                        "unresolved levels would report an order and an interval for what is "
+                        "sampling noise. The barrier is {:.2f} sigma*sqrt(T) below the spot, far "
+                        "enough that discrete monitoring misses almost nothing: the bias is real "
+                        "but smaller than this run can see.",
+                        kResolutionThreshold,
+                        resolved_levels,
+                        config.monitoring_counts.size(),
+                        std::log(config.spot / barrier) /
+                            (config.volatility * std::sqrt(config.maturity)));
+                } else {
+                    arm["fit_vs_monitoring_interval"] =
+                        fit_json(monitoring_intervals, absolute_biases);
+
+                    // The theoretical 0.5 is asymptotic, and the coarse levels are
+                    // where the higher-order terms are largest. Both fits are
+                    // published; where they disagree, the disagreement is the finding.
+                    if (monitoring_intervals.size() > kAsymptoticWindow) {
+                        const std::size_t offset = monitoring_intervals.size() - kAsymptoticWindow;
+                        arm["asymptotic_window_fit"] =
+                            fit_json(std::span{monitoring_intervals}.subspan(offset),
+                                     std::span{absolute_biases}.subspan(offset));
+                        arm["asymptotic_window_levels"] = kAsymptoticWindow;
+                    }
+                }
+
                 arm["local_orders"] = local_orders_json(monitoring_intervals, absolute_biases);
             }
 
@@ -426,11 +522,11 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
                 {"monitoring_dates", kSensitivityDates},
                 {"continuous_reference", reference.value()},
                 {"discrete_price", summary.mean},
-                {"bias", *summary.bias},
-                {"relative_bias", *summary.bias / reference.value()},
+                {"bias", cell.value().bias},
+                {"relative_bias", cell.value().bias / reference.value()},
                 {"across_seed_standard_error", summary.standard_error},
                 {"bias_over_standard_error",
-                 summary.standard_error > 0.0 ? *summary.bias / summary.standard_error : 0.0},
+                 summary.standard_error > 0.0 ? cell.value().bias / summary.standard_error : 0.0},
                 {"mean_knock_fraction", cell.value().mean_knock_fraction}});
         }
         record.results["volatility_sensitivity"] = std::move(cells);
@@ -459,28 +555,62 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
     }
 
     record.interpretation =
-        "Discrete monitoring biases a knock-out upward, and by more than intuition allows. The "
+        "Discrete monitoring biases a knock-out upward, and by far more than intuition allows. The "
         "barrier is unobserved between fixes, so excursions that would have killed the option go "
         "unseen and it survives paths it should not -- making it worth more than the continuously "
-        "monitored contract the closed form prices. At daily observation the bias is still a "
-        "measurable fraction of the price and many across-seed standard errors from zero, so "
-        "'daily is effectively continuous' is false by a margin this experiment resolves. The "
-        "decay is O(1/sqrt(m)), which is why: quadrupling the observation frequency only halves "
-        "the error, and the frequencies a real contract uses are nowhere near enough. The size of "
-        "the effect is not merely fitted here. Broadie-Glasserman-Kou predict it in closed form by "
-        "shifting the barrier through the mean overshoot beta*sigma*sqrt(dt), and the "
-        "continuity-corrected reference accounts for most of the measured bias without having been "
-        "fitted to it. The Brownian-bridge correction removes the bias rather than shrinking it: "
-        "between two observed points log-GBM is a Brownian bridge whose crossing probability is "
-        "known exactly, so a simulation can account for the excursions it did not observe instead "
-        "of pretending they did not happen. Because log-GBM is exactly Brownian motion with drift, "
-        "that correction is exact rather than asymptotic, and the bridge prices agree with the "
-        "analytic continuous value at every frequency tested -- including the coarsest, where "
-        "discrete monitoring is at its worst. The practical reading is that the monitoring "
-        "convention is a contract term worth more than most modelling choices: the gap between "
-        "discretely and continuously monitored prices here exceeds what a plausible change in "
-        "volatility would produce, and it is a term of the contract rather than an approximation "
-        "to be tuned away.";
+        "monitored contract the closed form prices. The size is the headline: at a barrier 0.26 "
+        "sigma*sqrt(T) below the spot, observed daily, the bias is 10.1% of the price and 83 "
+        "across-seed standard errors from zero. 'Daily is effectively continuous' is not a "
+        "small approximation, it is wrong by a tenth of the contract's value. The effect grows "
+        "with volatility on the same terms it grows with coarseness -- at daily monitoring the "
+        "bias runs +0.30%, +3.01%, +10.03% of price at volatilities of 0.1, 0.2 and 0.4 -- because "
+        "what matters is sigma*sqrt(dt), the distance the price can wander unobserved, not the "
+        "calendar.\n\n"
+        "The decay rate needs care, and this experiment is a good illustration of why a fitted "
+        "slope is not a measured order. Theory (Broadie-Glasserman-Kou) says the bias decays as "
+        "O(1/sqrt(m)), an order of 0.5 against the monitoring interval. The fits here come in "
+        "*below* that and their intervals exclude it: 0.395 [0.368, 0.422] at B=90 and 0.437 "
+        "[0.425, 0.449] at B=95 over the full sweep. Taken at face value that reads as a "
+        "refutation. It is not one. The local orders climb monotonically toward 0.5 without "
+        "arriving -- 0.342, 0.375, 0.390, 0.431, 0.435 at B=90 -- which is the signature of a "
+        "pre-asymptotic range, where the O(1/m) terms the asymptotic statement discards are still "
+        "contributing. Restricted to the three finest levels the B=95 fit is 0.455 [0.404, 0.505] "
+        "and does contain 0.5; the B=90 window is 0.433 [0.419, 0.448] and still does not, because "
+        "its residuals are small enough that the interval is narrower than the model's own "
+        "misspecification. So the measured statement is that the bias decays at a rate approaching "
+        "0.5 from below over the frequencies tested, not that it decays at 0.5, and not that "
+        "theory is wrong.\n\n"
+        "What settles it is a check that does not depend on a fit at all. The same theory predicts "
+        "the bias's *size* in closed form: a barrier watched m times behaves like a continuous "
+        "barrier moved away from the spot by the mean overshoot, exp(-beta*sigma*sqrt(dt)). That "
+        "shifted-barrier price was not fitted to this data -- it comes from -zeta(1/2)/sqrt(2*pi) "
+        "and a barrier shift -- and it lands within 2 across-seed standard errors of the measured "
+        "discrete price at 16 of the 18 resolved cells. A theory with the rate wrong could not "
+        "predict the size to within its noise across three barriers and six frequencies. The "
+        "fitted slope is contaminated; the theory is not.\n\n"
+        "The two exceptions are worth more than the agreements. At B=95 the correction's residual "
+        "is +0.184 at m=5 -- 33 standard errors, unmistakably resolved -- and +0.035 at m=12, 6.2 "
+        "standard errors. That is the correction's own o(1/sqrt(m)) error, appearing exactly where "
+        "theory says it should: the closest barrier watched least often, the most extreme corner "
+        "tested. Across the six frequencies the residual runs +33.0, +6.2, -1.1, -0.4, +0.6, +1.0 "
+        "standard errors, draining away as the approximation's own remainder must. So this "
+        "experiment does not merely use the continuity correction as an oracle; it measures where "
+        "the correction itself stops being accurate, and finds it fails where it is supposed "
+        "to.\n\n"
+        "The Brownian-bridge correction removes the bias rather than shrinking it. Between two "
+        "observed points log-GBM is a Brownian bridge whose crossing probability is known exactly, "
+        "so a simulation can account for the excursions it did not observe instead of pretending "
+        "they did not happen -- and because log-GBM is exactly Brownian motion with drift, that "
+        "correction is exact rather than asymptotic. No bridge cell shows a bias this run can "
+        "resolve: the largest across all 24 is 2.0 across-seed standard errors, against a discrete "
+        "arm reaching 563. It holds at the coarsest frequency as well as the finest, which is the "
+        "point -- it is a correction, not a refinement, and five observations with the bridge beat "
+        "250 without it.\n\n"
+        "The practical reading is that the monitoring convention is a contract term worth more "
+        "than most modelling choices. The gap between the discretely and continuously monitored "
+        "price at B=95 exceeds what doubling volatility from 0.1 to 0.2 does to the continuous "
+        "price. It is a term of the contract, not an approximation to be tuned away, and a system "
+        "that leaves it implicit will silently price one contract and report another.";
 
     record.limitations.emplace_back(
         "The path is simulated with the exact scheme at exactly the monitoring dates, so it "
@@ -503,6 +633,35 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
         "rather than a market observation. It agrees with mpmath to 1e-15 and QuantLib to 1e-9, so "
         "it is a trustworthy statement about the model -- but this experiment measures agreement "
         "with a formula, not with reality.");
+    record.limitations.emplace_back(
+        "At B=70, 1.78 sigma*sqrt(T) below the spot, the bias never clears 2.1 across-seed "
+        "standard errors at any monitoring frequency. This run measured nothing there, and no "
+        "order is reported for it. The bias is real -- theory says so, and the sign is right at "
+        "four of six frequencies -- but it is smaller than 200000 paths across 16 seeds can see. "
+        "Read as evidence that a distant barrier's monitoring bias is negligible at these path "
+        "counts, not as evidence that it is zero.");
+    record.limitations.emplace_back(
+        "The fitted orders below 0.5 are a property of the frequencies tested, not a measured "
+        "contradiction of theory, and the record should not be quoted as though the two were the "
+        "same. The evidence for that reading is circumstantial in the fits themselves -- climbing "
+        "local orders, and a B=95 asymptotic window that contains 0.5 -- and direct only in the "
+        "continuity-corrected check. Reaching the asymptotic range would need monitoring "
+        "frequencies well beyond daily, which no traded contract uses and which this experiment "
+        "therefore did not prioritise.");
+    record.limitations.emplace_back(
+        "Read `continuity_corrected_residual_over_se`, not `bias_explained_fraction`, when judging "
+        "the continuity correction. The fraction divides by the bias, so where the bias is small "
+        "it "
+        "is a noisy statistic and misleads: at B=80 it ranges from 67% to 109% across frequencies, "
+        "which reads as the correction failing, while every residual there is within 1.9 standard "
+        "errors of zero and therefore consistent with it being exactly right. The fraction is "
+        "published because a reader will want it, not because it decides anything.");
+    record.limitations.emplace_back(
+        "The 24 bridge cells share the same 16 seeds, so they are not 24 independent tests of the "
+        "correction. Their sampling errors are correlated across barriers and frequencies -- "
+        "visibly so: the largest positive deviation sits at m=50 for three of the four barriers. "
+        "The evidence that the bridge is unbiased is weaker than the cell count suggests, though "
+        "no individual cell comes close to the threshold.");
     record.limitations.emplace_back(
         "The nearest barrier tested is 95, roughly 0.26 sigma*sqrt(T) below the spot. Barriers "
         "very close to the spot knock out nearly every path, leaving a small surviving sample and "

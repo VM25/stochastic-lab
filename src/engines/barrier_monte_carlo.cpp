@@ -137,12 +137,8 @@ Result<PricingResult> BarrierMonteCarloEngine::price(const MarketState& market,
             }
 
             if (use_bridge) {
-                const double p = bridge_crossing_probability(std::log(path[k - 1]),
-                                                             std::log(path[k]),
-                                                             log_barrier,
-                                                             variance_rate,
-                                                             dt,
-                                                             down);
+                const double p = bridge_crossing_probability(
+                    std::log(path[k - 1]), std::log(path[k]), log_barrier, variance_rate, dt, down);
                 bridge_probabilities.add(p);
                 if (bridge_stream.next_uniform() < p) {
                     knocked = true;
@@ -191,10 +187,10 @@ Result<PricingResult> BarrierMonteCarloEngine::price(const MarketState& market,
     result.add_diagnostic("knocked_by_bridge_only", diagnostics.knocked_by_bridge_only);
     result.add_diagnostic("mean_bridge_probability", diagnostics.mean_bridge_probability);
     result.add_diagnostic("paid", diagnostics.paid);
-    result.add_diagnostic(
-        "knock_fraction",
-        static_cast<double>(diagnostics.knocked_at_observation + diagnostics.knocked_by_bridge_only) /
-            static_cast<double>(config.paths));
+    result.add_diagnostic("knock_fraction",
+                          static_cast<double>(diagnostics.knocked_at_observation +
+                                              diagnostics.knocked_by_bridge_only) /
+                              static_cast<double>(config.paths));
 
     if (option.convention() == MonitoringConvention::Discrete) {
         result.add_warning(fmt::format(

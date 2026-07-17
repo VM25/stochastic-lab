@@ -217,17 +217,21 @@ TEST(StreamCoordinatesTest, LimitsSpanTheFullWordAndDoNotOverflow) {
 // appearing independent -- and every error estimate built on them would be wrong
 // in a way no moment test could reveal.
 TEST(StreamCoordinatesTest, DistinctCoordinatesGiveDistinctDraws) {
+    constexpr std::uint64_t kSeeds[] = {0, 1, 12345};
+    constexpr StreamPurpose kPurposes[] = {StreamPurpose::AssetShock,
+                                           StreamPurpose::VarianceShock,
+                                           StreamPurpose::BarrierBridge,
+                                           StreamPurpose::Diagnostic};
+    constexpr std::uint64_t kPaths = 8;
+    constexpr std::uint64_t kPositions = 8;
+
     std::set<double> seen;
 
-    for (const std::uint64_t seed : {std::uint64_t{0}, std::uint64_t{1}, std::uint64_t{12345}}) {
-        for (const StreamPurpose purpose :
-             {StreamPurpose::AssetShock,
-              StreamPurpose::VarianceShock,
-              StreamPurpose::BarrierBridge,
-              StreamPurpose::Diagnostic}) {
-            for (std::uint64_t path = 0; path < 8; ++path) {
+    for (const std::uint64_t seed : kSeeds) {
+        for (const StreamPurpose purpose : kPurposes) {
+            for (std::uint64_t path = 0; path < kPaths; ++path) {
                 RandomStream stream(seed, purpose, path);
-                for (std::uint64_t position = 0; position < 8; ++position) {
+                for (std::uint64_t position = 0; position < kPositions; ++position) {
                     const double value = stream.next_uniform();
                     EXPECT_TRUE(seen.insert(value).second)
                         << "two distinct coordinate tuples produced the same draw: seed=" << seed
@@ -238,8 +242,11 @@ TEST(StreamCoordinatesTest, DistinctCoordinatesGiveDistinctDraws) {
         }
     }
 
-    // 3 seeds x 3 purposes x 8 paths x 8 positions.
-    EXPECT_EQ(seen.size(), 3U * 3U * 8U * 8U);
+    // Counted from the loops rather than written out, because a hand-written total
+    // is a second place to state the same fact and the two drift apart. Adding
+    // BarrierBridge to the sweep above left a stale `3 purposes` here, and the test
+    // then failed for arithmetic reasons while the property it guards was fine.
+    EXPECT_EQ(seen.size(), std::size(kSeeds) * std::size(kPurposes) * kPaths * kPositions);
 }
 
 // Neighbouring coordinates are the dangerous case: seeds, paths and positions are
