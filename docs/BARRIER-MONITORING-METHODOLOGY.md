@@ -134,15 +134,31 @@ bias was not resolved.
 Theory (Broadie–Glasserman–Kou) says the discrete-monitoring bias decays as
 `O(1/sqrt(m))`: an order of 0.5 against the monitoring interval.
 
-The measured fits come in **below 0.5, with intervals that exclude it**:
+Almost no measured interval contains 0.5 — and, revealingly, **they miss it from
+both sides**:
 
-| Barrier | Full-range fit | Asymptotic window (finest 3) |
-|---|---|---|
-| 90 | 0.395 [0.368, 0.422] | 0.433 [0.419, 0.448] |
-| 95 | 0.437 [0.425, 0.449] | 0.455 [0.404, 0.505] |
+| Barrier | Distance | Full-range fit | Asymptotic window (finest 3) |
+|---|---|---|---|
+| down 70 | 1.78 σ√T | *refused — unresolved* | — |
+| down 80 | 1.12 σ√T | 0.248 [0.152, 0.343] | 0.308 [−0.451, 1.068] ✓ |
+| down 90 | 0.53 σ√T | 0.395 [0.368, 0.422] | 0.433 [0.419, 0.448] |
+| down 95 | 0.26 σ√T | 0.437 [0.425, 0.449] | 0.455 [0.404, 0.505] ✓ |
+| up 105 | 0.24 σ√T | 0.630 [0.595, 0.665] | 0.580 [0.571, 0.589] |
+| up 110 | 0.48 σ√T | 0.552 [0.543, 0.560] | 0.543 [0.456, 0.630] ✓ |
+| up 120 | 0.91 σ√T | 0.487 [0.475, 0.499] | 0.500 [0.427, 0.572] ✓ |
+| up 140 | 1.68 σ√T | 0.426 [0.395, 0.456] | 0.463 [0.302, 0.624] ✓ |
+
+(✓ = the 95% interval contains 0.5.)
 
 Taken at face value this is a refutation of the theory. It is not one, and the
 distinction matters more than the numbers do.
+
+**The two-sided miss is itself the argument.** Down-barriers come in low and close
+up-barriers come in high. A study of one direction only would have read its own miss
+as a signed correction to theory — "the real order is about 0.4" — and been wrong in
+a way no amount of extra care *within* that direction would have exposed. What is
+actually happening is that the higher-order terms the asymptotic statement discards
+carry opposite signs for the two geometries.
 
 **The evidence that the range is pre-asymptotic, not the theory wrong:**
 
@@ -151,10 +167,13 @@ distinction matters more than the numbers do.
    local orders that climb toward `k` as the contamination drains away. This is the
    same signature seen in Phases 5 and 6.
 
-2. **The B = 95 asymptotic window contains 0.5**, and B = 95 is the best-resolved
-   corner of the study — the largest bias relative to noise.
+2. **The asymptotic windows recover 0.5 at five of the seven fitted arms**, including
+   both extremes of barrier distance.
 
-3. **The B = 90 window still excludes 0.5 despite being closer**, because its
+3. **The misses fall on both sides of 0.5**, which no single-signed error in the
+   method could produce.
+
+4. **The B = 90 window still excludes 0.5 despite being well resolved**, because its
    residuals are small enough that the interval is narrower than the model's own
    misspecification. A tight interval around a slightly wrong slope is not evidence
    that the slope is right; it is evidence that a straight line is the wrong model
@@ -190,12 +209,15 @@ This is a far sharper test than a fitted slope, for two reasons. It predicts the
 actual number rather than a trend, and DiffusionWorks did not fit it to the data —
 it comes from `-zeta(1/2)/sqrt(2*pi)` and a barrier shift.
 
-Measured: the continuity-corrected reference lands within **2 across-seed standard
-errors** of the discrete price at **16 of the 18 resolved cells**.
+Measured, **for down-barriers**: the continuity-corrected reference lands within
+**2 across-seed standard errors** of the discrete price at **16 of the 18 resolved
+cells**.
 
 **A theory with the rate wrong could not predict the size to within its noise
 across three barriers and six frequencies.** The fitted slope is contaminated; the
-theory is not. This is why section 5's fits are reported as a pre-asymptotic
+theory is not.
+
+For up-barriers it does not land, and that is section 6.2. This is why section 5's fits are reported as a pre-asymptotic
 measurement rather than a refutation — and the point generalises: when a fitted
 order disagrees with theory, an independent prediction of the *magnitude*
 distinguishes "my fitting range is bad" from "the theory is wrong", where more grid
@@ -212,15 +234,14 @@ with the correction being exactly right.
 `continuity_corrected_residual_over_se` is the statistic that decides. Both are
 published; only one of them means anything.
 
-### Where the correction fails, and why that is the good part
+## 6.2 Where the correction fails, and why that is the good part
 
 The correction is itself an approximation with error `o(1/sqrt(m))`. Its residual is
-expected to be resolved *somewhere*, and where it happens is a measurement of the
+expected to be resolved *somewhere*, and where that happens is a measurement of the
 correction's own accuracy rather than an embarrassment.
 
-Two of the 18 resolved cells disagree, both at B = 95 — the closest barrier, watched
-least often, the most extreme corner tested. The residual across the six
-frequencies:
+**Down-barriers.** Two of the 18 resolved cells disagree, both at B = 95 — the
+closest barrier, watched least often. The residual across the six frequencies:
 
 ```
 m       5      12      25      50     100     250
@@ -228,24 +249,70 @@ res  +33.0    +6.2    -1.1    -0.4    +0.6    +1.0    (across-seed SE)
 ```
 
 At m = 5 the correction is off by +0.184, unmistakably resolved at 33 standard
-errors. It drains away exactly as an `o(1/sqrt(m))` remainder must.
+errors, and it drains away exactly as an `o(1/sqrt(m))` remainder must.
 
-So EXP-07 does not merely use the continuity correction as an oracle. It measures
-where the correction stops being accurate, and finds that it fails where it is
-supposed to.
+**Up-barriers: the correction is resolved as wrong at 23 of the 24 cells.**
+Systematically negative — it over-predicts — and still −5.4 σ at daily monitoring on
+the nearest barrier:
+
+```
+B=105   m:    5      12      25      50     100     250
+           -275.0  -150.4   -52.9   -30.4   -10.8    -5.4   (across-seed SE)
+```
+
+The one cell that does not disagree is B = 140 at m = 250 (−1.5 σ) — the farthest
+up-barrier at the finest monitoring, exactly where an `o(1/sqrt(m))` remainder should
+have drained away. The exception is the theory behaving as advertised, not a let-off.
+
+**This is not a sign error.** The shift direction was checked independently against
+mpmath: moving the barrier *away* from the spot gives 0.01531 against a measured
+0.01471, while reversing it gives 0.00459 — off by an order of magnitude rather than
+a few percent. The sign is right; the remainder is real.
+
+Two things make it visible, and they are worth separating:
+
+1. **The noise collapses, so the same error becomes resolvable.** An up-and-out call
+   near the spot knocks out on almost every path and pays zero, so the estimator's
+   variance is tiny. The absolute residual is 0.0006–0.008 — comparable to the
+   down-barrier case — but it is 0.1% of a down-barrier price and 4% of this one.
+   *Significance measures what the run can see, not how large the error is.*
+
+2. **The geometry is genuinely harder.** An up-and-out call pays `B − K` *just below*
+   its barrier and zero at it: the value is **discontinuous across the boundary**. A
+   down-and-out call struck above its barrier approaches zero smoothly there. A
+   continuity correction built on an overshoot argument is weakest exactly where the
+   value jumps.
+
+So EXP-07 does not merely use the continuity correction as an oracle. It locates
+where the oracle stops being trustworthy — and the answer is not where a
+down-barrier-only study would have suggested. **Do not use the continuity-corrected
+reference for an up-and-out call near the spot.** Use the bridge, which is exact for
+this model.
 
 ## 7. What the numbers say
 
 At S = K = 100, r = 0.05, q = 0, T = 1, down-and-out call, 200 000 paths × 16 seeds.
 
-**Discrete monitoring is biased high, and the size is the headline:**
+**Discrete monitoring is biased high in every one of the 42 resolved cells, and the
+size is worst exactly where the contract is cheapest:**
 
-| Barrier | Distance | Bias at daily (m=250) | As % of price | Resolution |
-|---|---|---|---|---|
-| 70 | 1.78 σ√T | not resolved | — | max 2.1 SE |
-| 80 | 1.12 σ√T | +0.029 | +0.28% | 4 SE |
-| 90 | 0.53 σ√T | +0.261 | +3.01% | 37 SE |
-| 95 | 0.26 σ√T | +0.569 | +10.09% | 83 SE |
+| Barrier | Distance | Continuous price | Bias at daily (m=250) | As % of price | Resolution |
+|---|---|---|---|---|---|
+| down 70 | 1.78 σ√T | 10.45 | not resolved | — | max 2.1 SE |
+| down 80 | 1.12 σ√T | 10.35 | +0.029 | +0.28% | 4 SE |
+| down 90 | 0.53 σ√T | 8.67 | +0.261 | +3.01% | 37 SE |
+| down 95 | 0.26 σ√T | 5.64 | +0.569 | +10.09% | 83 SE |
+| up 105 | 0.24 σ√T | **0.0088** | +0.0059 | **+67.4%** | 53 SE |
+| up 110 | 0.48 σ√T | 0.119 | +0.036 | +30.1% | 69 SE |
+| up 120 | 0.91 σ√T | 1.176 | +0.150 | +12.8% | 106 SE |
+| up 140 | 1.68 σ√T | 5.711 | +0.219 | +3.8% | 44 SE |
+
+The up-and-out at B = 105 is the sharpest statement in the experiment. It knocks out
+in precisely the states where it would have paid — the payoff window is only
+S_T ∈ (100, 105) — so what survives is worth 0.0088, and **daily monitoring biases
+that by two thirds of its own value**. The monitoring convention's cost is not
+uniform: it concentrates in the cheap, nearly-knocked-out contracts, where a relative
+error is largest and intuition is weakest.
 
 **Volatility moves it as directly as frequency does** (B = 90, daily):
 
@@ -258,30 +325,28 @@ At S = K = 100, r = 0.05, q = 0, T = 1, down-and-out call, 200 000 paths × 16 s
 What matters is `sigma·sqrt(dt)` — the distance the price can wander unobserved —
 not the calendar.
 
-**The bridge removes the bias rather than shrinking it.** No bridge cell shows a
-bias this run can resolve; the largest across all 24 is 2.0 across-seed standard
-errors, against a discrete arm reaching 563. It holds at m = 5 as well as at
+**The bridge removes the bias rather than shrinking it, in both directions.** No
+bridge cell shows a bias this run can resolve; the largest across all 48 is 2.4
+across-seed standard errors, against a discrete arm reaching 563. It holds at m = 5 as well as at
 m = 250: five observations with the bridge beat 250 without it.
 
 ## 8. Limitations
 
-* **EXP-07's measurements are down-and-out calls with B ≤ K only.** The analytic
-  engine now covers all four call cases on both branches of the strike-versus-barrier
-  split (validated against QuantLib at 1e-9 and mpmath at 1e-14), so the reference
-  exists — but the published record predates that and has not been re-run across
-  up-barriers. The catalog asks for both directions; this is the outstanding gap.
+* **Calls only.** Puts are a separate set of cases the analytic engine does not
+  implement, so no trusted continuous reference exists for them.
 * **The reference is a formula, not a market.** Reiner–Rubinstein agrees with
   mpmath to 1e-15 and QuantLib to 1e-9, so it is a trustworthy statement about the
   model — but every bias here is measured against a model output.
-* **The 24 bridge cells share 16 seeds**, so they are not 24 independent tests.
+* **The 48 bridge cells share 16 seeds**, so they are not 48 independent tests.
   Their sampling errors are correlated across barriers and frequencies — visibly
   so: the largest positive deviation sits at m = 50 for three of the four barriers.
   The evidence that the bridge is unbiased is weaker than the cell count suggests.
 * **B = 70 measured nothing.** The bias there is real but below this run's
   resolution. Read as "negligible at these path counts", not "zero".
-* **Barriers very close to the spot are not characterised.** The nearest tested is
-  0.26 σ√T. Closer barriers knock out nearly every path, leaving a small surviving
-  sample and an estimator whose variance is dominated by rare paths.
+* **Barriers very close to the spot are not characterised.** The nearest tested are
+  0.24–0.26 σ√T. Closer barriers knock out nearly every path, leaving a surviving
+  sample small enough that the estimator's variance is dominated by rare paths. The
+  up-and-out at B = 105, worth 0.0088, is the edge of what this run resolves.
 * **The bridge estimator draws a Bernoulli decision per interval** rather than
   accumulating the conditional survival probability. Both are unbiased; the
   conditional-expectation form would have strictly lower variance. The bridge arm's

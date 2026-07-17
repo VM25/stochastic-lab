@@ -28,7 +28,7 @@ python3 python/plot_convergence.py results/*.json --outdir docs/figures
 | EXP-03 | pass | Both schemes converge weakly at order 1. Euler and Milstein share their first moment *exactly*. |
 | EXP-04 | pass | The bias floor exists and is located: on coarse grids more paths stop helping. |
 | EXP-06 | pass | Crank–Nicolson reaches order 2.0034 in space; Rannacher restores order 1.98 in time where plain CN oscillates. The explicit stability bound is sufficient, not necessary — stable to ratio 1.60, divergent at 1.70. |
-| EXP-07 | pass | Daily monitoring is not continuous monitoring: the bias reaches 10.1% of price at a barrier 0.26 σ√T away. The Brownian bridge removes it at every frequency tested. |
+| EXP-07 | pass | Daily monitoring is not continuous monitoring: the bias reaches **67% of price** for an up-and-out call near the spot, and is biased high in all 42 resolved cells. The Brownian bridge removes it at every frequency, in both directions. |
 
 The EXP-02 warning is not a defect. It records that the full-range slopes (0.4974,
 0.9838) exclude their theoretical values while the asymptotic-window slopes
@@ -37,14 +37,23 @@ The local orders climb monotonically toward theory as the grid refines, which is
 what distinguishes this from a wrong order. Both fits are published; the reasoning
 is in `docs/CONVERGENCE-METHODOLOGY.md` §3.
 
-EXP-07 passes while reporting fitted orders that *exclude* their theoretical 0.5
-(0.395 at B=90, 0.437 at B=95). The same pre-asymptotic reading as EXP-02 applies —
-but here it is not left resting on the climbing local orders alone. The
-Broadie–Glasserman–Kou continuity correction predicts the bias's *magnitude* in
-closed form, and it accounts for 94–101% of the measured bias without having been
-fitted to it. A theory with the rate wrong could not predict the size to within a
-percent, which is what distinguishes a contaminated fitting range from a wrong
-order. See `docs/BARRIER-MONITORING-METHODOLOGY.md` §5–6.
+EXP-07 passes while reporting fitted orders that *exclude* their theoretical 0.5 —
+and they miss it **from both sides**: down-barriers low (0.395 at B=90) and close
+up-barriers high (0.630 at B=105). That two-sided miss is the argument. A
+single-direction study would have read its own miss as a signed correction to theory
+and been wrong in a way no extra care within that direction could expose; what is
+really happening is that the discarded higher-order terms carry opposite signs for
+the two geometries. The asymptotic windows recover 0.5 at five of seven fitted arms.
+See `docs/BARRIER-MONITORING-METHODOLOGY.md` §5–6.
+
+EXP-07 also **measures where its own oracle stops working**. The Broadie–Glasserman–Kou
+continuity correction predicts the bias's magnitude in closed form, and for
+down-barriers it lands within 2 standard errors at 16 of 18 resolved cells without
+having been fitted to the data. For up-barriers it is resolved as *wrong* at 23 of 24
+cells — not a sign error (verified independently; reversing the shift misses by an
+order of magnitude) but the correction's own o(1/√m) remainder, made visible because
+an up-and-out call near the spot pays on almost no paths and so has almost no noise
+to hide under. The record says not to use it as an oracle there.
 
 EXP-07 also **refuses to fit** the B=70 arm, where the bias never clears 2.1
 across-seed standard errors. An earlier run fitted it anyway and published an order
