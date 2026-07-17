@@ -46,6 +46,8 @@ std::string_view to_string(CommandKind kind) noexcept {
             return "price";
         case CommandKind::Simulate:
             return "simulate";
+        case CommandKind::Greeks:
+            return "greeks";
         case CommandKind::Validate:
             return "validate";
         case CommandKind::Experiment:
@@ -64,6 +66,9 @@ std::optional<CommandKind> parse_command(std::string_view text) noexcept {
     }
     if (text == "simulate") {
         return CommandKind::Simulate;
+    }
+    if (text == "greeks") {
+        return CommandKind::Greeks;
     }
     if (text == "validate") {
         return CommandKind::Validate;
@@ -125,7 +130,7 @@ Result<Options> parse_arguments(const std::vector<std::string_view>& args) {
     if (!command.has_value()) {
         return Result<Options>::failure(
             ErrorCode::InvalidArgument,
-            fmt::format("unknown command '{}'; expected one of: price, simulate, validate, "
+            fmt::format("unknown command '{}'; expected one of: price, simulate, greeks, validate, "
                         "experiment, calibrate, benchmark",
                         command_text),
             kContext);
@@ -258,6 +263,7 @@ Usage:
 Commands:
   price       Value an instrument with a chosen model and method
   simulate    Generate paths and report simulation diagnostics
+  greeks      Estimate a Greek by finite difference, pathwise, or likelihood ratio
   validate    Check results against references and financial invariants
   experiment  Run a configured numerical experiment
   calibrate   Fit Heston parameters to an implied-volatility surface
@@ -294,6 +300,12 @@ std::string command_usage_text(CommandKind kind) {
             description = "Generate paths and report simulation diagnostics.";
             detail = "Reports path statistics and scheme diagnostics. Non-finite path states are\n"
                      "reported as failures rather than dropped from the sample.";
+            break;
+        case CommandKind::Greeks:
+            description = "Estimate a Greek by finite difference, pathwise, or likelihood ratio.";
+            detail =
+                "Runs the chosen estimator across a seed set and reports the estimate with its\n"
+                "across-seed uncertainty, the bump used, runtime, status, and any warnings.";
             break;
         case CommandKind::Validate:
             description = "Check results against references and financial invariants.";

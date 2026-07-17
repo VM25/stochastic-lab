@@ -6,7 +6,9 @@
 
 #include <chrono>
 #include <cmath>
+#include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -29,6 +31,19 @@ std::string_view to_string(GreekName greek) noexcept {
     return "unknown";
 }
 
+std::optional<GreekName> parse_greek_name(std::string_view text) noexcept {
+    if (text == "delta") {
+        return GreekName::Delta;
+    }
+    if (text == "gamma") {
+        return GreekName::Gamma;
+    }
+    if (text == "vega") {
+        return GreekName::Vega;
+    }
+    return std::nullopt;
+}
+
 std::string_view to_string(GreekMethod method) noexcept {
     switch (method) {
         case GreekMethod::FiniteDifference:
@@ -39,6 +54,19 @@ std::string_view to_string(GreekMethod method) noexcept {
             return "likelihood_ratio";
     }
     return "unknown";
+}
+
+std::optional<GreekMethod> parse_greek_method(std::string_view text) noexcept {
+    if (text == "finite_difference") {
+        return GreekMethod::FiniteDifference;
+    }
+    if (text == "pathwise") {
+        return GreekMethod::Pathwise;
+    }
+    if (text == "likelihood_ratio") {
+        return GreekMethod::LikelihoodRatio;
+    }
+    return std::nullopt;
 }
 
 namespace {

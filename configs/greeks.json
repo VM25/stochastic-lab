@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "command": "greeks",
+  "market": {
+    "spot": 100.0,
+    "rate": 0.05,
+    "dividend_yield": 0.0
+  },
+  "instrument": {
+    "type": "european",
+    "option_type": "call",
+    "strike": 100.0,
+    "maturity": 1.0
+  },
+  "model": {
+    "type": "black_scholes",
+    "volatility": 0.2
+  },
+  "greeks": {
+    "greek": "delta",
+    "method": "pathwise",
+    "spot_bump_fraction": 0.01,
+    "volatility_bump": 0.01,
+    "paths": 200000,
+    "seed_count": 16,
+    "master_seed": 20260717
+  }
+}

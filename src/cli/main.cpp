@@ -5,6 +5,7 @@
 #include <diffusionworks/experiments/experiment.hpp>
 
 #include "experiment_command.hpp"
+#include "greeks_command.hpp"
 #include "options.hpp"
 #include "output.hpp"
 #include "price_command.hpp"
@@ -54,6 +55,8 @@ namespace {
             return cli::run_price(config.value(), options);
         case cli::CommandKind::Simulate:
             return cli::run_simulate(config.value(), options);
+        case cli::CommandKind::Greeks:
+            return cli::run_greeks(config.value(), options);
         case cli::CommandKind::Experiment:
             return cli::run_experiment(config.value(), options);
         case cli::CommandKind::Validate:

@@ -31,6 +31,7 @@ enum class ExitCode : int {
 enum class CommandKind {
     Price,
     Simulate,
+    Greeks,
     Validate,
     Experiment,
     Calibrate,

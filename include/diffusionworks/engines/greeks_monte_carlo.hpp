@@ -6,6 +6,7 @@
 #include <diffusionworks/models/black_scholes.hpp>
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -16,6 +17,8 @@ namespace diffusionworks {
 enum class GreekName : std::uint8_t { Delta, Gamma, Vega };
 
 [[nodiscard]] std::string_view to_string(GreekName greek) noexcept;
+
+[[nodiscard]] std::optional<GreekName> parse_greek_name(std::string_view text) noexcept;
 
 /// How the sensitivity is estimated from Monte Carlo paths.
 ///
@@ -39,6 +42,8 @@ enum class GreekName : std::uint8_t { Delta, Gamma, Vega };
 enum class GreekMethod : std::uint8_t { FiniteDifference, Pathwise, LikelihoodRatio };
 
 [[nodiscard]] std::string_view to_string(GreekMethod method) noexcept;
+
+[[nodiscard]] std::optional<GreekMethod> parse_greek_method(std::string_view text) noexcept;
 
 /// Parameters for a Greek estimation run.
 struct GreeksMonteCarloConfig {

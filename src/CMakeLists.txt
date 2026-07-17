@@ -88,6 +88,7 @@ target_sources(
     diffusionworks
     PRIVATE cli/main.cpp
             cli/experiment_command.cpp
+            cli/greeks_command.cpp
             cli/options.cpp
             cli/output.cpp
             cli/price_command.cpp
@@ -118,6 +119,7 @@ if(DW_BUILD_TESTS)
     add_library(
         diffusionworks_cli_lib STATIC
         cli/experiment_command.cpp
+        cli/greeks_command.cpp
         cli/options.cpp
         cli/output.cpp
         cli/price_command.cpp

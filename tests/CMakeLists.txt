@@ -208,6 +208,7 @@ add_dw_test(
     SOURCES cli/options_test.cpp
             cli/price_command_test.cpp
             cli/simulate_command_test.cpp
+            cli/greeks_command_test.cpp
             cli/experiment_command_test.cpp
     LIBS diffusionworks::cli_lib)
 
