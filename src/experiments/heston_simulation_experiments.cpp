@@ -104,7 +104,7 @@ Result<SchemeCell> run_cell(const MarketState& market,
 
     cell.negative_fraction = negative_fraction_sum / static_cast<double>(seeds.size());
     cell.mean_runtime_seconds = runtime_sum / static_cast<double>(seeds.size());
-    cell.priced_seeds = static_cast<std::uint64_t>(replications.size());
+    cell.priced_seeds = replications.size();
 
     if (replications.size() >= 2) {
         auto summary = summarize_seeds(replications, reference);
