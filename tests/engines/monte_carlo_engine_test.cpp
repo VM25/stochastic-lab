@@ -733,7 +733,8 @@ TEST(MonteCarloAsianThreadingTest, NonPositiveStateCountIsInvariantToThreadCount
     const auto model = BlackScholesModel::create(1.2).value();
 
     const auto count_non_positive = [&](int threads) -> std::int64_t {
-        MonteCarloConfig config = config_with(60000, 12, kSeed, DiscretizationScheme::EulerMaruyama);
+        MonteCarloConfig config =
+            config_with(60000, 12, kSeed, DiscretizationScheme::EulerMaruyama);
         config.threads = threads;
         const auto priced = MonteCarloEngine::price(market, option, model, config);
         EXPECT_TRUE(priced.ok()) << priced.error().describe();

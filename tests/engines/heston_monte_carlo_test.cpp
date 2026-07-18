@@ -335,10 +335,8 @@ TEST(HestonMonteCarloTest, RefusesZeroMaturity) {
 // bit-identical at every thread count and no worker's diagnostics can be lost.
 // ---------------------------------------------------------------------------
 
-HestonMonteCarloConfig threaded(int threads,
-                                std::int64_t steps,
-                                std::int64_t paths,
-                                std::uint64_t seed = 20260717) {
+HestonMonteCarloConfig
+threaded(int threads, std::int64_t steps, std::int64_t paths, std::uint64_t seed = 20260717) {
     HestonMonteCarloConfig c = config(steps, paths, seed);
     c.threads = threads;
     return c;
@@ -364,7 +362,8 @@ TEST(HestonMonteCarloThreadingTest, MatchesTheSingleThreadedResultAcrossThreadCo
 
 TEST(HestonMonteCarloThreadingTest, IsBitReproducibleAtAFixedThreadCount) {
     const auto mk = market(100.0, 0.05, 0.0);
-    const auto first = HestonMonteCarloEngine::price(mk, call(), benign(), threaded(4, 100, 120000));
+    const auto first =
+        HestonMonteCarloEngine::price(mk, call(), benign(), threaded(4, 100, 120000));
     const auto second =
         HestonMonteCarloEngine::price(mk, call(), benign(), threaded(4, 100, 120000));
     ASSERT_TRUE(first.ok()) << first.error().describe();

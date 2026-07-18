@@ -318,6 +318,7 @@ Result<GreekEstimate> GreeksMonteCarloEngine::estimate(const MarketState& market
     struct Local {
         OnlineMoments samples;
     };
+
     const auto make_local = [] { return Local{}; };
     const auto body = [&](std::int64_t i, Local& local) -> Status {
         RandomStream stream(config.seed, StreamPurpose::AssetShock, static_cast<std::uint64_t>(i));
