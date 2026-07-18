@@ -182,6 +182,11 @@ add_dw_test(
     SOURCES engines/finite_difference_test.cpp)
 
 add_dw_test(
+    dw_test_implied_volatility
+    LABEL unit
+    SOURCES engines/implied_volatility_test.cpp)
+
+add_dw_test(
     dw_test_heston_analytic
     LABEL unit
     SOURCES engines/heston_analytic_test.cpp)

@@ -22,6 +22,7 @@ target_sources(
             engines/greeks_monte_carlo.cpp
             engines/heston_analytic.cpp
             engines/heston_monte_carlo.cpp
+            engines/implied_volatility.cpp
             engines/monte_carlo_engine.cpp
             experiments/barrier_experiments.cpp
             experiments/convergence.cpp
