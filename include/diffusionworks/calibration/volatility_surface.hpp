@@ -72,6 +72,28 @@ struct SyntheticSurfaceSpec {
                                 .correlation = -0.6};
 };
 
+/// One market quote given in implied-volatility terms, the way surfaces are usually
+/// quoted.
+struct ImpliedVolatilityQuote {
+    OptionType type{OptionType::Call};
+    double strike{};
+    double maturity{};
+    double implied_volatility{};
+    double weight{1.0};
+};
+
+/// Builds a surface from implied-volatility quotes, pricing each through Black-Scholes
+/// so the calibrator has both the price and the volatility for every quote. Fails
+/// loudly on a quote that cannot be priced rather than dropping it, and requires the
+/// provenance a published calibration must carry.
+[[nodiscard]] Result<VolatilitySurface>
+build_surface_from_implied_vols(double spot,
+                                double rate,
+                                double dividend_yield,
+                                const std::vector<ImpliedVolatilityQuote>& quotes,
+                                std::string source,
+                                std::string as_of);
+
 /// Generates a synthetic volatility surface by pricing every grid point under Heston
 /// and inverting each price to its Black-Scholes implied volatility.
 ///

@@ -1,8 +1,12 @@
 #include <diffusionworks/calibration/volatility_surface.hpp>
+#include <diffusionworks/engines/black_scholes_analytic.hpp>
 #include <diffusionworks/engines/heston_analytic.hpp>
 #include <diffusionworks/engines/implied_volatility.hpp>
+#include <diffusionworks/models/black_scholes.hpp>
 
 #include <fmt/format.h>
+
+#include <utility>
 
 namespace diffusionworks {
 namespace {
@@ -13,6 +17,55 @@ constexpr const char* kContext = "VolatilitySurface";
 
 Result<MarketState> VolatilitySurface::market() const {
     return MarketState::create(spot, rate, dividend_yield);
+}
+
+Result<VolatilitySurface>
+build_surface_from_implied_vols(double spot,
+                                double rate,
+                                double dividend_yield,
+                                const std::vector<ImpliedVolatilityQuote>& quotes,
+                                std::string source,
+                                std::string as_of) {
+    if (quotes.empty()) {
+        return Result<VolatilitySurface>::failure(
+            ErrorCode::InvalidArgument, "a surface needs at least one quote", kContext);
+    }
+    const auto market = MarketState::create(spot, rate, dividend_yield);
+    if (!market) {
+        return Result<VolatilitySurface>::failure(market.error());
+    }
+
+    VolatilitySurface surface;
+    surface.spot = spot;
+    surface.rate = rate;
+    surface.dividend_yield = dividend_yield;
+    surface.source = std::move(source);
+    surface.as_of = std::move(as_of);
+    surface.quotes.reserve(quotes.size());
+
+    for (const ImpliedVolatilityQuote& quote : quotes) {
+        const auto option = EuropeanOption::create(quote.type, quote.strike, quote.maturity);
+        if (!option) {
+            return Result<VolatilitySurface>::failure(option.error());
+        }
+        const auto model = BlackScholesModel::create(quote.implied_volatility);
+        if (!model) {
+            return Result<VolatilitySurface>::failure(model.error());
+        }
+        const auto priced =
+            BlackScholesAnalyticEngine::price(market.value(), option.value(), model.value());
+        if (!priced) {
+            return Result<VolatilitySurface>::failure(priced.error());
+        }
+        surface.quotes.push_back(SurfaceQuote{.type = quote.type,
+                                              .strike = quote.strike,
+                                              .maturity = quote.maturity,
+                                              .price = priced.value().value,
+                                              .implied_volatility = quote.implied_volatility,
+                                              .weight = quote.weight});
+    }
+
+    return Result<VolatilitySurface>::success(std::move(surface));
 }
 
 Result<VolatilitySurface> generate_heston_surface(const SyntheticSurfaceSpec& spec) {

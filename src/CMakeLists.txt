@@ -97,6 +97,7 @@ add_executable(diffusionworks)
 target_sources(
     diffusionworks
     PRIVATE cli/main.cpp
+            cli/calibrate_command.cpp
             cli/experiment_command.cpp
             cli/greeks_command.cpp
             cli/options.cpp
@@ -128,6 +129,7 @@ set_target_properties(
 if(DW_BUILD_TESTS)
     add_library(
         diffusionworks_cli_lib STATIC
+        cli/calibrate_command.cpp
         cli/experiment_command.cpp
         cli/greeks_command.cpp
         cli/options.cpp

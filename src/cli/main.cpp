@@ -4,6 +4,7 @@
 #include <diffusionworks/core/result.hpp>
 #include <diffusionworks/experiments/experiment.hpp>
 
+#include "calibrate_command.hpp"
 #include "experiment_command.hpp"
 #include "greeks_command.hpp"
 #include "options.hpp"
@@ -59,8 +60,9 @@ namespace {
             return cli::run_greeks(config.value(), options);
         case cli::CommandKind::Experiment:
             return cli::run_experiment(config.value(), options);
-        case cli::CommandKind::Validate:
         case cli::CommandKind::Calibrate:
+            return cli::run_calibrate(config.value(), options);
+        case cli::CommandKind::Validate:
         case cli::CommandKind::Benchmark:
             break;
     }

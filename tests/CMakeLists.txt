@@ -246,6 +246,7 @@ add_dw_test(
             cli/simulate_command_test.cpp
             cli/greeks_command_test.cpp
             cli/experiment_command_test.cpp
+            cli/calibrate_command_test.cpp
     LIBS diffusionworks::cli_lib)
 
 # --- External cross-validation ----------------------------------------------
