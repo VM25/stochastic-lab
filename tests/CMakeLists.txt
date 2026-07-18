@@ -88,6 +88,16 @@ add_dw_test(
     LABEL concurrency
     SOURCES concurrency/parallel_reduce_test.cpp)
 
+# Engine-level threading smoke tests, also labelled concurrency so the ThreadSanitizer
+# job runs each parallelised engine's own path loop -- not only the shared facility.
+# Kept small (a few thousand paths) so they run under TSan's slowdown; the detailed
+# statistical threading tests stay in the per-engine suites.
+
+add_dw_test(
+    dw_test_engine_threading
+    LABEL concurrency
+    SOURCES concurrency/engine_threading_test.cpp)
+
 # --- Randomness -------------------------------------------------------------
 #
 # The statistical tests here draw millions of samples so that their acceptance

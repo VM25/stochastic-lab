@@ -21,7 +21,13 @@ shared mutable random-number state** to contend on. The parallelisation is there
 
 There are no locks in the path loop and no shared accumulator: each worker writes only
 its own block's state and its own error slot. ThreadSanitizer confirms this is
-race-free.
+race-free, and it does so for **every parallelised engine, not only the shared
+facility**: the `concurrency`-labelled targets the CI TSan job runs are
+`parallel_reduce_test` (the facility) *and* `engine_threading_test` (a small, fast
+threading smoke test for the European, Asian, Heston, Greeks, and barrier loops). The
+per-engine statistical suites carry the detailed threading tests; these
+`concurrency`-labelled smoke tests exist so the race check is a durable CI gate for each
+engine.
 
 ## 2. Reproducibility, exactly stated
 
