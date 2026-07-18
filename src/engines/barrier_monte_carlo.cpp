@@ -1,3 +1,4 @@
+#include <diffusionworks/concurrency/parallel_reduce.hpp>
 #include <diffusionworks/engines/barrier_monte_carlo.hpp>
 #include <diffusionworks/random/random_stream.hpp>
 #include <diffusionworks/simulation/gbm_path_generator.hpp>
@@ -7,6 +8,8 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <utility>
 #include <vector>
 
@@ -82,6 +85,12 @@ Result<PricingResult> BarrierMonteCarloEngine::price(const MarketState& market,
             "analytic engine returns it exactly",
             kContext);
     }
+    if (config.threads < 1 || config.threads > 1024) {
+        return Result<PricingResult>::failure(
+            ErrorCode::InvalidArgument,
+            fmt::format("threads must be between 1 and 1024 but is {}", config.threads),
+            kContext);
+    }
 
     const std::int64_t dates = *option.monitoring_count();
     const auto grid = TimeGrid::uniform(option.maturity(), dates);
@@ -102,17 +111,46 @@ Result<PricingResult> BarrierMonteCarloEngine::price(const MarketState& market,
     const double dt = grid.value().step_size();
     const double discount = market.discount_factor(option.maturity());
 
-    std::vector<double> path(generator.path_size());
-    OnlineMoments payoffs;
-    BarrierMonteCarloDiagnostics diagnostics;
-    diagnostics.paths = config.paths;
-    diagnostics.monitoring_dates = dates;
-    OnlineMoments bridge_probabilities;
+    // A worker's thread-local state: its own payoff and bridge-probability
+    // accumulators, its own diagnostic counts, and its own path buffer (allocated once
+    // per worker, never per path -- ADR-013), so nothing is shared and mutated across
+    // workers (ADR-011).
+    struct Local {
+        OnlineMoments payoffs;
+        OnlineMoments bridge_probabilities;
+        std::int64_t knocked_at_observation{0};
+        std::int64_t knocked_by_bridge_only{0};
+        std::int64_t paid{0};
+        std::vector<double> path;
+    };
 
-    for (std::int64_t i = 0; i < config.paths; ++i) {
-        const auto generated = generator.generate(config.seed, static_cast<std::uint64_t>(i), path);
+    const auto make_local = [&] {
+        Local local;
+        local.path.resize(generator.path_size());
+        return local;
+    };
+
+    // The counts are integer sums and the two OnlineMoments merge in block order, so
+    // every path's contribution reduces exactly once and no diagnostic is lost.
+    const auto reduce = [](Local& into, const Local& from) {
+        into.payoffs.merge(from.payoffs);
+        into.bridge_probabilities.merge(from.bridge_probabilities);
+        into.knocked_at_observation += from.knocked_at_observation;
+        into.knocked_by_bridge_only += from.knocked_by_bridge_only;
+        into.paid += from.paid;
+    };
+
+    // One path. The asset shocks come from (seed, index) through the generator, and the
+    // bridge uniforms from (seed, BarrierBridge, index); the early-knockout break lives
+    // entirely inside this path's own monitoring loop. So which worker owns the path
+    // cannot change the coordinates it draws, the order it draws them in, or when it
+    // stops -- the parallel run tests every interval against exactly the bridge uniform
+    // the sequential run did.
+    const auto body = [&](std::int64_t i, Local& local) -> Status {
+        const auto generated =
+            generator.generate(config.seed, static_cast<std::uint64_t>(i), local.path);
         if (!generated.ok()) {
-            return Result<PricingResult>::failure(generated.error());
+            return Status::failure(generated.error());
         }
 
         bool knocked = false;
@@ -125,21 +163,25 @@ Result<PricingResult> BarrierMonteCarloEngine::price(const MarketState& market,
         RandomStream bridge_stream(
             config.seed, StreamPurpose::BarrierBridge, static_cast<std::uint64_t>(i));
 
-        for (std::size_t k = 1; k < path.size(); ++k) {
+        for (std::size_t k = 1; k < local.path.size(); ++k) {
             // Node 0 is the initial spot. Whether the *starting* spot breaches is
             // the caller's question, not a monitoring event -- the analytic engine
             // handles an already-breached contract -- so monitoring starts at the
             // first date.
-            if (option.breaches(path[k])) {
+            if (option.breaches(local.path[k])) {
                 knocked = true;
                 knocked_at_date = true;
                 break;
             }
 
             if (use_bridge) {
-                const double p = bridge_crossing_probability(
-                    std::log(path[k - 1]), std::log(path[k]), log_barrier, variance_rate, dt, down);
-                bridge_probabilities.add(p);
+                const double p = bridge_crossing_probability(std::log(local.path[k - 1]),
+                                                             std::log(local.path[k]),
+                                                             log_barrier,
+                                                             variance_rate,
+                                                             dt,
+                                                             down);
+                local.bridge_probabilities.add(p);
                 if (bridge_stream.next_uniform() < p) {
                     knocked = true;
                     break;
@@ -149,18 +191,32 @@ Result<PricingResult> BarrierMonteCarloEngine::price(const MarketState& market,
 
         if (knocked) {
             if (knocked_at_date) {
-                ++diagnostics.knocked_at_observation;
+                ++local.knocked_at_observation;
             } else {
-                ++diagnostics.knocked_by_bridge_only;
+                ++local.knocked_by_bridge_only;
             }
         }
 
-        const double payoff = option.payoff(path.back(), knocked);
+        const double payoff = option.payoff(local.path.back(), knocked);
         if (payoff > 0.0) {
-            ++diagnostics.paid;
+            ++local.paid;
         }
-        payoffs.add(discount * payoff);
+        local.payoffs.add(discount * payoff);
+        return Status::success();
+    };
+
+    auto reduced = parallel_reduce<Local>(config.paths, config.threads, make_local, body, reduce);
+    if (!reduced.ok()) {
+        return Result<PricingResult>::failure(reduced.error());
     }
+    const OnlineMoments& payoffs = reduced.value().payoffs;
+
+    BarrierMonteCarloDiagnostics diagnostics;
+    diagnostics.paths = config.paths;
+    diagnostics.monitoring_dates = dates;
+    diagnostics.knocked_at_observation = reduced.value().knocked_at_observation;
+    diagnostics.knocked_by_bridge_only = reduced.value().knocked_by_bridge_only;
+    diagnostics.paid = reduced.value().paid;
 
     const auto standard_error = payoffs.standard_error();
     if (!standard_error.ok()) {
@@ -171,8 +227,9 @@ Result<PricingResult> BarrierMonteCarloEngine::price(const MarketState& market,
         return Result<PricingResult>::failure(interval.error());
     }
 
-    diagnostics.mean_bridge_probability =
-        bridge_probabilities.count() > 0 ? bridge_probabilities.mean() : 0.0;
+    diagnostics.mean_bridge_probability = reduced.value().bridge_probabilities.count() > 0
+                                              ? reduced.value().bridge_probabilities.mean()
+                                              : 0.0;
 
     PricingResult result;
     result.method = fmt::format("barrier_monte_carlo_{}", to_string(option.convention()));

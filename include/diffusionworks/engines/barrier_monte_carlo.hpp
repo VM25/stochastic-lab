@@ -14,6 +14,18 @@ struct BarrierMonteCarloConfig {
     std::int64_t paths{200000};
     std::uint64_t seed{20260716};
     double confidence_level{0.95};
+
+    /// Worker threads for the path loop. One is sequential and bit-identical to the
+    /// single-threaded engine (ADR-011). More partition the paths deterministically
+    /// across fixed workers with thread-local accumulators and diagnostics reduced in
+    /// block order, so a fixed thread count is reproducible and different counts differ
+    /// only by the floating-point reassociation of the merge -- a documented effect, not
+    /// a race. Each path draws its asset shocks and its bridge uniforms from streams
+    /// keyed by (seed, purpose, index), and the early-knockout break happens entirely
+    /// within one path's own loop, so partitioning by index leaves every path's
+    /// random-coordinate usage and bridge comparisons exactly as the sequential run had
+    /// them: which worker owns a path cannot change when that path stops drawing.
+    int threads{1};
 };
 
 /// What the barrier simulation observed about itself.

@@ -514,5 +514,116 @@ TEST(BarrierMonteCarloTest, DifferentSeedsProduceDifferentEstimates) {
     EXPECT_NE(first.value().value, second.value().value);
 }
 
+// ---------------------------------------------------------------------------
+// Multithreading (Phase 12)
+//
+// The path loop runs across deterministic worker partitions with thread-local
+// accumulators and diagnostics reduced in block order (ADR-011). One thread is the
+// sequential reference; a fixed thread count is reproducible; different counts agree
+// up to the reassociation of the merge. The early-knockout break lives inside one
+// path's own loop and every stream is keyed by (seed, purpose, index), so
+// partitioning by index cannot change which bridge uniform an interval is tested
+// against or when a path stops drawing. The knock counts, which the early break
+// drives, are exact integer reductions and so must be *identical* at every thread
+// count -- the sharpest evidence that partitioning and early knockout do not interact.
+// ---------------------------------------------------------------------------
+
+BarrierMonteCarloConfig
+threaded(int threads, std::int64_t paths = 120000, std::uint64_t seed = 20260716) {
+    BarrierMonteCarloConfig config = with_paths(paths, seed);
+    config.threads = threads;
+    return config;
+}
+
+double double_diagnostic(const PricingResult& result, const std::string& name) {
+    for (const Diagnostic& diagnostic : result.diagnostics) {
+        if (diagnostic.name == name) {
+            return std::get<double>(diagnostic.value);
+        }
+    }
+    ADD_FAILURE() << "no double diagnostic named " << name;
+    return std::numeric_limits<double>::quiet_NaN();
+}
+
+// The bridge convention exercises both the early-knockout break and the bridge CRN
+// comparison. The price and its standard error agree up to the documented
+// reassociation of the merge, and the knock counts -- which the early break drives --
+// are bit-identical, because they are exact integer reductions of decisions each path
+// makes in isolation from its own keyed streams.
+TEST(BarrierMonteCarloThreadingTest, BridgeConventionAgreesAcrossThreadCounts) {
+    const auto option =
+        monitored(BarrierType::DownAndOut, MonitoringConvention::BrownianBridge, 90.0, 25);
+
+    const auto one = BarrierMonteCarloEngine::price(market(), option, model(), threaded(1));
+    ASSERT_TRUE(one.ok()) << one.error().describe();
+    const std::int64_t at_obs = integer_diagnostic(one.value(), "knocked_at_observation");
+    const std::int64_t by_bridge = integer_diagnostic(one.value(), "knocked_by_bridge_only");
+    const std::int64_t paid = integer_diagnostic(one.value(), "paid");
+    EXPECT_GT(at_obs, 0);
+    EXPECT_GT(by_bridge, 0)
+        << "the setup should knock some paths only by the bridge for the check to bite";
+
+    for (const int threads : {2, 4, 8}) {
+        const auto many =
+            BarrierMonteCarloEngine::price(market(), option, model(), threaded(threads));
+        ASSERT_TRUE(many.ok()) << "threads=" << threads << ": " << many.error().describe();
+        EXPECT_NEAR(many.value().value, one.value().value, 1e-9) << "threads=" << threads;
+        EXPECT_NEAR(*many.value().standard_error, *one.value().standard_error, 1e-9)
+            << "threads=" << threads;
+
+        // The knock counts are exact integer reductions: identical, not merely close.
+        EXPECT_EQ(integer_diagnostic(many.value(), "knocked_at_observation"), at_obs)
+            << "threads=" << threads << ": an observation-knock count moved under partitioning";
+        EXPECT_EQ(integer_diagnostic(many.value(), "knocked_by_bridge_only"), by_bridge)
+            << "threads=" << threads << ": a bridge-only knock count moved under partitioning";
+        EXPECT_EQ(integer_diagnostic(many.value(), "paid"), paid) << "threads=" << threads;
+    }
+}
+
+// Discrete monitoring has no bridge stream, but it still terminates early at the first
+// observed breach. The knock count and the price are the same at any thread count.
+TEST(BarrierMonteCarloThreadingTest, DiscreteConventionAgreesAcrossThreadCounts) {
+    const auto option =
+        monitored(BarrierType::DownAndOut, MonitoringConvention::Discrete, 90.0, 25);
+
+    const auto one = BarrierMonteCarloEngine::price(market(), option, model(), threaded(1));
+    ASSERT_TRUE(one.ok()) << one.error().describe();
+    const std::int64_t at_obs = integer_diagnostic(one.value(), "knocked_at_observation");
+    EXPECT_GT(at_obs, 0);
+
+    for (const int threads : {2, 4, 8}) {
+        const auto many =
+            BarrierMonteCarloEngine::price(market(), option, model(), threaded(threads));
+        ASSERT_TRUE(many.ok()) << "threads=" << threads << ": " << many.error().describe();
+        EXPECT_NEAR(many.value().value, one.value().value, 1e-9) << "threads=" << threads;
+        EXPECT_EQ(integer_diagnostic(many.value(), "knocked_at_observation"), at_obs)
+            << "threads=" << threads;
+        EXPECT_EQ(integer_diagnostic(many.value(), "knocked_by_bridge_only"), 0)
+            << "discrete monitoring never knocks by bridge";
+    }
+}
+
+TEST(BarrierMonteCarloThreadingTest, IsBitReproducibleAtAFixedThreadCount) {
+    const auto option =
+        monitored(BarrierType::DownAndOut, MonitoringConvention::BrownianBridge, 90.0, 25);
+    const auto first = BarrierMonteCarloEngine::price(market(), option, model(), threaded(4));
+    const auto second = BarrierMonteCarloEngine::price(market(), option, model(), threaded(4));
+    ASSERT_TRUE(first.ok());
+    ASSERT_TRUE(second.ok());
+    EXPECT_EQ(first.value().value, second.value().value);
+    EXPECT_EQ(*first.value().standard_error, *second.value().standard_error);
+    // The mean bridge probability is an OnlineMoments mean: bit-identical at a fixed count.
+    EXPECT_EQ(double_diagnostic(first.value(), "mean_bridge_probability"),
+              double_diagnostic(second.value(), "mean_bridge_probability"));
+}
+
+TEST(BarrierMonteCarloThreadingTest, RejectsAnInvalidThreadCount) {
+    const auto option =
+        monitored(BarrierType::DownAndOut, MonitoringConvention::Discrete, 90.0, 25);
+    const auto priced = BarrierMonteCarloEngine::price(market(), option, model(), threaded(0));
+    ASSERT_FALSE(priced.ok());
+    EXPECT_EQ(priced.error().code, ErrorCode::InvalidArgument);
+}
+
 }  // namespace
 }  // namespace diffusionworks
