@@ -377,10 +377,11 @@ Result<PricingResult> MonteCarloEngine::price(const MarketState& market,
     const double discount = market.discount_factor(option.maturity());
     const std::int64_t stride = config.steps / option.monitoring_count();
 
-    std::vector<double> path(generator.path_size());
-    std::vector<double> reflected(config.variance_reduction.antithetic ? generator.path_size() : 0);
+    // The pilot below runs sequentially and reuses this one buffer; the parallelised
+    // main sample allocates its own per-worker buffers (ADR-013).
+    std::vector<double> pilot_path(generator.path_size());
 
-    RunDiagnostics diagnostics;
+    RunDiagnostics pilot_diagnostics;
 
     // --- Control expectation and pilot beta ---------------------------------
 
@@ -421,8 +422,8 @@ Result<PricingResult> MonteCarloEngine::price(const MarketState& market,
                                        pilot_index,
                                        PathVariate::Primary,
                                        true,
-                                       path,
-                                       diagnostics);
+                                       pilot_path,
+                                       pilot_diagnostics);
             if (!sample) {
                 return Result<PricingResult>::failure(std::move(sample).error());
             }
@@ -456,10 +457,25 @@ Result<PricingResult> MonteCarloEngine::price(const MarketState& market,
     }
 
     // --- Main sample --------------------------------------------------------
+    //
+    // Only this loop is parallelised. The pilot above ran sequentially over path
+    // indices [paths, paths + pilot_paths), disjoint from the production indices
+    // [0, paths) drawn here, so beta and control_mean are constants with respect to
+    // this sample at any thread count -- every path reads the same two numbers. The
+    // partition is deterministic (partition_indices), so a path index lands in the
+    // same block, and its Primary/Antithetic draws use the same RNG coordinates,
+    // regardless of the worker count.
 
-    OnlineMoments observations;
+    const bool antithetic = config.variance_reduction.antithetic;
 
-    for (std::int64_t index = 0; index < config.paths; ++index) {
+    const auto make_local = [&] {
+        Local local;
+        local.path.resize(generator.path_size());
+        local.reflected.resize(antithetic ? generator.path_size() : 0);
+        return local;
+    };
+
+    const auto body = [&](std::int64_t index, Local& local) -> Status {
         const auto path_index = static_cast<std::uint64_t>(index);
 
         auto primary = sample_asian(generator,
@@ -470,10 +486,10 @@ Result<PricingResult> MonteCarloEngine::price(const MarketState& market,
                                     path_index,
                                     PathVariate::Primary,
                                     use_control,
-                                    path,
-                                    diagnostics);
+                                    local.path,
+                                    local.diagnostics);
         if (!primary) {
-            return Result<PricingResult>::failure(std::move(primary).error());
+            return Status::failure(std::move(primary).error());
         }
 
         const auto corrected = [&](const PathSample& sample) {
@@ -481,9 +497,9 @@ Result<PricingResult> MonteCarloEngine::price(const MarketState& market,
                                : sample.payoff;
         };
 
-        if (!config.variance_reduction.antithetic) {
-            observations.add(corrected(primary.value()));
-            continue;
+        if (!antithetic) {
+            local.observations.add(corrected(primary.value()));
+            return Status::success();
         }
 
         auto mirrored = sample_asian(generator,
@@ -494,18 +510,32 @@ Result<PricingResult> MonteCarloEngine::price(const MarketState& market,
                                      path_index,
                                      PathVariate::Antithetic,
                                      use_control,
-                                     reflected,
-                                     diagnostics);
+                                     local.reflected,
+                                     local.diagnostics);
         if (!mirrored) {
-            return Result<PricingResult>::failure(std::move(mirrored).error());
+            return Status::failure(std::move(mirrored).error());
         }
 
         // The pair average is one observation. Applied after the control
         // correction so that both members are corrected on their own control.
-        observations.add(0.5 * (corrected(primary.value()) + corrected(mirrored.value())));
+        local.observations.add(0.5 * (corrected(primary.value()) + corrected(mirrored.value())));
+        return Status::success();
+    };
+
+    auto reduced =
+        parallel_reduce<Local>(config.paths, config.threads, make_local, body, reduce_local);
+    if (!reduced) {
+        return Result<PricingResult>::failure(std::move(reduced).error());
     }
 
-    auto result = summarize(observations, diagnostics, config, timer.elapsed_seconds());
+    // Fold the pilot's excursions (counted sequentially above) into the reduced
+    // main-sample diagnostics, so the reported count matches the sequential engine
+    // and no worker can lose them. Integer addition, so the order is immaterial.
+    RunDiagnostics diagnostics = reduced.value().diagnostics;
+    diagnostics.non_positive_states += pilot_diagnostics.non_positive_states;
+
+    auto result =
+        summarize(reduced.value().observations, diagnostics, config, timer.elapsed_seconds());
     if (!result) {
         return result;
     }

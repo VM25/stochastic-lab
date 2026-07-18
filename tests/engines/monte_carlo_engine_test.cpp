@@ -6,6 +6,8 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <limits>
+#include <variant>
 #include <vector>
 
 namespace diffusionworks {
@@ -615,6 +617,141 @@ TEST(MonteCarloThreadingTest, RejectsAnInvalidThreadCount) {
     const auto priced = MonteCarloEngine::price(market, option, model, zero);
     ASSERT_FALSE(priced.ok());
     EXPECT_EQ(priced.error().code, ErrorCode::InvalidArgument);
+}
+
+// ---------------------------------------------------------------------------
+// Multithreading: the arithmetic Asian control-variate engine (Phase 12)
+//
+// Only the main sample loop is parallelised. The control-variate pilot is a
+// sequential pre-pass over path indices [paths, paths + pilot_paths) -- disjoint
+// from the production indices [0, paths) drawn by the main loop -- so beta and the
+// control expectation are constants at any thread count. Because the pilot never
+// runs in parallel, its variance-reduction statistics must be *bit-identical*
+// across thread counts, and the price agrees up to the reassociation of the merge.
+// ---------------------------------------------------------------------------
+
+MonteCarloConfig threaded_asian_config(int threads, bool antithetic, bool control) {
+    MonteCarloConfig config = config_with(120000, 12, kSeed);
+    config.threads = threads;
+    config.variance_reduction.antithetic = antithetic;
+    config.variance_reduction.control_variate = control;
+    return config;
+}
+
+// Extracts a double-valued diagnostic by name, failing the test if it is absent or
+// not a double -- used to compare the pilot's statistics across thread counts.
+double double_diagnostic(const PricingResult& result, const std::string& name) {
+    for (const Diagnostic& d : result.diagnostics) {
+        if (d.name == name) {
+            if (const double* v = std::get_if<double>(&d.value)) {
+                return *v;
+            }
+        }
+    }
+    ADD_FAILURE() << "missing double diagnostic: " << name;
+    return std::numeric_limits<double>::quiet_NaN();
+}
+
+TEST(MonteCarloAsianThreadingTest, ControlVariateAgreesAcrossThreadCounts) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto option =
+        AsianOption::create(OptionType::Call, AveragingType::Arithmetic, 100.0, 1.0, 12).value();
+    const auto model = BlackScholesModel::create(0.2).value();
+
+    const auto one =
+        MonteCarloEngine::price(market, option, model, threaded_asian_config(1, false, true));
+    ASSERT_TRUE(one.ok()) << one.error().describe();
+
+    for (const int threads : {2, 4, 8}) {
+        const auto many = MonteCarloEngine::price(
+            market, option, model, threaded_asian_config(threads, false, true));
+        ASSERT_TRUE(many.ok()) << "threads=" << threads << ": " << many.error().describe();
+
+        // The same production paths, so the price and its standard error agree up to
+        // the documented reassociation of the reduction.
+        EXPECT_NEAR(many.value().value, one.value().value, 1e-9) << "threads=" << threads;
+        EXPECT_NEAR(*many.value().standard_error, *one.value().standard_error, 1e-9)
+            << "threads=" << threads;
+
+        // The pilot is sequential, so beta, the control expectation, and the pilot
+        // correlation are the *same bits* regardless of how the main loop partitions.
+        EXPECT_EQ(double_diagnostic(many.value(), "control_beta"),
+                  double_diagnostic(one.value(), "control_beta"))
+            << "threads=" << threads << ": the sequential pilot's beta must not move";
+        EXPECT_EQ(double_diagnostic(many.value(), "control_expectation"),
+                  double_diagnostic(one.value(), "control_expectation"))
+            << "threads=" << threads;
+        EXPECT_EQ(double_diagnostic(many.value(), "control_pilot_correlation"),
+                  double_diagnostic(one.value(), "control_pilot_correlation"))
+            << "threads=" << threads;
+    }
+}
+
+TEST(MonteCarloAsianThreadingTest, ControlVariateIsBitReproducibleAtAFixedThreadCount) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto option =
+        AsianOption::create(OptionType::Call, AveragingType::Arithmetic, 100.0, 1.0, 12).value();
+    const auto model = BlackScholesModel::create(0.2).value();
+
+    const auto first =
+        MonteCarloEngine::price(market, option, model, threaded_asian_config(4, false, true));
+    const auto second =
+        MonteCarloEngine::price(market, option, model, threaded_asian_config(4, false, true));
+    ASSERT_TRUE(first.ok()) << first.error().describe();
+    ASSERT_TRUE(second.ok()) << second.error().describe();
+    EXPECT_EQ(first.value().value, second.value().value);
+    EXPECT_EQ(*first.value().standard_error, *second.value().standard_error);
+}
+
+// The control correction and antithetic pairing together are still deterministic:
+// the correction uses the constant pilot beta, and each pair is drawn inside one
+// path index, so partitioning by index keeps both intact.
+TEST(MonteCarloAsianThreadingTest, ControlAndAntitheticCombinedAgreeAcrossThreadCounts) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto option =
+        AsianOption::create(OptionType::Call, AveragingType::Arithmetic, 100.0, 1.0, 12).value();
+    const auto model = BlackScholesModel::create(0.2).value();
+
+    const auto one =
+        MonteCarloEngine::price(market, option, model, threaded_asian_config(1, true, true));
+    const auto many =
+        MonteCarloEngine::price(market, option, model, threaded_asian_config(8, true, true));
+    ASSERT_TRUE(one.ok()) << one.error().describe();
+    ASSERT_TRUE(many.ok()) << many.error().describe();
+    EXPECT_NEAR(many.value().value, one.value().value, 1e-9);
+    EXPECT_NEAR(*many.value().standard_error, *one.value().standard_error, 1e-9);
+}
+
+// The non-positive-state diagnostic must survive partitioning: the pilot's
+// excursions are folded into the reduced main-sample count, and workers sum their
+// own counts, so the total is the same at any thread count. Euler at high vol
+// crosses zero often enough to make the count non-trivial.
+TEST(MonteCarloAsianThreadingTest, NonPositiveStateCountIsInvariantToThreadCount) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto option =
+        AsianOption::create(OptionType::Call, AveragingType::Arithmetic, 100.0, 1.0, 12).value();
+    const auto model = BlackScholesModel::create(1.2).value();
+
+    const auto count_non_positive = [&](int threads) -> std::int64_t {
+        MonteCarloConfig config = config_with(60000, 12, kSeed, DiscretizationScheme::EulerMaruyama);
+        config.threads = threads;
+        const auto priced = MonteCarloEngine::price(market, option, model, config);
+        EXPECT_TRUE(priced.ok()) << priced.error().describe();
+        for (const Diagnostic& d : priced.value().diagnostics) {
+            if (d.name == "non_positive_states") {
+                return std::get<std::int64_t>(d.value);
+            }
+        }
+        ADD_FAILURE() << "missing non_positive_states diagnostic";
+        return -1;
+    };
+
+    const std::int64_t reference = count_non_positive(1);
+    EXPECT_GT(reference, 0) << "the regime should produce excursions for the check to bite";
+    for (const int threads : {2, 4, 8}) {
+        EXPECT_EQ(count_non_positive(threads), reference)
+            << "threads=" << threads << ": the excursion count changed under partitioning";
+    }
 }
 
 }  // namespace
