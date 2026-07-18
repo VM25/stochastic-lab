@@ -108,6 +108,9 @@ constexpr const char* kContext = "price";
         if (!config) {
             return Result<PricingResult>::failure(std::move(config).error());
         }
+        if (options.threads.has_value()) {
+            config.value().threads = static_cast<int>(options.threads.value());
+        }
         return MonteCarloEngine::price(market, option, model, config.value());
     }
 
@@ -142,6 +145,9 @@ constexpr const char* kContext = "price";
     auto config = parse_monte_carlo_config(method, options.seed);
     if (!config) {
         return Result<PricingResult>::failure(std::move(config).error());
+    }
+    if (options.threads.has_value()) {
+        config.value().threads = static_cast<int>(options.threads.value());
     }
     return MonteCarloEngine::price(market, option, model, config.value());
 }
@@ -404,13 +410,16 @@ Result<nlohmann::json> run_price(const ConfigDocument& config, const Options& op
         document["configuration_source"] = config.source().string();
     }
 
-    // Threads are reported only where they could have mattered. This build runs
-    // single-threaded; multithreading arrives in Phase 12.
-    if (options.threads.has_value() && options.threads.value() != 1) {
+    // Monte Carlo pricing uses the requested threads (Phase 12). Analytic pricing is a
+    // single closed-form evaluation with nothing to parallelise, so a thread count
+    // supplied there had no effect and is reported as such rather than silently ignored.
+    if (options.threads.has_value() && options.threads.value() != 1 &&
+        method_type.value() != "monte_carlo") {
         document["warnings"] = nlohmann::json::array(
-            {fmt::format("--threads {} was supplied but this build runs single-threaded; "
-                         "multithreading arrives in Phase 12",
-                         options.threads.value())});
+            {fmt::format("--threads {} was supplied but {} pricing is a single evaluation with "
+                         "nothing to parallelise; the thread count had no effect",
+                         options.threads.value(),
+                         method_type.value())});
     }
 
     document["build_metadata"] = to_json(collect_build_info());

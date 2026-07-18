@@ -15,6 +15,7 @@ target_sources(
             calibration/market_dataset.cpp
             calibration/parameter_transform.cpp
             calibration/volatility_surface.cpp
+            concurrency/parallel_reduce.cpp
             config/domain_parsers.cpp
             core/build_info.cpp
             core/config.cpp
@@ -69,6 +70,7 @@ target_link_libraries(
     diffusionworks_core
     PUBLIC nlohmann_json::nlohmann_json
            fmt::fmt
+           Threads::Threads
     PRIVATE dw::warnings
             dw::sanitizers)
 

@@ -540,5 +540,82 @@ TEST(MonteCarloEngineTest, ReportedStandardErrorMatchesTheRealisedDispersion) {
         << "the exact scheme should be unbiased, but the mean error is " << *summary.value().bias;
 }
 
+// ---------------------------------------------------------------------------
+// Multithreading (Phase 12)
+//
+// The path loop runs across deterministic worker partitions with thread-local
+// accumulators reduced in block order (ADR-011). One thread is the sequential
+// reference; a fixed thread count is reproducible; different counts agree up to the
+// floating-point reassociation of the exact merge, and nothing races.
+// ---------------------------------------------------------------------------
+
+MonteCarloConfig threaded_config(int threads, bool antithetic = false) {
+    MonteCarloConfig config = config_with(200000, 1, kSeed);
+    config.threads = threads;
+    config.variance_reduction.antithetic = antithetic;
+    return config;
+}
+
+// One thread is the sequential engine; more threads change the answer only by the
+// reassociation of the merge, which for this run is a few parts in 1e-10.
+TEST(MonteCarloThreadingTest, MatchesTheSingleThreadedResultAcrossThreadCounts) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto option = EuropeanOption::create(OptionType::Call, 100.0, 1.0).value();
+    const auto model = BlackScholesModel::create(0.2).value();
+
+    const auto one = MonteCarloEngine::price(market, option, model, threaded_config(1));
+    ASSERT_TRUE(one.ok()) << one.error().describe();
+
+    for (const int threads : {2, 4, 8}) {
+        const auto many = MonteCarloEngine::price(market, option, model, threaded_config(threads));
+        ASSERT_TRUE(many.ok()) << "threads=" << threads << ": " << many.error().describe();
+        // The same paths, so the same price up to the documented reassociation of the
+        // reduction, and the same standard error to the same tolerance.
+        EXPECT_NEAR(many.value().value, one.value().value, 1e-9) << "threads=" << threads;
+        EXPECT_NEAR(*many.value().standard_error, *one.value().standard_error, 1e-9)
+            << "threads=" << threads;
+    }
+}
+
+// A fixed thread count is bit-for-bit reproducible: the partition and the reduction
+// order are fixed, so the operations are identical.
+TEST(MonteCarloThreadingTest, IsBitReproducibleAtAFixedThreadCount) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto option = EuropeanOption::create(OptionType::Call, 100.0, 1.0).value();
+    const auto model = BlackScholesModel::create(0.2).value();
+
+    const auto first = MonteCarloEngine::price(market, option, model, threaded_config(4));
+    const auto second = MonteCarloEngine::price(market, option, model, threaded_config(4));
+    ASSERT_TRUE(first.ok());
+    ASSERT_TRUE(second.ok());
+    EXPECT_EQ(first.value().value, second.value().value);
+    EXPECT_EQ(*first.value().standard_error, *second.value().standard_error);
+}
+
+// Antithetic pairing is thread-safe and equally deterministic: each pair is drawn
+// inside one path index, so partitioning by index keeps pairs together.
+TEST(MonteCarloThreadingTest, AntitheticIsConsistentAcrossThreadCounts) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto option = EuropeanOption::create(OptionType::Call, 100.0, 1.0).value();
+    const auto model = BlackScholesModel::create(0.2).value();
+
+    const auto one = MonteCarloEngine::price(market, option, model, threaded_config(1, true));
+    const auto many = MonteCarloEngine::price(market, option, model, threaded_config(8, true));
+    ASSERT_TRUE(one.ok()) << one.error().describe();
+    ASSERT_TRUE(many.ok()) << many.error().describe();
+    EXPECT_NEAR(many.value().value, one.value().value, 1e-9);
+}
+
+TEST(MonteCarloThreadingTest, RejectsAnInvalidThreadCount) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto option = EuropeanOption::create(OptionType::Call, 100.0, 1.0).value();
+    const auto model = BlackScholesModel::create(0.2).value();
+
+    MonteCarloConfig zero = threaded_config(0);
+    const auto priced = MonteCarloEngine::price(market, option, model, zero);
+    ASSERT_FALSE(priced.ok());
+    EXPECT_EQ(priced.error().code, ErrorCode::InvalidArgument);
+}
+
 }  // namespace
 }  // namespace diffusionworks

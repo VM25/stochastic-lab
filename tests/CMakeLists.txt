@@ -73,6 +73,16 @@ add_dw_test(
             numerics/tridiagonal_test.cpp
             numerics/nelder_mead_test.cpp)
 
+# --- Concurrency ------------------------------------------------------------
+#
+# Labelled `concurrency` so the ThreadSanitizer job runs it: these exercise the
+# multithreaded path loop, where a data race is the failure mode.
+
+add_dw_test(
+    dw_test_concurrency
+    LABEL concurrency
+    SOURCES concurrency/parallel_reduce_test.cpp)
+
 # --- Randomness -------------------------------------------------------------
 #
 # The statistical tests here draw millions of samples so that their acceptance

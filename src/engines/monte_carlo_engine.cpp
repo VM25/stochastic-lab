@@ -1,3 +1,4 @@
+#include <diffusionworks/concurrency/parallel_reduce.hpp>
 #include <diffusionworks/engines/geometric_asian_analytic.hpp>
 #include <diffusionworks/engines/monte_carlo_engine.hpp>
 #include <diffusionworks/simulation/gbm_path_generator.hpp>
@@ -58,6 +59,12 @@ private:
                         config.control_variate_pilot_paths),
             kContext);
     }
+    if (config.threads < 1 || config.threads > 1024) {
+        return Status::failure(
+            ErrorCode::InvalidArgument,
+            fmt::format("threads must be between 1 and 1024 but is {}", config.threads),
+            kContext);
+    }
     return Status::success();
 }
 
@@ -71,6 +78,21 @@ struct PathSample {
 struct RunDiagnostics {
     std::int64_t non_positive_states{0};
 };
+
+/// A worker's thread-local state: its own accumulator, diagnostics, and path buffers,
+/// so nothing is shared and mutated across workers (ADR-011, ADR-013).
+struct Local {
+    OnlineMoments observations;
+    RunDiagnostics diagnostics;
+    std::vector<double> path;
+    std::vector<double> reflected;
+};
+
+/// Merges one worker's local state into another, in block order.
+void reduce_local(Local& into, const Local& from) {
+    into.observations.merge(from.observations);
+    into.diagnostics.non_positive_states += from.diagnostics.non_positive_states;
+}
 
 /// Assembles the parts of the result every Monte Carlo run shares.
 [[nodiscard]] Result<PricingResult> summarize(const OnlineMoments& observations,
@@ -170,45 +192,56 @@ Result<PricingResult> MonteCarloEngine::price(const MarketState& market,
 
     const GbmPathGenerator generator(market, model, grid.value(), config.scheme);
     const double discount = market.discount_factor(option.maturity());
+    const bool antithetic = config.variance_reduction.antithetic;
 
-    // Allocated once for the run, reused by every path.
-    std::vector<double> path(generator.path_size());
-    std::vector<double> reflected(config.variance_reduction.antithetic ? generator.path_size() : 0);
+    // Each worker gets its own path buffers, allocated once (ADR-013), never shared.
+    const auto make_local = [&] {
+        Local local;
+        local.path.resize(generator.path_size());
+        local.reflected.resize(antithetic ? generator.path_size() : 0);
+        return local;
+    };
 
-    OnlineMoments observations;
-    RunDiagnostics diagnostics;
-
-    for (std::int64_t index = 0; index < config.paths; ++index) {
+    // One path's contribution, accumulated into the worker's own state. The generator
+    // is a pure function of (seed, index), so no two workers touch shared RNG state.
+    const auto body = [&](std::int64_t index, Local& local) -> Status {
         const auto path_index = static_cast<std::uint64_t>(index);
 
-        auto primary = generator.generate(config.seed, path_index, path, PathVariate::Primary);
+        auto primary =
+            generator.generate(config.seed, path_index, local.path, PathVariate::Primary);
         if (!primary) {
-            return Result<PricingResult>::failure(std::move(primary).error());
+            return Status::failure(std::move(primary).error());
         }
-        diagnostics.non_positive_states += primary.value().non_positive_states;
+        local.diagnostics.non_positive_states += primary.value().non_positive_states;
+        const double payoff = discount * option.payoff(local.path.back());
 
-        const double payoff = discount * option.payoff(path.back());
-
-        if (!config.variance_reduction.antithetic) {
-            observations.add(payoff);
-            continue;
+        if (!antithetic) {
+            local.observations.add(payoff);
+            return Status::success();
         }
 
         auto mirrored =
-            generator.generate(config.seed, path_index, reflected, PathVariate::Antithetic);
+            generator.generate(config.seed, path_index, local.reflected, PathVariate::Antithetic);
         if (!mirrored) {
-            return Result<PricingResult>::failure(std::move(mirrored).error());
+            return Status::failure(std::move(mirrored).error());
         }
-        diagnostics.non_positive_states += mirrored.value().non_positive_states;
+        local.diagnostics.non_positive_states += mirrored.value().non_positive_states;
 
-        // One observation, not two. The pair is negatively correlated by
-        // construction, so adding the members separately would misstate the
-        // standard error.
-        const double reflected_payoff = discount * option.payoff(reflected.back());
-        observations.add(0.5 * (payoff + reflected_payoff));
+        // One observation, not two: the pair is negatively correlated by construction,
+        // so adding the members separately would misstate the standard error.
+        const double reflected_payoff = discount * option.payoff(local.reflected.back());
+        local.observations.add(0.5 * (payoff + reflected_payoff));
+        return Status::success();
+    };
+
+    auto reduced =
+        parallel_reduce<Local>(config.paths, config.threads, make_local, body, reduce_local);
+    if (!reduced) {
+        return Result<PricingResult>::failure(std::move(reduced).error());
     }
 
-    return summarize(observations, diagnostics, config, timer.elapsed_seconds());
+    return summarize(
+        reduced.value().observations, reduced.value().diagnostics, config, timer.elapsed_seconds());
 }
 
 // ---------------------------------------------------------------------------

@@ -99,6 +99,15 @@ struct MonteCarloConfig {
     /// correctness. Counter-based addressing makes the disjointness free: the
     /// pilot simply reads indices [paths, paths + pilot_paths).
     std::int64_t control_variate_pilot_paths{2000};
+
+    /// Worker threads for the path loop. One is sequential and bit-identical to the
+    /// single-threaded engine (ADR-011). More partition the paths deterministically
+    /// across fixed workers with thread-local accumulators reduced in block order, so a
+    /// fixed thread count is reproducible and different counts differ only by the
+    /// floating-point reassociation of the merge -- a documented effect, not a race.
+    /// The counter-based generator makes this safe: every path is a pure function of
+    /// (seed, index), so there is no shared mutable RNG to contend on.
+    int threads{1};
 };
 
 /// Monte Carlo pricing under geometric Brownian motion.

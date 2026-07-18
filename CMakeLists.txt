@@ -82,6 +82,11 @@ include(Sanitizers)
 include(BuildInfo)
 include(Dependencies)
 
+# Multithreaded Monte Carlo (Phase 12) uses std::jthread; on libstdc++/libc++ the
+# standard threading facilities need the system threads library on the link line.
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 # ---------------------------------------------------------------------------
 # Core library
 # ---------------------------------------------------------------------------
