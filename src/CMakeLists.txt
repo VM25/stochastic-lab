@@ -11,7 +11,8 @@ add_library(diffusionworks::core ALIAS diffusionworks_core)
 
 target_sources(
     diffusionworks_core
-    PRIVATE config/domain_parsers.cpp
+    PRIVATE calibration/parameter_transform.cpp
+            config/domain_parsers.cpp
             core/build_info.cpp
             core/config.cpp
             engines/barrier_analytic.cpp
@@ -38,6 +39,7 @@ target_sources(
             market/market_state.cpp
             models/black_scholes.cpp
             models/heston.cpp
+            numerics/nelder_mead.cpp
             numerics/tridiagonal.cpp
             pde/asset_grid.cpp
             pde/black_scholes_operator.cpp

@@ -70,7 +70,8 @@ add_dw_test(
     dw_test_numerics
     LABEL unit
     SOURCES numerics/normal_test.cpp
-            numerics/tridiagonal_test.cpp)
+            numerics/tridiagonal_test.cpp
+            numerics/nelder_mead_test.cpp)
 
 # --- Randomness -------------------------------------------------------------
 #
@@ -185,6 +186,13 @@ add_dw_test(
     dw_test_implied_volatility
     LABEL unit
     SOURCES engines/implied_volatility_test.cpp)
+
+# --- Calibration -----------------------------------------------------------
+
+add_dw_test(
+    dw_test_calibration
+    LABEL unit
+    SOURCES calibration/parameter_transform_test.cpp)
 
 add_dw_test(
     dw_test_heston_analytic
