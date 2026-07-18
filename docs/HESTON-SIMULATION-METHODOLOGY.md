@@ -101,7 +101,14 @@ exists only as `EXP-10`'s baseline — the thing whose failure justifies full
 truncation — and is never used to price. The CLI pricing path is always full
 truncation.
 
-## 7. The bias is real, first-order, and reported
+Its failure in EXP-10 is **regime- and configuration-specific**, not a universal
+impossibility. The scheme fails whenever a step drives the variance negative and the
+next square root is taken; that is common in the tested regimes and path counts, but a
+milder regime, a finer step, or fewer paths could avoid a negative variance entirely
+and let the naive scheme return a price. The claim is "it failed for the tested
+configurations," never "a naive Euler can never price a Heston path."
+
+## 7. The bias is real, empirically first-order here, and reported
 
 Full truncation is biased: the discretised price differs from the true Heston price by
 an amount that decays with the step. `EXP-10` measures it against the semi-analytic
@@ -119,10 +126,13 @@ In the default study (`configs/experiment/heston_simulation.json`, spot 100, str
   price it at any step count, because even a rare negative variance loses the path.
 - **Feller-violating (xi = 1.0, ratio 0.16):** the bias is of order one at five steps
   and falls to within a sampling error or two of the reference by 320 steps. The
-  fitted decay order is ≈ 1.09 with a 95% interval of about [1.0, 1.2] — first order,
-  as expected. The pre-truncation variance is floored on a quarter to a half of steps
-  and dips well below zero, and full truncation absorbs it with zero path failures.
-  The naive scheme loses up to ~95% of its paths here.
+  fitted decay order is ≈ 1.09 with a 95% interval of about [1.0, 1.2] — consistent
+  with first order. This is **empirical evidence for this regime and step range, not a
+  universal convergence theorem** for full-truncation Euler under Heston; a different
+  regime or asymptotic window could measure a different order. The pre-truncation
+  variance is floored on a quarter to a half of steps and dips well below zero, and
+  full truncation absorbs it with zero path failures. The naive scheme loses up to
+  ~95% of its paths here.
 
 The Feller condition is reported, never treated as automatic invalidity: the violating
 regime is priced, with its bias measured and its uncertainty attached.

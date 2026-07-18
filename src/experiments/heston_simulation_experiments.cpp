@@ -364,18 +364,24 @@ run_heston_variance_discretization(const HestonSimulationExperimentConfig& confi
     }
 
     record.interpretation =
-        "Full truncation does the one thing the naive scheme cannot: it prices every regime here "
-        "without a single non-finite path, while the naive Euler scheme -- which feeds the raw, "
-        "possibly-negative variance straight into the square root -- fails to produce a price at "
-        "any step count tested, in the Feller-satisfying regime as well as the violating one. That "
-        "is the whole case for the extra care, and it is measured rather than asserted: the "
-        "path_failures column is zero for full truncation everywhere and non-zero for the naive "
-        "scheme everywhere.\n\n"
+        "For the configurations tested here, full truncation does something the naive scheme does "
+        "not: it prices every regime without a single non-finite path, while the naive Euler "
+        "scheme "
+        "-- which feeds the raw, possibly-negative variance straight into the square root -- fails "
+        "to produce a price at any step count tested, in this Feller-satisfying regime as well as "
+        "the violating one. This is measured, not asserted: the path_failures column is zero for "
+        "full truncation everywhere and non-zero for the naive scheme everywhere. It is a "
+        "statement "
+        "about these regimes and this unguarded scheme, not a proof that a naive Euler can never "
+        "price a Heston path -- a milder regime, a finer step, or fewer paths could avoid a "
+        "negative variance entirely.\n\n"
         "The remaining full-truncation bias is real and is not hidden. In the Feller-violating "
-        "regime it is of order one at a handful of steps and falls roughly first order as the step "
-        "shrinks, tracked in bias_decay_order over the levels where the bias clears the sampling "
-        "noise; by the finest step it has fallen to within a sampling error or two of the "
-        "semi-analytic reference. In the Feller-satisfying regime the bias is already below the "
+        "regime it is of order one at a handful of steps and, empirically for this regime, falls "
+        "at roughly first order as the step shrinks -- the fitted bias_decay_order over the levels "
+        "where the bias clears the sampling noise, not a convergence theorem for full-truncation "
+        "Euler in general. By the finest step it has fallen to within a sampling error or two of "
+        "the semi-analytic reference. In the Feller-satisfying regime the bias is already below "
+        "the "
         "sampling noise at every step tested, so this run reports its decay order as unresolved "
         "rather than fitting a slope to noise.\n\n"
         "The invalid-variance behaviour is quantified in the negative_fraction and "
@@ -386,6 +392,10 @@ run_heston_variance_discretization(const HestonSimulationExperimentConfig& confi
         "violating regime is priced, with its bias measured and its uncertainty attached.";
 
     record.limitations = {
+        "The fitted bias decay order (~1 in the violating regime) is empirical evidence for the "
+        "tested regime and step range, not a universal convergence theorem for full-truncation "
+        "Euler under Heston. A different regime or a different asymptotic window could measure a "
+        "different order.",
         "The bias decay order is fitted only where the bias resolves above the sampling noise, so "
         "the Feller-satisfying regime -- where the bias is genuinely tiny -- yields no order here. "
         "That is a statement about resolution at this path count, not evidence the scheme fails to "
@@ -394,9 +404,10 @@ run_heston_variance_discretization(const HestonSimulationExperimentConfig& confi
         "establishes that it avoids the naive scheme's failures and that its bias decays; it does "
         "not rank it against reflection, the quadratic-exponential scheme, or an exact "
         "Broadie-Kaya sampler.",
-        "The naive scheme is included as a diagnostic baseline. Its total collapse here should not "
-        "be read as a claim about every conceivable naive implementation -- only about the "
-        "unguarded square-root Euler scheme, which is the one a first attempt reaches for."};
+        "The naive scheme's failure here is specific to the tested configurations and to the "
+        "unguarded square-root Euler scheme -- the one a first attempt reaches for. It is not a "
+        "claim that a naive Euler can never price a Heston path: a milder regime, a finer step, or "
+        "fewer paths could avoid the negative variance that sinks it here."};
 
     record.runtime_seconds =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
