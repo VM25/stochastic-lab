@@ -196,6 +196,22 @@ Do not knowingly push broken core functionality without clearly marking it as an
 
 Milestone-completion commits must pass all milestone exit criteria.
 
+### Formatting runs before the commit, not after CI
+
+Formatting is checked *locally, before each commit* — never discovered as a red CI
+job after several commits have accumulated. A committed pre-commit hook enforces this:
+
+```bash
+git config core.hooksPath scripts/git-hooks
+```
+
+`scripts/git-hooks/pre-commit` runs the pinned `clang-format` over the staged C++ and
+rejects a commit that is not formatting-clean. It runs only `clang-format` (sub-second);
+the slower `clang-tidy` and include-hygiene checks stay in `scripts/lint.sh` and CI,
+because a multi-minute pre-commit hook would only invite `--no-verify`. Set the hooks
+path once per clone (the setting is local and cannot be committed). When a fix is
+needed, `scripts/lint.sh --fix` reformats in place.
+
 ---
 
 ## Repository Hygiene
