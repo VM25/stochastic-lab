@@ -5,6 +5,7 @@
 #include <diffusionworks/experiments/experiment.hpp>
 
 #include <cstdint>
+#include <string>
 #include <vector>
 
 namespace diffusionworks {
@@ -81,5 +82,65 @@ struct CalibrationRecoveryConfig {
 /// start that did not begin at the answer.
 [[nodiscard]] Result<ExperimentRecord>
 run_heston_calibration_recovery(const CalibrationRecoveryConfig& config);
+
+/// Parameters for EXP-12: market-surface calibration stability.
+///
+/// A fixed surface is calibrated under several deliberate variations -- different
+/// weighting schemes, tighter bounds, a reduced strike set, and a different guess set
+/// -- and the spread of the calibrated parameters across those variations is the
+/// result. The surface here is a documented synthetic reference (generated from
+/// `surface_parameters` and timestamped by `as_of`), never real market data, and no
+/// economic reading is placed on it.
+struct MarketSurfaceStabilityConfig {
+    double spot{100.0};
+    double rate{0.025};
+    double dividend_yield{0.0};
+
+    std::vector<double> strikes{85.0, 92.5, 100.0, 107.5, 115.0};
+    std::vector<double> maturities{0.25, 0.5, 1.0};
+
+    /// The parameters the fixed reference surface is generated from. Matches the stored
+    /// configs/calibration/market_surface.json so the two describe the same surface.
+    HestonParameters surface_parameters{.initial_variance = 0.045,
+                                        .mean_reversion = 1.8,
+                                        .long_run_variance = 0.06,
+                                        .vol_of_variance = 0.45,
+                                        .correlation = -0.65};
+
+    /// The as-of timestamp the surface is documented with.
+    std::string as_of{"2026-07-18T00:00:00Z"};
+
+    /// The starting points each scenario calibrates from.
+    std::vector<HestonParameters> initial_guesses{{.initial_variance = 0.04,
+                                                   .mean_reversion = 1.0,
+                                                   .long_run_variance = 0.05,
+                                                   .vol_of_variance = 0.5,
+                                                   .correlation = -0.5},
+                                                  {.initial_variance = 0.06,
+                                                   .mean_reversion = 2.5,
+                                                   .long_run_variance = 0.07,
+                                                   .vol_of_variance = 0.3,
+                                                   .correlation = -0.7},
+                                                  {.initial_variance = 0.03,
+                                                   .mean_reversion = 3.0,
+                                                   .long_run_variance = 0.045,
+                                                   .vol_of_variance = 0.6,
+                                                   .correlation = -0.4}};
+
+    CalibrationObjectiveType objective{CalibrationObjectiveType::ImpliedVolatility};
+
+    std::int64_t quadrature_nodes{256};
+    int max_iterations{2000};
+};
+
+/// EXP-12: how stable are calibrated Heston parameters on a fixed documented surface?
+///
+/// Calibrates the same surface under several variations of the calibration setup and
+/// reports the dispersion of the calibrated parameters across them, the residual
+/// surface of each, and each scenario's convergence and fit. Parameter instability is
+/// reported rather than smoothed away, and the surface's synthetic provenance and
+/// timestamp travel with the record so no economic claim outruns the evidence.
+[[nodiscard]] Result<ExperimentRecord>
+run_market_surface_stability(const MarketSurfaceStabilityConfig& config);
 
 }  // namespace diffusionworks

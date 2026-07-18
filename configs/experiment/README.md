@@ -61,3 +61,39 @@ methodology is `docs/HESTON-SIMULATION-METHODOLOGY.md`.
 | `seed_count` | Independent replications. The bias is measured across seeds, so one seed cannot separate it from a lucky draw. |
 | `master_seed` | Base seed; `--seed` overrides it. |
 | `bias_resolution` | How many across-seed standard errors a bias must clear before its decay order is fitted rather than treated as noise. |
+
+## `calibration.json`
+
+Drives EXP-11, the Heston calibration-recovery study. The methodology is
+`docs/CALIBRATION-METHODOLOGY.md`. Heston parameter vectors are objects with the five
+named fields (`initial_variance`, `mean_reversion`, `long_run_variance`,
+`vol_of_variance`, `correlation`).
+
+| Field | Meaning |
+| --- | --- |
+| `spot`, `rate`, `dividend_yield` | The market. |
+| `strikes`, `maturities` | The grid the synthetic surface is priced on. |
+| `true_parameters` | The parameters the surface is generated from — the answer recovery must reach without being told it. |
+| `initial_guesses` | Diverse starting points, at least two, none the truth. The recovery verdict is read only from a start that did not begin near the answer. |
+| `objective` | `implied_volatility` (primary) or `price`. |
+| `quadrature_nodes`, `max_iterations` | Pricing accuracy per evaluation and the optimizer budget. |
+| `recovery_tolerance`, `fit_tolerance_iv_rmse` | The normalised parameter distance and IV RMSE below which recovery and fit count as accurate. |
+| `truth_guess_epsilon` | A guess this close to the truth is treated as the truth and excluded from the recovery verdict. |
+
+## `calibration_stability.json`
+
+Drives EXP-12, the market-surface stability study. It calibrates one fixed surface
+under five built-in scenarios (uniform / at-the-money / wing weighting, tighter bounds,
+and a reduced strike set) and reports the dispersion of the calibrated parameters.
+
+| Field | Meaning |
+| --- | --- |
+| `spot`, `rate`, `dividend_yield`, `strikes`, `maturities` | The market and grid of the fixed surface. |
+| `surface_parameters` | The Heston parameters the documented synthetic surface is generated from. Matches `configs/calibration/market_surface.json`. |
+| `as_of` | The timestamp the surface is documented with. |
+| `initial_guesses` | The starting points every scenario calibrates from. |
+| `objective`, `quadrature_nodes`, `max_iterations` | As above. |
+
+The surface here is a **documented synthetic reference, not real market data**;
+`configs/calibration/market_surface.json` is the same surface as an explicit
+implied-volatility quote set runnable through the `calibrate` command.

@@ -440,6 +440,38 @@ TEST(ExperimentCommandTest, HestonCalibrationRecoveryProducesARecord) {
     EXPECT_FALSE(results.at("best_blind").is_null());
 }
 
+TEST(ExperimentCommandTest, MarketSurfaceStabilityProducesARecord) {
+    // Three strikes and one maturity, two guesses, light pricing: the smallest shape
+    // the five-scenario stability study still runs in. The physics is validated in the
+    // calibrator tests; this exercises the wiring.
+    const auto document =
+        run_experiment(config_from(R"({"schema_version": 1, "command": "experiment",
+                        "calibration_stability": {
+                          "strikes": [95.0, 100.0, 105.0], "maturities": [1.0],
+                          "initial_guesses": [
+                            {"initial_variance": 0.04, "mean_reversion": 1.0, "long_run_variance": 0.05, "vol_of_variance": 0.5, "correlation": -0.5},
+                            {"initial_variance": 0.06, "mean_reversion": 2.5, "long_run_variance": 0.07, "vol_of_variance": 0.3, "correlation": -0.7}
+                          ],
+                          "quadrature_nodes": 96, "max_iterations": 500}})"),
+                       options_for("EXP-12"));
+    ASSERT_TRUE(document.ok()) << document.error().describe();
+    EXPECT_EQ(document.value().at("id"), "EXP-12");
+
+    const std::string status = document.value().at("status");
+    EXPECT_TRUE(status == "pass" || status == "warning") << status;
+
+    const auto& results = document.value().at("results");
+    // Five scenarios, the cross-scenario dispersion, and the documented provenance.
+    ASSERT_TRUE(results.contains("scenarios"));
+    EXPECT_EQ(results.at("scenarios").size(), 5U);
+    EXPECT_TRUE(results.contains("parameter_dispersion"));
+    EXPECT_TRUE(results.contains("as_of"));
+    EXPECT_NE(results.at("surface_source").get<std::string>().find("SYNTHETIC"), std::string::npos)
+        << "the synthetic provenance must travel with the record";
+    // Each scenario carries its residual surface by strike and maturity.
+    EXPECT_TRUE(results.at("scenarios").at(0).contains("residual_surface"));
+}
+
 // The catalog names calibrating only from the true parameters as a failure condition,
 // so a single guess is refused.
 TEST(ExperimentCommandTest, CalibrationRecoveryRejectsASingleGuess) {

@@ -1007,6 +1007,169 @@ Result<CalibrationRecoveryConfig> parse_calibration_recovery_config(const Config
     return Result<CalibrationRecoveryConfig>::success(std::move(config));
 }
 
+/// Parses the `calibration_stability` block for EXP-12.
+Result<MarketSurfaceStabilityConfig> parse_calibration_stability_config(const ConfigNode& root) {
+    MarketSurfaceStabilityConfig config;
+
+    if (!root.contains("calibration_stability")) {
+        return Result<MarketSurfaceStabilityConfig>::success(config);
+    }
+
+    auto node = root.object("calibration_stability");
+    if (!node) {
+        return Result<MarketSurfaceStabilityConfig>::failure(std::move(node).error());
+    }
+
+    const Status unknown = node.value().reject_unknown_keys({"spot",
+                                                             "rate",
+                                                             "dividend_yield",
+                                                             "strikes",
+                                                             "maturities",
+                                                             "surface_parameters",
+                                                             "as_of",
+                                                             "initial_guesses",
+                                                             "objective",
+                                                             "quadrature_nodes",
+                                                             "max_iterations"});
+    if (!unknown) {
+        return Result<MarketSurfaceStabilityConfig>::failure(unknown.error());
+    }
+
+    std::optional<Error> first_error;
+    const auto read_number = [&](const char* key, double fallback) -> double {
+        auto v = node.value().number_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_integer = [&](const char* key, std::int64_t fallback) -> std::int64_t {
+        auto v = node.value().integer_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_doubles = [&](const char* key, std::vector<double> fallback) {
+        if (!node.value().contains(key)) {
+            return fallback;
+        }
+        auto array = node.value().array(key);
+        if (!array) {
+            if (!first_error.has_value()) {
+                first_error = array.error();
+            }
+            return fallback;
+        }
+        std::vector<double> out;
+        for (std::size_t i = 0; i < array.value().size(); ++i) {
+            auto v = array.value().number_at(i);
+            if (!v) {
+                if (!first_error.has_value()) {
+                    first_error = v.error();
+                }
+                return fallback;
+            }
+            out.push_back(v.value());
+        }
+        return out;
+    };
+
+    config.spot = read_number("spot", config.spot);
+    config.rate = read_number("rate", config.rate);
+    config.dividend_yield = read_number("dividend_yield", config.dividend_yield);
+    config.quadrature_nodes = read_integer("quadrature_nodes", config.quadrature_nodes);
+    config.max_iterations = static_cast<int>(read_integer("max_iterations", config.max_iterations));
+    config.strikes = read_doubles("strikes", config.strikes);
+    config.maturities = read_doubles("maturities", config.maturities);
+
+    if (first_error.has_value()) {
+        return Result<MarketSurfaceStabilityConfig>::failure(*first_error);
+    }
+
+    auto as_of = node.value().string_or("as_of", config.as_of);
+    if (!as_of) {
+        return Result<MarketSurfaceStabilityConfig>::failure(std::move(as_of).error());
+    }
+    config.as_of = as_of.value();
+
+    auto objective = node.value().string_or("objective", std::string("implied_volatility"));
+    if (!objective) {
+        return Result<MarketSurfaceStabilityConfig>::failure(std::move(objective).error());
+    }
+    if (objective.value() == "implied_volatility") {
+        config.objective = CalibrationObjectiveType::ImpliedVolatility;
+    } else if (objective.value() == "price") {
+        config.objective = CalibrationObjectiveType::Price;
+    } else {
+        return Result<MarketSurfaceStabilityConfig>::failure(
+            ErrorCode::InvalidConfiguration,
+            fmt::format("calibration_stability.objective must be 'implied_volatility' or 'price', "
+                        "got '{}'",
+                        objective.value()),
+            kContext);
+    }
+
+    if (node.value().contains("surface_parameters")) {
+        auto params_node = node.value().object("surface_parameters");
+        if (!params_node) {
+            return Result<MarketSurfaceStabilityConfig>::failure(std::move(params_node).error());
+        }
+        auto parsed = parse_heston_parameters(params_node.value());
+        if (!parsed) {
+            return Result<MarketSurfaceStabilityConfig>::failure(std::move(parsed).error());
+        }
+        config.surface_parameters = parsed.value();
+    }
+
+    if (node.value().contains("initial_guesses")) {
+        auto guesses = node.value().array("initial_guesses");
+        if (!guesses) {
+            return Result<MarketSurfaceStabilityConfig>::failure(std::move(guesses).error());
+        }
+        std::vector<HestonParameters> parsed_guesses;
+        for (std::size_t i = 0; i < guesses.value().size(); ++i) {
+            auto element = guesses.value().at(i);
+            if (!element) {
+                return Result<MarketSurfaceStabilityConfig>::failure(std::move(element).error());
+            }
+            auto parsed = parse_heston_parameters(element.value());
+            if (!parsed) {
+                return Result<MarketSurfaceStabilityConfig>::failure(std::move(parsed).error());
+            }
+            parsed_guesses.push_back(parsed.value());
+        }
+        config.initial_guesses = std::move(parsed_guesses);
+    }
+
+    if (config.strikes.empty() || config.maturities.empty()) {
+        return Result<MarketSurfaceStabilityConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "calibration_stability needs at least one strike and one maturity",
+            kContext);
+    }
+    if (config.initial_guesses.empty()) {
+        return Result<MarketSurfaceStabilityConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "calibration_stability needs at least one initial guess",
+            kContext);
+    }
+    if (config.quadrature_nodes < 2 || config.max_iterations < 1) {
+        return Result<MarketSurfaceStabilityConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "calibration_stability needs quadrature_nodes >= 2 and max_iterations >= 1",
+            kContext);
+    }
+
+    return Result<MarketSurfaceStabilityConfig>::success(std::move(config));
+}
+
 nlohmann::json table_to_json(const CsvTable& table) {
     return nlohmann::json{{"headers", table.headers}, {"rows", table.rows}};
 }
@@ -1039,7 +1202,7 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
     Result<ExperimentRecord> record = Result<ExperimentRecord>::failure(
         ErrorCode::NotImplemented,
         fmt::format("experiment '{}' is not implemented in this build. Implemented: EXP-01, "
-                    "EXP-02, EXP-03, EXP-04, EXP-06, EXP-07, EXP-08, EXP-10, EXP-11.",
+                    "EXP-02, EXP-03, EXP-04, EXP-06, EXP-07, EXP-08, EXP-10, EXP-11, EXP-12.",
                     id),
         kContext);
 
@@ -1095,6 +1258,12 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
             return Result<nlohmann::json>::failure(std::move(calibration).error());
         }
         record = run_heston_calibration_recovery(calibration.value());
+    } else if (id == "EXP-12") {
+        auto stability = parse_calibration_stability_config(config.root());
+        if (!stability) {
+            return Result<nlohmann::json>::failure(std::move(stability).error());
+        }
+        record = run_market_surface_stability(stability.value());
     }
 
     if (!record) {

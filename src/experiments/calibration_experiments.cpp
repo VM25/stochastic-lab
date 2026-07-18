@@ -3,8 +3,11 @@
 
 #include <fmt/format.h>
 
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -287,6 +290,285 @@ Result<ExperimentRecord> run_heston_calibration_recovery(const CalibrationRecove
         "and on the guesses supplied. A different guess set could land in a different local "
         "minimum; the dispersion across starts and the non-uniqueness flag are the honest measure "
         "of how much that matters here."};
+
+    record.runtime_seconds =
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time).count();
+    return Result<ExperimentRecord>::success(std::move(record));
+}
+
+namespace {
+
+/// One calibrated scenario: which variation of the setup, and what it produced.
+struct ScenarioResult {
+    std::string name;
+    HestonParameters calibrated;
+    double objective{};
+    double implied_vol_rmse{};
+    double price_rmse{};
+    NelderMeadStatus status{NelderMeadStatus::MaxIterationsReached};
+    bool non_unique{};
+    int quotes_failed{};
+    nlohmann::json residuals;
+};
+
+}  // namespace
+
+Result<ExperimentRecord> run_market_surface_stability(const MarketSurfaceStabilityConfig& config) {
+    const auto start_time = std::chrono::steady_clock::now();
+
+    ExperimentRecord record;
+    record.id = "EXP-12";
+    record.name = "Market-Surface Calibration Stability";
+    record.question =
+        "How stable are calibrated Heston parameters on a fixed documented market surface?";
+    record.reproduction_command = "diffusionworks experiment --id EXP-12 --config "
+                                  "configs/experiment/calibration_stability.json";
+
+    if (config.initial_guesses.empty()) {
+        return Result<ExperimentRecord>::failure(ErrorCode::InvalidArgument,
+                                                 "stability study needs at least one initial guess",
+                                                 "EXP-12");
+    }
+
+    // The fixed reference surface. Documented as synthetic, never real market data.
+    SyntheticSurfaceSpec spec;
+    spec.spot = config.spot;
+    spec.rate = config.rate;
+    spec.dividend_yield = config.dividend_yield;
+    spec.strikes = config.strikes;
+    spec.maturities = config.maturities;
+    spec.parameters = config.surface_parameters;
+    const auto base_surface = generate_heston_surface(spec);
+    if (!base_surface) {
+        return Result<ExperimentRecord>::failure(base_surface.error());
+    }
+
+    const HestonParameterBounds default_bounds = HestonParameterBounds::defaults();
+    HestonParameterBounds tight_bounds;
+    tight_bounds.lower = {.initial_variance = 0.01,
+                          .mean_reversion = 0.5,
+                          .long_run_variance = 0.02,
+                          .vol_of_variance = 0.1,
+                          .correlation = -0.95};
+    tight_bounds.upper = {.initial_variance = 0.1,
+                          .mean_reversion = 5.0,
+                          .long_run_variance = 0.12,
+                          .vol_of_variance = 1.0,
+                          .correlation = -0.1};
+
+    // Weight the quotes near the money, or out in the wings, to probe how much the
+    // emphasis moves the fit. The reference weight of one is the neutral scheme.
+    const auto reweight = [&](const std::function<double(const SurfaceQuote&)>& weight) {
+        VolatilitySurface s = base_surface.value();
+        for (SurfaceQuote& q : s.quotes) {
+            q.weight = weight(q);
+        }
+        return s;
+    };
+    const VolatilitySurface atm_weighted = reweight([&](const SurfaceQuote& q) {
+        const double moneyness = q.strike / config.spot - 1.0;
+        return std::exp(-0.5 * (moneyness / 0.08) * (moneyness / 0.08));
+    });
+    const VolatilitySurface wing_weighted = reweight(
+        [&](const SurfaceQuote& q) { return 1.0 + 8.0 * std::abs(q.strike / config.spot - 1.0); });
+
+    // The core-strike surface drops the two extreme strikes, if there are enough to
+    // drop; otherwise it is the base surface.
+    VolatilitySurface core = base_surface.value();
+    if (config.strikes.size() >= 5) {
+        const double lowest = config.strikes.front();
+        const double highest = config.strikes.back();
+        std::vector<SurfaceQuote> kept;
+        for (const SurfaceQuote& q : core.quotes) {
+            if (q.strike > lowest && q.strike < highest) {
+                kept.push_back(q);
+            }
+        }
+        core.quotes = std::move(kept);
+    }
+
+    struct Scenario {
+        std::string name;
+        const VolatilitySurface* surface;
+        const HestonParameterBounds* bounds;
+    };
+
+    const std::vector<Scenario> scenarios = {
+        {.name = "uniform_weights_default_bounds",
+         .surface = &base_surface.value(),
+         .bounds = &default_bounds},
+        {.name = "atm_weighted", .surface = &atm_weighted, .bounds = &default_bounds},
+        {.name = "wing_weighted", .surface = &wing_weighted, .bounds = &default_bounds},
+        {.name = "tight_bounds", .surface = &base_surface.value(), .bounds = &tight_bounds},
+        {.name = "core_strikes_only", .surface = &core, .bounds = &default_bounds}};
+
+    record.table.headers = {"scenario",
+                            "status",
+                            "objective",
+                            "iv_rmse",
+                            "price_rmse",
+                            "v0",
+                            "kappa",
+                            "theta",
+                            "xi",
+                            "rho",
+                            "non_unique"};
+
+    std::vector<ScenarioResult> results;
+    results.reserve(scenarios.size());
+    for (const Scenario& scenario : scenarios) {
+        CalibrationConfig calibration;
+        calibration.bounds = *scenario.bounds;
+        calibration.initial_guesses = config.initial_guesses;
+        calibration.objective = config.objective;
+        calibration.pricing = HestonAnalyticConfig{.quadrature_nodes = config.quadrature_nodes,
+                                                   .convergence_tolerance = 1.0e-5};
+        calibration.optimizer.max_iterations = config.max_iterations;
+
+        const auto calibrated = calibrate_heston(*scenario.surface, calibration);
+        if (!calibrated) {
+            return Result<ExperimentRecord>::failure(calibrated.error());
+        }
+        const CalibrationStart& best = calibrated.value().best;
+
+        ScenarioResult r;
+        r.name = scenario.name;
+        r.calibrated = best.calibrated;
+        r.objective = best.objective_value;
+        r.implied_vol_rmse = best.implied_vol_rmse;
+        r.price_rmse = best.price_rmse;
+        r.status = best.status;
+        r.non_unique = calibrated.value().non_unique;
+        r.quotes_failed = best.quotes_failed;
+        r.residuals = nlohmann::json::array();
+        for (const QuoteResidual& q : calibrated.value().best_residuals) {
+            r.residuals.push_back(
+                nlohmann::json{{"strike", q.strike},
+                               {"maturity", q.maturity},
+                               {"weight", q.weight},
+                               {"market_price", q.market_price},
+                               {"model_price", q.model_price},
+                               {"market_implied_volatility", q.market_implied_volatility},
+                               {"model_implied_volatility", q.model_implied_volatility}});
+        }
+        results.push_back(std::move(r));
+    }
+
+    // Cross-scenario parameter dispersion: how much the calibrated parameters move as
+    // the setup varies. This spread, not any single fit, is the answer.
+    const auto spread = [&](const std::function<double(const HestonParameters&)>& get) {
+        double sum = 0.0;
+        double min_v = get(results.front().calibrated);
+        double max_v = min_v;
+        for (const ScenarioResult& r : results) {
+            const double v = get(r.calibrated);
+            sum += v;
+            min_v = std::min(min_v, v);
+            max_v = std::max(max_v, v);
+        }
+        const double mean = sum / static_cast<double>(results.size());
+        double var = 0.0;
+        for (const ScenarioResult& r : results) {
+            const double d = get(r.calibrated) - mean;
+            var += d * d;
+        }
+        const double stddev =
+            results.size() >= 2 ? std::sqrt(var / static_cast<double>(results.size() - 1)) : 0.0;
+        return nlohmann::json{{"mean", mean}, {"stddev", stddev}, {"min", min_v}, {"max", max_v}};
+    };
+
+    nlohmann::json dispersion{
+        {"initial_variance", spread([](const HestonParameters& p) { return p.initial_variance; })},
+        {"mean_reversion", spread([](const HestonParameters& p) { return p.mean_reversion; })},
+        {"long_run_variance",
+         spread([](const HestonParameters& p) { return p.long_run_variance; })},
+        {"vol_of_variance", spread([](const HestonParameters& p) { return p.vol_of_variance; })},
+        {"correlation", spread([](const HestonParameters& p) { return p.correlation; })}};
+
+    nlohmann::json scenario_json = nlohmann::json::array();
+    bool all_converged = true;
+    for (const ScenarioResult& r : results) {
+        all_converged = all_converged && r.status == NelderMeadStatus::Converged;
+        record.table.rows.push_back({r.name,
+                                     std::string(to_string(r.status)),
+                                     number(r.objective),
+                                     number(r.implied_vol_rmse),
+                                     number(r.price_rmse),
+                                     number(r.calibrated.initial_variance),
+                                     number(r.calibrated.mean_reversion),
+                                     number(r.calibrated.long_run_variance),
+                                     number(r.calibrated.vol_of_variance),
+                                     number(r.calibrated.correlation),
+                                     r.non_unique ? "yes" : "no"});
+        scenario_json.push_back(nlohmann::json{{"scenario", r.name},
+                                               {"status", to_string(r.status)},
+                                               {"objective", r.objective},
+                                               {"implied_vol_rmse", r.implied_vol_rmse},
+                                               {"price_rmse", r.price_rmse},
+                                               {"non_unique", r.non_unique},
+                                               {"quotes_failed", r.quotes_failed},
+                                               {"calibrated", to_json(r.calibrated)},
+                                               {"residual_surface", r.residuals}});
+    }
+
+    record.configuration =
+        nlohmann::json{{"spot", config.spot},
+                       {"rate", config.rate},
+                       {"dividend_yield", config.dividend_yield},
+                       {"strikes", config.strikes},
+                       {"maturities", config.maturities},
+                       {"surface_parameters", to_json(config.surface_parameters)},
+                       {"as_of", config.as_of},
+                       {"objective", to_string(config.objective)},
+                       {"quadrature_nodes", config.quadrature_nodes},
+                       {"max_iterations", config.max_iterations},
+                       {"initial_guess_count", config.initial_guesses.size()}};
+
+    record.results = nlohmann::json{
+        {"surface_source",
+         fmt::format(
+             "SYNTHETIC reference surface (not real market data), generated from a Heston "
+             "model v0={:.4g}, kappa={:.4g}, theta={:.4g}, xi={:.4g}, rho={:.4g} and frozen "
+             "as of {}",
+             config.surface_parameters.initial_variance,
+             config.surface_parameters.mean_reversion,
+             config.surface_parameters.long_run_variance,
+             config.surface_parameters.vol_of_variance,
+             config.surface_parameters.correlation,
+             config.as_of)},
+        {"as_of", config.as_of},
+        {"surface_quote_count", base_surface.value().quotes.size()},
+        {"scenarios", std::move(scenario_json)},
+        {"parameter_dispersion", std::move(dispersion)}};
+
+    record.status = all_converged ? ExperimentStatus::Pass : ExperimentStatus::Warning;
+
+    record.interpretation =
+        "The calibrated parameters are read off a fixed synthetic surface under several deliberate "
+        "changes of the setup -- weighting the quotes uniformly, toward the money, and toward the "
+        "wings; tightening the bounds; and dropping the wing strikes -- and the spread of the "
+        "results across those changes, in parameter_dispersion, is the finding. A stable parameter "
+        "moves little across the scenarios; one that swings is weakly identified by this surface, "
+        "and that is reported rather than hidden behind a single fit.\n\n"
+        "The residual surface of every scenario is kept, by strike and maturity, so the fit can be "
+        "read where it is good and where it is not. The surface is a documented synthetic "
+        "reference "
+        "frozen at a stated timestamp, not observed market data, so nothing here is an economic "
+        "statement about a real market -- only about how this estimator behaves on this surface.";
+
+    record.limitations = {
+        "The surface is synthetic and generated by Heston itself, so a scenario's fit can be "
+        "nearly "
+        "exact and the dispersion small; a real surface carries model error that this study, by "
+        "construction, does not.",
+        "The scenarios are a fixed, deliberately small menu. A wider or different set of "
+        "weightings "
+        "and bounds could expose instability this one does not, so a small dispersion here bounds "
+        "instability only over the variations actually tried.",
+        "Stability across setups is not identifiability: parameters can move together in a way "
+        "that "
+        "keeps the fit good, so a small per-scenario RMSE with a large dispersion is exactly the "
+        "weak-identification signal this experiment exists to surface."};
 
     record.runtime_seconds =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - start_time).count();
