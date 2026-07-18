@@ -324,5 +324,125 @@ TEST(HestonMonteCarloTest, RefusesZeroMaturity) {
     EXPECT_EQ(priced.error().code, ErrorCode::UnsupportedCombination);
 }
 
+// ---------------------------------------------------------------------------
+// Multithreading (Phase 12)
+//
+// The path loop runs across deterministic worker partitions with thread-local payoff
+// accumulators and diagnostics reduced in block order (ADR-011). One thread is the
+// sequential reference; a fixed thread count is reproducible; different counts agree
+// up to the reassociation of the payoff merge. The excursion count and the
+// minimum-variance depth reduce *exactly* -- an integer sum and a min -- so they are
+// bit-identical at every thread count and no worker's diagnostics can be lost.
+// ---------------------------------------------------------------------------
+
+HestonMonteCarloConfig threaded(int threads,
+                                std::int64_t steps,
+                                std::int64_t paths,
+                                std::uint64_t seed = 20260717) {
+    HestonMonteCarloConfig c = config(steps, paths, seed);
+    c.threads = threads;
+    return c;
+}
+
+TEST(HestonMonteCarloThreadingTest, MatchesTheSingleThreadedResultAcrossThreadCounts) {
+    const auto mk = market(100.0, 0.05, 0.0);
+    const auto option = call();
+    const auto model = benign();
+
+    const auto one = HestonMonteCarloEngine::price(mk, option, model, threaded(1, 100, 120000));
+    ASSERT_TRUE(one.ok()) << one.error().describe();
+
+    for (const int threads : {2, 4, 8}) {
+        const auto many =
+            HestonMonteCarloEngine::price(mk, option, model, threaded(threads, 100, 120000));
+        ASSERT_TRUE(many.ok()) << "threads=" << threads << ": " << many.error().describe();
+        EXPECT_NEAR(many.value().value, one.value().value, 1e-9) << "threads=" << threads;
+        EXPECT_NEAR(*many.value().standard_error, *one.value().standard_error, 1e-9)
+            << "threads=" << threads;
+    }
+}
+
+TEST(HestonMonteCarloThreadingTest, IsBitReproducibleAtAFixedThreadCount) {
+    const auto mk = market(100.0, 0.05, 0.0);
+    const auto first = HestonMonteCarloEngine::price(mk, call(), benign(), threaded(4, 100, 120000));
+    const auto second =
+        HestonMonteCarloEngine::price(mk, call(), benign(), threaded(4, 100, 120000));
+    ASSERT_TRUE(first.ok()) << first.error().describe();
+    ASSERT_TRUE(second.ok()) << second.error().describe();
+    EXPECT_EQ(first.value().value, second.value().value);
+    EXPECT_EQ(*first.value().standard_error, *second.value().standard_error);
+}
+
+// The variance diagnostics are exact reductions -- an integer sum for the event count
+// and a min for the depth -- so they must be *identical* at every thread count, not
+// merely close. The stressed regime makes both non-trivial: many flooring events and a
+// genuinely negative minimum pre-truncation variance the truncation had to absorb.
+TEST(HestonMonteCarloThreadingTest, VarianceDiagnosticsAreIdenticalAcrossThreadCounts) {
+    const auto mk = market(100.0, 0.05, 0.0);
+    const auto option = call();
+    const auto model = stressed();
+
+    const auto one = HestonMonteCarloEngine::price(mk, option, model, threaded(1, 80, 60000));
+    ASSERT_TRUE(one.ok()) << one.error().describe();
+    const std::int64_t events = int_diagnostic(one.value(), "negative_variance_events");
+    const double min_var = diagnostic(one.value(), "minimum_variance");
+    const std::int64_t non_finite = int_diagnostic(one.value(), "non_finite_paths");
+    EXPECT_GT(events, 0) << "the stressed regime should floor the variance for the check to bite";
+    EXPECT_LT(min_var, 0.0) << "the stressed regime should drive the pre-truncation variance below "
+                               "zero for the check to bite";
+
+    for (const int threads : {2, 4, 8}) {
+        const auto many =
+            HestonMonteCarloEngine::price(mk, option, model, threaded(threads, 80, 60000));
+        ASSERT_TRUE(many.ok()) << "threads=" << threads << ": " << many.error().describe();
+        EXPECT_EQ(int_diagnostic(many.value(), "negative_variance_events"), events)
+            << "threads=" << threads << ": the flooring count moved under partitioning";
+        EXPECT_EQ(diagnostic(many.value(), "minimum_variance"), min_var)
+            << "threads=" << threads << ": the excursion depth moved under partitioning";
+        EXPECT_EQ(int_diagnostic(many.value(), "non_finite_paths"), non_finite)
+            << "threads=" << threads;
+    }
+}
+
+// A non-finite failure is a status, and it must be identical at every thread count: the
+// naive scheme blows up in the stressed regime, and the block -- and the counted
+// non-finite paths behind it -- is the same regardless of how the paths partition.
+TEST(HestonMonteCarloThreadingTest, NonFiniteFailureStatusIsIdenticalAcrossThreadCounts) {
+    const auto mk = market(100.0, 0.05, 0.0);
+    const auto option = call();
+    const auto model = stressed();
+
+    HestonMonteCarloConfig naive_one = threaded(1, 80, 40000);
+    naive_one.scheme = HestonVarianceScheme::NaiveEuler;
+    const auto outcome_one = HestonMonteCarloEngine::simulate(mk, option, model, naive_one);
+    ASSERT_TRUE(outcome_one.ok());
+    EXPECT_FALSE(outcome_one.value().price.has_value());
+    const std::int64_t non_finite = outcome_one.value().diagnostics.non_finite_paths;
+    EXPECT_GT(non_finite, 0) << "the naive scheme must produce non-finite paths here";
+
+    for (const int threads : {2, 4, 8}) {
+        HestonMonteCarloConfig naive = threaded(threads, 80, 40000);
+        naive.scheme = HestonVarianceScheme::NaiveEuler;
+
+        const auto outcome = HestonMonteCarloEngine::simulate(mk, option, model, naive);
+        ASSERT_TRUE(outcome.ok()) << "threads=" << threads;
+        EXPECT_FALSE(outcome.value().price.has_value()) << "threads=" << threads;
+        EXPECT_EQ(outcome.value().diagnostics.non_finite_paths, non_finite)
+            << "threads=" << threads << ": the non-finite-path count moved under partitioning";
+
+        // price() must return the same hard error regardless of the thread count.
+        const auto priced = HestonMonteCarloEngine::price(mk, option, model, naive);
+        ASSERT_FALSE(priced.ok()) << "threads=" << threads;
+        EXPECT_EQ(priced.error().code, ErrorCode::NonFiniteValue) << "threads=" << threads;
+    }
+}
+
+TEST(HestonMonteCarloThreadingTest, RejectsAnInvalidThreadCount) {
+    const auto priced =
+        HestonMonteCarloEngine::price(market(), call(), benign(), threaded(0, 50, 20000));
+    ASSERT_FALSE(priced.ok());
+    EXPECT_EQ(priced.error().code, ErrorCode::InvalidArgument);
+}
+
 }  // namespace
 }  // namespace diffusionworks

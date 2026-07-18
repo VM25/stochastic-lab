@@ -49,6 +49,17 @@ struct HestonMonteCarloConfig {
     /// The default is full truncation. The naive scheme is selected only by the
     /// experiment that studies it, never as a way to actually price an option.
     HestonVarianceScheme scheme{HestonVarianceScheme::FullTruncation};
+
+    /// Worker threads for the path loop. One is sequential and bit-identical to the
+    /// single-threaded engine (ADR-011). More partition the paths deterministically
+    /// across fixed workers with thread-local accumulators and diagnostics reduced in
+    /// block order, so a fixed thread count is reproducible and different counts differ
+    /// only by the floating-point reassociation of the payoff merge -- a documented
+    /// effect, not a race. Each path draws from streams keyed by (seed, purpose, index),
+    /// so there is no shared mutable RNG to contend on. The integer excursion counts and
+    /// the minimum-variance depth reduce exactly (sum and min), so they are identical at
+    /// any thread count and no worker's diagnostics can be lost.
+    int threads{1};
 };
 
 /// What the Heston simulation observed about its own variance paths.

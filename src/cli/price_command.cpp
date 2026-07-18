@@ -287,6 +287,9 @@ Result<nlohmann::json> run_price(const ConfigDocument& config, const Options& op
                     ErrorCode::InvalidArgument, "method.seed must be non-negative", kContext);
             }
             heston_config.seed = options.seed.value_or(static_cast<std::uint64_t>(seed.value()));
+            if (options.threads.has_value()) {
+                heston_config.threads = static_cast<int>(options.threads.value());
+            }
 
             priced = HestonMonteCarloEngine::price(
                 market.value(), option.value(), heston.value(), heston_config);
@@ -314,6 +317,19 @@ Result<nlohmann::json> run_price(const ConfigDocument& config, const Options& op
         if (!config.source().empty()) {
             document["configuration_source"] = config.source().string();
         }
+
+        // heston_monte_carlo uses the requested threads (Phase 12); heston_analytic is a
+        // single quadrature with nothing to parallelise, so a thread count supplied there
+        // had no effect and is reported as such rather than silently ignored.
+        if (options.threads.has_value() && options.threads.value() != 1 &&
+            heston_method.value() != "heston_monte_carlo") {
+            document["warnings"] = nlohmann::json::array(
+                {fmt::format("--threads {} was supplied but {} is a single evaluation with nothing "
+                             "to parallelise; the thread count had no effect",
+                             options.threads.value(),
+                             heston_method.value())});
+        }
+
         document["build_metadata"] = to_json(collect_build_info());
         return Result<nlohmann::json>::success(std::move(document));
     }

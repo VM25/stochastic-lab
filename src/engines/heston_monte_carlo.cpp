@@ -1,3 +1,4 @@
+#include <diffusionworks/concurrency/parallel_reduce.hpp>
 #include <diffusionworks/engines/heston_monte_carlo.hpp>
 #include <diffusionworks/random/random_stream.hpp>
 #include <diffusionworks/simulation/time_grid.hpp>
@@ -8,6 +9,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <utility>
 
 namespace diffusionworks {
@@ -47,6 +49,12 @@ HestonMonteCarloEngine::simulate(const MarketState& market,
             "a zero-maturity option has no path to simulate; its payoff is the price",
             kContext);
     }
+    if (config.threads < 1 || config.threads > 1024) {
+        return Result<HestonSimulationOutcome>::failure(
+            ErrorCode::InvalidArgument,
+            fmt::format("threads must be between 1 and 1024 but is {}", config.threads),
+            kContext);
+    }
 
     const auto grid = TimeGrid::uniform(option.maturity(), config.steps);
     if (!grid.ok()) {
@@ -68,13 +76,42 @@ HestonMonteCarloEngine::simulate(const MarketState& market,
     const double discount = market.discount_factor(option.maturity());
     const bool full_truncation = config.scheme == HestonVarianceScheme::FullTruncation;
 
-    OnlineMoments payoffs;
-    HestonSimulationDiagnostics diagnostics;
-    diagnostics.paths = config.paths;
-    diagnostics.steps = config.steps;
-    diagnostics.minimum_variance = v0;
+    // A worker's thread-local state: its own payoff accumulator and its own copies
+    // of the accumulating diagnostics, so nothing is shared and mutated across
+    // workers (ADR-011). `minimum_variance` starts at v0 in every worker, exactly as
+    // the sequential run seeds it, so the reducing `min` reproduces the sequential
+    // depth regardless of the partition.
+    struct Local {
+        OnlineMoments payoffs;
+        std::int64_t negative_variance_events{0};
+        std::int64_t non_finite_paths{0};
+        double minimum_variance{0.0};
+    };
 
-    for (std::int64_t i = 0; i < config.paths; ++i) {
+    const auto make_local = [&] {
+        Local local;
+        local.minimum_variance = v0;
+        return local;
+    };
+
+    // The excursion counts sum and the depth mins -- both exact, order-independent
+    // reductions -- so no worker's diagnostics are ever lost, and the totals are the
+    // same at any thread count. The payoffs merge with the reassociation the mean
+    // and variance carry.
+    const auto reduce = [](Local& into, const Local& from) {
+        into.payoffs.merge(from.payoffs);
+        into.negative_variance_events += from.negative_variance_events;
+        into.non_finite_paths += from.non_finite_paths;
+        into.minimum_variance = std::min(into.minimum_variance, from.minimum_variance);
+    };
+
+    // One path. The two shock streams are keyed by (seed, purpose, index), so a path
+    // draws the same coordinates in whichever worker owns it -- path ownership and the
+    // RNG addressing are unchanged by partitioning. A non-finite path is a diagnostic,
+    // not an error: it is counted and the body still succeeds, exactly as the
+    // sequential loop continued past it, because the price is blocked afterwards on the
+    // reduced count rather than on the first path to diverge.
+    const auto body = [&](std::int64_t i, Local& local) -> Status {
         // The two shock streams are independent by construction; the correlation is
         // imposed by the Cholesky combination below, never by sharing a stream. The
         // variance's own shock drives the pair (passes through unchanged), so a run
@@ -110,9 +147,9 @@ HestonMonteCarloEngine::simulate(const MarketState& market,
             // scheme's real excursion rather than its cleaned-up state.
             if (std::isfinite(variance)) {
                 if (variance < 0.0) {
-                    ++diagnostics.negative_variance_events;
+                    ++local.negative_variance_events;
                 }
-                diagnostics.minimum_variance = std::min(diagnostics.minimum_variance, variance);
+                local.minimum_variance = std::min(local.minimum_variance, variance);
             }
             if (!std::isfinite(log_spot) || !std::isfinite(variance)) {
                 path_finite = false;
@@ -121,17 +158,31 @@ HestonMonteCarloEngine::simulate(const MarketState& market,
         }
 
         if (!path_finite) {
-            ++diagnostics.non_finite_paths;
-            continue;
+            ++local.non_finite_paths;
+            return Status::success();
         }
 
         const double terminal_spot = std::exp(log_spot);
         if (!std::isfinite(terminal_spot)) {
-            ++diagnostics.non_finite_paths;
-            continue;
+            ++local.non_finite_paths;
+            return Status::success();
         }
-        payoffs.add(discount * option.payoff(terminal_spot));
+        local.payoffs.add(discount * option.payoff(terminal_spot));
+        return Status::success();
+    };
+
+    auto reduced = parallel_reduce<Local>(config.paths, config.threads, make_local, body, reduce);
+    if (!reduced.ok()) {
+        return Result<HestonSimulationOutcome>::failure(reduced.error());
     }
+    const OnlineMoments& payoffs = reduced.value().payoffs;
+
+    HestonSimulationDiagnostics diagnostics;
+    diagnostics.paths = config.paths;
+    diagnostics.steps = config.steps;
+    diagnostics.negative_variance_events = reduced.value().negative_variance_events;
+    diagnostics.minimum_variance = reduced.value().minimum_variance;
+    diagnostics.non_finite_paths = reduced.value().non_finite_paths;
 
     HestonSimulationOutcome outcome;
     outcome.diagnostics = diagnostics;
