@@ -111,7 +111,7 @@ nelder_mead(const std::function<double(std::span<const double>)>& objective,
     NelderMeadStatus status = NelderMeadStatus::MaxIterationsReached;
     int iteration = 0;
     for (; iteration < config.max_iterations; ++iteration) {
-        std::sort(simplex.begin(), simplex.end(), by_value);
+        std::ranges::sort(simplex, by_value);
 
         const double best = simplex.front().value;
         const double worst = simplex.back().value;
@@ -195,7 +195,7 @@ nelder_mead(const std::function<double(std::span<const double>)>& objective,
         }
     }
 
-    std::sort(simplex.begin(), simplex.end(), by_value);
+    std::ranges::sort(simplex, by_value);
 
     NelderMeadResult result;
     result.point = simplex.front().point;

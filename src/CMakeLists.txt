@@ -28,6 +28,7 @@ target_sources(
             engines/implied_volatility.cpp
             engines/monte_carlo_engine.cpp
             experiments/barrier_experiments.cpp
+            experiments/calibration_experiments.cpp
             experiments/convergence.cpp
             experiments/convergence_experiments.cpp
             experiments/greek_experiments.cpp

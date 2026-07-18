@@ -138,6 +138,29 @@ ConfigDocument tiny_heston_simulation_config() {
     return config_from(kTinyHestonSimulationConfig);
 }
 
+/// The calibration-recovery block, cut to the smallest shape that still runs: a
+/// six-quote surface, two blind guesses, light pricing. This exercises the wiring; the
+/// recovery physics is validated in tests/calibration/heston_calibrator_test.cpp.
+constexpr const char* kTinyCalibrationConfig = R"({
+  "schema_version": 1,
+  "command": "experiment",
+  "calibration_recovery": {
+    "strikes": [90.0, 100.0, 110.0],
+    "maturities": [0.5, 1.0],
+    "true_parameters": {"initial_variance": 0.04, "mean_reversion": 1.5, "long_run_variance": 0.05, "vol_of_variance": 0.4, "correlation": -0.6},
+    "initial_guesses": [
+      {"initial_variance": 0.03, "mean_reversion": 1.0, "long_run_variance": 0.06, "vol_of_variance": 0.5, "correlation": -0.5},
+      {"initial_variance": 0.02, "mean_reversion": 2.5, "long_run_variance": 0.03, "vol_of_variance": 0.7, "correlation": -0.3}
+    ],
+    "quadrature_nodes": 128,
+    "max_iterations": 1000
+  }
+})";
+
+ConfigDocument tiny_calibration_config() {
+    return config_from(kTinyCalibrationConfig);
+}
+
 Options options_for(const std::string& id) {
     Options options;
     options.command = CommandKind::Experiment;
@@ -387,6 +410,60 @@ TEST(ExperimentCommandTest, BarrierExperimentRejectsAnUnknownKey) {
     EXPECT_EQ(document.error().code, ErrorCode::InvalidConfiguration);
     EXPECT_NE(document.error().describe().find("volatilty"), std::string::npos)
         << document.error().describe();
+}
+
+TEST(ExperimentCommandTest, HestonCalibrationRecoveryProducesARecord) {
+    const auto document = run_experiment(tiny_calibration_config(), options_for("EXP-11"));
+    ASSERT_TRUE(document.ok()) << document.error().describe();
+    EXPECT_EQ(document.value().at("id"), "EXP-11");
+
+    const std::string status = document.value().at("status");
+    EXPECT_TRUE(status == "pass" || status == "fail" || status == "warning" ||
+                status == "inconclusive")
+        << "unknown status: " << status;
+
+    // The record keeps the four things apart: per-start detail, the blind best fit, the
+    // recovery distance, and the non-uniqueness evidence.
+    const auto& results = document.value().at("results");
+    for (const char* field : {"starts",
+                              "best_blind",
+                              "recovery_distance",
+                              "convergence_rate",
+                              "non_unique",
+                              "similar_fits",
+                              "parameter_dispersion"}) {
+        EXPECT_TRUE(results.contains(field)) << "missing " << field;
+    }
+    // Every start is recorded, whether or not it began at the truth.
+    EXPECT_EQ(results.at("starts").size(), 2U);
+    // The recovery is read from a blind start, so a best_blind must exist here.
+    EXPECT_FALSE(results.at("best_blind").is_null());
+}
+
+// The catalog names calibrating only from the true parameters as a failure condition,
+// so a single guess is refused.
+TEST(ExperimentCommandTest, CalibrationRecoveryRejectsASingleGuess) {
+    const auto document =
+        run_experiment(config_from(R"({"schema_version": 1, "command": "experiment",
+                        "calibration_recovery": {"initial_guesses": [
+                          {"initial_variance": 0.04, "mean_reversion": 1.5, "long_run_variance": 0.05, "vol_of_variance": 0.4, "correlation": -0.6}
+                        ]}})"),
+                       options_for("EXP-11"));
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidArgument);
+}
+
+// A typo in a parameter name fails loudly rather than leaving a default in place.
+TEST(ExperimentCommandTest, CalibrationRecoveryRejectsAnUnknownParameterKey) {
+    const auto document =
+        run_experiment(config_from(R"({"schema_version": 1, "command": "experiment",
+                        "calibration_recovery": {"initial_guesses": [
+                          {"initial_variance": 0.03, "mean_reversion": 1.0, "long_run_variance": 0.06, "vol_of_vol": 0.5, "correlation": -0.5},
+                          {"initial_variance": 0.02, "mean_reversion": 2.5, "long_run_variance": 0.03, "vol_of_variance": 0.7, "correlation": -0.3}
+                        ]}})"),
+                       options_for("EXP-11"));
+    ASSERT_FALSE(document.ok());
+    EXPECT_EQ(document.error().code, ErrorCode::InvalidConfiguration);
 }
 
 // A bias is a difference against the reference, carrying sampling error; one seed

@@ -37,11 +37,21 @@ struct Evaluation {
 /// cleanly, so the penalty never moves the minimum; it only shapes the path there.
 constexpr double kQuotePenalty = 1.0;
 
-/// Normalised Euclidean distance between two parameter vectors, each coordinate
-/// scaled by its bound range so the five parameters are comparable.
-[[nodiscard]] double normalized_distance(const HestonParameters& a,
-                                         const HestonParameters& b,
-                                         const HestonParameterBounds& bounds) {
+}  // namespace
+
+const char* to_string(CalibrationObjectiveType type) noexcept {
+    switch (type) {
+        case CalibrationObjectiveType::ImpliedVolatility:
+            return "implied_volatility";
+        case CalibrationObjectiveType::Price:
+            return "price";
+    }
+    return "unknown";
+}
+
+double normalized_parameter_distance(const HestonParameters& a,
+                                     const HestonParameters& b,
+                                     const HestonParameterBounds& bounds) {
     const auto term = [](double x, double y, double lower, double upper) {
         const double range = upper - lower;
         const double d = range > 0.0 ? (x - y) / range : 0.0;
@@ -65,18 +75,6 @@ constexpr double kQuotePenalty = 1.0;
              bounds.lower.vol_of_variance,
              bounds.upper.vol_of_variance) +
         term(a.correlation, b.correlation, bounds.lower.correlation, bounds.upper.correlation));
-}
-
-}  // namespace
-
-const char* to_string(CalibrationObjectiveType type) noexcept {
-    switch (type) {
-        case CalibrationObjectiveType::ImpliedVolatility:
-            return "implied_volatility";
-        case CalibrationObjectiveType::Price:
-            return "price";
-    }
-    return "unknown";
 }
 
 Result<CalibrationResult> calibrate_heston(const VolatilitySurface& surface,
@@ -201,7 +199,7 @@ Result<CalibrationResult> calibrate_heston(const VolatilitySurface& surface,
     // need per-evaluation inversions, so it skips them.
     const std::function<double(std::span<const double>)> unconstrained_objective =
         [&](std::span<const double> x) -> double {
-        std::array<double, 5> point{x[0], x[1], x[2], x[3], x[4]};
+        const std::array<double, 5> point{x[0], x[1], x[2], x[3], x[4]};
         const HestonParameters parameters = to_constrained(point, config.bounds);
         return evaluate(parameters, objective_is_iv).objective;
     };
@@ -344,7 +342,7 @@ Result<CalibrationResult> calibrate_heston(const VolatilitySurface& surface,
             continue;
         }
         const double distance =
-            normalized_distance(s.calibrated, result.best.calibrated, config.bounds);
+            normalized_parameter_distance(s.calibrated, result.best.calibrated, config.bounds);
         result.max_similar_fit_distance = std::max(result.max_similar_fit_distance, distance);
         if (distance > config.material_parameter_distance) {
             result.non_unique = true;

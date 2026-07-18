@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "command": "experiment",
+  "calibration_recovery": {
+    "spot": 100.0,
+    "rate": 0.02,
+    "dividend_yield": 0.0,
+    "strikes": [80.0, 90.0, 100.0, 110.0, 120.0],
+    "maturities": [0.25, 0.5, 1.0, 2.0],
+    "true_parameters": {
+      "initial_variance": 0.04,
+      "mean_reversion": 1.5,
+      "long_run_variance": 0.05,
+      "vol_of_variance": 0.4,
+      "correlation": -0.6
+    },
+    "initial_guesses": [
+      {"initial_variance": 0.03, "mean_reversion": 1.0, "long_run_variance": 0.06, "vol_of_variance": 0.5, "correlation": -0.5},
+      {"initial_variance": 0.09, "mean_reversion": 0.8, "long_run_variance": 0.09, "vol_of_variance": 0.2, "correlation": -0.85},
+      {"initial_variance": 0.02, "mean_reversion": 2.5, "long_run_variance": 0.03, "vol_of_variance": 0.7, "correlation": -0.3},
+      {"initial_variance": 0.06, "mean_reversion": 3.0, "long_run_variance": 0.04, "vol_of_variance": 0.9, "correlation": 0.0}
+    ],
+    "objective": "implied_volatility",
+    "quadrature_nodes": 256,
+    "max_iterations": 2000,
+    "recovery_tolerance": 0.05,
+    "fit_tolerance_iv_rmse": 0.001,
+    "truth_guess_epsilon": 0.05
+  }
+}

@@ -28,6 +28,15 @@ enum class CalibrationObjectiveType : std::uint8_t {
 
 [[nodiscard]] const char* to_string(CalibrationObjectiveType type) noexcept;
 
+/// Euclidean distance between two parameter vectors with each coordinate scaled by its
+/// bound range, so the five parameters -- which live on very different scales -- are
+/// comparable. This is the metric the calibrator uses to decide whether two fits are
+/// materially different, exposed because a recovery study needs the same measure to
+/// compare a calibrated fit against the truth.
+[[nodiscard]] double normalized_parameter_distance(const HestonParameters& a,
+                                                   const HestonParameters& b,
+                                                   const HestonParameterBounds& bounds);
+
 /// Configuration for one calibration.
 struct CalibrationConfig {
     HestonParameterBounds bounds{HestonParameterBounds::defaults()};
