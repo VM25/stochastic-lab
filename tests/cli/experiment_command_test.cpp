@@ -441,19 +441,24 @@ TEST(ExperimentCommandTest, HestonCalibrationRecoveryProducesARecord) {
 }
 
 TEST(ExperimentCommandTest, MarketSurfaceStabilityProducesARecord) {
-    // Three strikes and one maturity, two guesses, light pricing: the smallest shape
-    // the five-scenario stability study still runs in. The physics is validated in the
-    // calibrator tests; this exercises the wiring.
-    const auto document =
-        run_experiment(config_from(R"({"schema_version": 1, "command": "experiment",
-                        "calibration_stability": {
-                          "strikes": [95.0, 100.0, 105.0], "maturities": [1.0],
-                          "initial_guesses": [
-                            {"initial_variance": 0.04, "mean_reversion": 1.0, "long_run_variance": 0.05, "vol_of_variance": 0.5, "correlation": -0.5},
-                            {"initial_variance": 0.06, "mean_reversion": 2.5, "long_run_variance": 0.07, "vol_of_variance": 0.3, "correlation": -0.7}
-                          ],
-                          "quadrature_nodes": 96, "max_iterations": 500}})"),
-                       options_for("EXP-12"));
+    // Runs the seven-scenario stability study on the real committed SPY dataset, at
+    // light pricing so the wiring test finishes in seconds. The physics is validated in
+    // the calibrator tests; this checks the dataset loads, the four axes vary, and the
+    // record carries provenance, exclusions, dispersion, and the penalty gating.
+    const std::string dataset =
+        std::string(DW_TEST_DATA_DIR) + "/market/spy_options_2026-07-17.json";
+    const std::string text =
+        R"({"schema_version": 1, "command": "experiment",
+            "calibration_stability": {
+              "dataset_path": ")" +
+        dataset +
+        R"(",
+              "initial_guesses": [
+                {"initial_variance": 0.03, "mean_reversion": 1.5, "long_run_variance": 0.04, "vol_of_variance": 0.6, "correlation": -0.6},
+                {"initial_variance": 0.05, "mean_reversion": 2.5, "long_run_variance": 0.05, "vol_of_variance": 0.4, "correlation": -0.7}
+              ],
+              "quadrature_nodes": 80, "max_iterations": 250}})";
+    const auto document = run_experiment(config_from(text.c_str()), options_for("EXP-12"));
     ASSERT_TRUE(document.ok()) << document.error().describe();
     EXPECT_EQ(document.value().at("id"), "EXP-12");
 
@@ -461,15 +466,30 @@ TEST(ExperimentCommandTest, MarketSurfaceStabilityProducesARecord) {
     EXPECT_TRUE(status == "pass" || status == "warning") << status;
 
     const auto& results = document.value().at("results");
-    // Five scenarios, the cross-scenario dispersion, and the documented provenance.
+    // Seven scenarios spanning the four axes, the dispersion, and the dataset report.
     ASSERT_TRUE(results.contains("scenarios"));
-    EXPECT_EQ(results.at("scenarios").size(), 5U);
+    EXPECT_EQ(results.at("scenarios").size(), 7U);
     EXPECT_TRUE(results.contains("parameter_dispersion"));
-    EXPECT_TRUE(results.contains("as_of"));
-    EXPECT_NE(results.at("surface_source").get<std::string>().find("SYNTHETIC"), std::string::npos)
-        << "the synthetic provenance must travel with the record";
-    // Each scenario carries its residual surface by strike and maturity.
-    EXPECT_TRUE(results.at("scenarios").at(0).contains("residual_surface"));
+    EXPECT_TRUE(results.contains("exclusions_by_reason"));
+    EXPECT_TRUE(results.contains("any_scenario_relied_on_penalties"));
+    EXPECT_EQ(results.at("total_quotes"), 18);
+
+    // The real dataset's provenance and licensing travel with the record.
+    const auto& ds = results.at("dataset");
+    EXPECT_EQ(ds.at("underlying"), "SPY");
+    EXPECT_FALSE(ds.at("licensing").get<std::string>().empty());
+    EXPECT_FALSE(ds.at("observation_timestamp").get<std::string>().empty());
+
+    // Each scenario carries its convergence, penalized-quote count, and residual
+    // surface -- the four things kept apart.
+    const auto& first = results.at("scenarios").at(0);
+    for (const char* field : {"status",
+                              "implied_vol_rmse",
+                              "penalized_quote_count",
+                              "relied_on_penalties",
+                              "residual_surface"}) {
+        EXPECT_TRUE(first.contains(field)) << "scenario missing " << field;
+    }
 }
 
 // The catalog names calibrating only from the true parameters as a failure condition,

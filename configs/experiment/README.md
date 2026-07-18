@@ -82,18 +82,23 @@ named fields (`initial_variance`, `mean_reversion`, `long_run_variance`,
 
 ## `calibration_stability.json`
 
-Drives EXP-12, the market-surface stability study. It calibrates one fixed surface
-under five built-in scenarios (uniform / at-the-money / wing weighting, tighter bounds,
-and a reduced strike set) and reports the dispersion of the calibrated parameters.
+Drives EXP-12, the market-surface stability study on a **real** option surface. It
+loads and validates the dataset at `dataset_path`, then calibrates it under seven
+built-in scenarios spanning the four axes the catalog names -- initial guesses (base
+and an alternative set), weighting (uniform / at-the-money / wing), parameter bounds
+(default / tight), and strike/maturity subsets (all / core strikes / short maturities)
+-- and reports the dispersion of the calibrated parameters, each scenario's residual
+surface, the penalized-quote count, and the dataset's excluded-quote report.
 
 | Field | Meaning |
 | --- | --- |
-| `spot`, `rate`, `dividend_yield`, `strikes`, `maturities` | The market and grid of the fixed surface. |
-| `surface_parameters` | The Heston parameters the documented synthetic surface is generated from. Matches `configs/calibration/market_surface.json`. |
-| `as_of` | The timestamp the surface is documented with. |
-| `initial_guesses` | The starting points every scenario calibrates from. |
+| `dataset_path` | Path (relative to the working directory) to the real-market dataset JSON. Default `data/market/spy_options_2026-07-17.json`. |
+| `initial_guesses` | The base starting points; one scenario also uses an alternative set derived from them. |
 | `objective`, `quadrature_nodes`, `max_iterations` | As above. |
+| `min_volume` | Below this day volume a quote is treated as stale and excluded during validation. |
 
-The surface here is a **documented synthetic reference, not real market data**;
-`configs/calibration/market_surface.json` is the same surface as an explicit
-implied-volatility quote set runnable through the `calibrate` command.
+The surface here is **real market data** (`data/market/spy_options_2026-07-17.json`),
+with its provenance, licensing, observation timestamp, and cleaning rules documented in
+the dataset file. The synthetic surface used for controlled recovery is
+`configs/calibration/synthetic_surface.json` -- a different file, and never called a
+market surface.

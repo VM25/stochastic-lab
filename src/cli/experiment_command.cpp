@@ -1020,17 +1020,12 @@ Result<MarketSurfaceStabilityConfig> parse_calibration_stability_config(const Co
         return Result<MarketSurfaceStabilityConfig>::failure(std::move(node).error());
     }
 
-    const Status unknown = node.value().reject_unknown_keys({"spot",
-                                                             "rate",
-                                                             "dividend_yield",
-                                                             "strikes",
-                                                             "maturities",
-                                                             "surface_parameters",
-                                                             "as_of",
+    const Status unknown = node.value().reject_unknown_keys({"dataset_path",
                                                              "initial_guesses",
                                                              "objective",
                                                              "quadrature_nodes",
-                                                             "max_iterations"});
+                                                             "max_iterations",
+                                                             "min_volume"});
     if (!unknown) {
         return Result<MarketSurfaceStabilityConfig>::failure(unknown.error());
     }
@@ -1056,48 +1051,20 @@ Result<MarketSurfaceStabilityConfig> parse_calibration_stability_config(const Co
         }
         return v.value();
     };
-    const auto read_doubles = [&](const char* key, std::vector<double> fallback) {
-        if (!node.value().contains(key)) {
-            return fallback;
-        }
-        auto array = node.value().array(key);
-        if (!array) {
-            if (!first_error.has_value()) {
-                first_error = array.error();
-            }
-            return fallback;
-        }
-        std::vector<double> out;
-        for (std::size_t i = 0; i < array.value().size(); ++i) {
-            auto v = array.value().number_at(i);
-            if (!v) {
-                if (!first_error.has_value()) {
-                    first_error = v.error();
-                }
-                return fallback;
-            }
-            out.push_back(v.value());
-        }
-        return out;
-    };
 
-    config.spot = read_number("spot", config.spot);
-    config.rate = read_number("rate", config.rate);
-    config.dividend_yield = read_number("dividend_yield", config.dividend_yield);
     config.quadrature_nodes = read_integer("quadrature_nodes", config.quadrature_nodes);
     config.max_iterations = static_cast<int>(read_integer("max_iterations", config.max_iterations));
-    config.strikes = read_doubles("strikes", config.strikes);
-    config.maturities = read_doubles("maturities", config.maturities);
+    config.min_volume = read_number("min_volume", config.min_volume);
 
     if (first_error.has_value()) {
         return Result<MarketSurfaceStabilityConfig>::failure(*first_error);
     }
 
-    auto as_of = node.value().string_or("as_of", config.as_of);
-    if (!as_of) {
-        return Result<MarketSurfaceStabilityConfig>::failure(std::move(as_of).error());
+    auto dataset_path = node.value().string_or("dataset_path", config.dataset_path);
+    if (!dataset_path) {
+        return Result<MarketSurfaceStabilityConfig>::failure(std::move(dataset_path).error());
     }
-    config.as_of = as_of.value();
+    config.dataset_path = dataset_path.value();
 
     auto objective = node.value().string_or("objective", std::string("implied_volatility"));
     if (!objective) {
@@ -1114,18 +1081,6 @@ Result<MarketSurfaceStabilityConfig> parse_calibration_stability_config(const Co
                         "got '{}'",
                         objective.value()),
             kContext);
-    }
-
-    if (node.value().contains("surface_parameters")) {
-        auto params_node = node.value().object("surface_parameters");
-        if (!params_node) {
-            return Result<MarketSurfaceStabilityConfig>::failure(std::move(params_node).error());
-        }
-        auto parsed = parse_heston_parameters(params_node.value());
-        if (!parsed) {
-            return Result<MarketSurfaceStabilityConfig>::failure(std::move(parsed).error());
-        }
-        config.surface_parameters = parsed.value();
     }
 
     if (node.value().contains("initial_guesses")) {
@@ -1148,12 +1103,6 @@ Result<MarketSurfaceStabilityConfig> parse_calibration_stability_config(const Co
         config.initial_guesses = std::move(parsed_guesses);
     }
 
-    if (config.strikes.empty() || config.maturities.empty()) {
-        return Result<MarketSurfaceStabilityConfig>::failure(
-            ErrorCode::InvalidArgument,
-            "calibration_stability needs at least one strike and one maturity",
-            kContext);
-    }
     if (config.initial_guesses.empty()) {
         return Result<MarketSurfaceStabilityConfig>::failure(
             ErrorCode::InvalidArgument,

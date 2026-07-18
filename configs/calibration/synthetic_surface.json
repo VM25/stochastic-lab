@@ -7,8 +7,8 @@
     "dividend_yield": 0.0
   },
   "surface": {
-    "source": "SYNTHETIC reference surface, not real market data. Generated from a Heston model (v0=0.045, kappa=1.8, theta=0.06, xi=0.45, rho=-0.65) at spot 100, rate 2.5%, and frozen with implied volatilities rounded to four decimals. Documented and timestamped so the calibration is reproducible and stable to study; it must not be read as an observed market.",
-    "as_of": "2026-07-18T00:00:00Z",
+    "source": "SYNTHETIC surface for CONTROLLED RECOVERY, not market data. Generated from a Heston model (v0=0.045, kappa=1.8, theta=0.06, xi=0.45, rho=-0.65) at spot 100, rate 2.5%, with implied volatilities rounded to four decimals. Its purpose is to check that the calibrator recovers known parameters from a surface Heston itself produced; a near-perfect fit is expected. The real-market stability study uses data/market/spy_options_2026-07-17.json, not this file. Do not read this as an observed market.",
+    "as_of": "synthetic (no market observation)",
     "quotes": [
       {"option_type": "call", "strike": 85.0, "maturity": 0.25, "implied_volatility": 0.2572, "weight": 1.0},
       {"option_type": "call", "strike": 92.5, "maturity": 0.25, "implied_volatility": 0.2349, "weight": 1.0},

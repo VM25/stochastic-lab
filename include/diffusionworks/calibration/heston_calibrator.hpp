@@ -60,6 +60,14 @@ struct CalibrationConfig {
 
     ImpliedVolatilityConfig implied_volatility{};
 
+    /// The penalty each unpriceable or uninvertible quote adds to the objective. It
+    /// must be large against a typical squared residual so a region the quadrature
+    /// cannot resolve is discouraged, yet finite so the optimizer descends on the
+    /// quotes that do resolve rather than freezing on an infinite plateau. Configurable
+    /// so its sensitivity can be studied: too small and the optimizer treats a region
+    /// with many failed quotes as competitive; large enough and it does not.
+    double quote_penalty{1.0};
+
     /// A start's fit counts as "similar to the best" when its objective is within this
     /// factor of the best objective. The window in which two fits are considered to
     /// explain the surface equally well.
@@ -129,6 +137,13 @@ struct CalibrationResult {
 
     /// The residual at each quote, evaluated at the best parameters.
     std::vector<QuoteResidual> best_residuals;
+
+    /// True when the best fit leaned on the penalty: at least one quote at the best
+    /// parameters could not be priced or inverted, so part of its objective is penalty
+    /// mass rather than fit. A calibration for which this is true must not be reported
+    /// as a clean success -- the penalty made the objective look better than the fit
+    /// actually is. This is the gate the penalty-sensitivity requirement turns on.
+    bool relied_on_penalties{};
 
     /// True when two started fits explain the surface about equally well (objectives
     /// within similar_fit_factor) yet sit materially apart in parameter space. This is

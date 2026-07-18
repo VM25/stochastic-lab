@@ -2,26 +2,15 @@
   "schema_version": 1,
   "command": "experiment",
   "calibration_stability": {
-    "spot": 100.0,
-    "rate": 0.025,
-    "dividend_yield": 0.0,
-    "strikes": [85.0, 92.5, 100.0, 107.5, 115.0],
-    "maturities": [0.25, 0.5, 1.0],
-    "surface_parameters": {
-      "initial_variance": 0.045,
-      "mean_reversion": 1.8,
-      "long_run_variance": 0.06,
-      "vol_of_variance": 0.45,
-      "correlation": -0.65
-    },
-    "as_of": "2026-07-18T00:00:00Z",
+    "dataset_path": "data/market/spy_options_2026-07-17.json",
     "initial_guesses": [
-      {"initial_variance": 0.04, "mean_reversion": 1.0, "long_run_variance": 0.05, "vol_of_variance": 0.5, "correlation": -0.5},
-      {"initial_variance": 0.06, "mean_reversion": 2.5, "long_run_variance": 0.07, "vol_of_variance": 0.3, "correlation": -0.7},
-      {"initial_variance": 0.03, "mean_reversion": 3.0, "long_run_variance": 0.045, "vol_of_variance": 0.6, "correlation": -0.4}
+      {"initial_variance": 0.03, "mean_reversion": 1.5, "long_run_variance": 0.04, "vol_of_variance": 0.6, "correlation": -0.6},
+      {"initial_variance": 0.05, "mean_reversion": 2.5, "long_run_variance": 0.05, "vol_of_variance": 0.4, "correlation": -0.7},
+      {"initial_variance": 0.02, "mean_reversion": 1.0, "long_run_variance": 0.06, "vol_of_variance": 0.8, "correlation": -0.5}
     ],
     "objective": "implied_volatility",
     "quadrature_nodes": 256,
-    "max_iterations": 2000
+    "max_iterations": 2000,
+    "min_volume": 100.0
   }
 }

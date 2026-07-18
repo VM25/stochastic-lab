@@ -192,7 +192,8 @@ add_dw_test(
 add_dw_test(
     dw_test_calibration
     LABEL unit
-    SOURCES calibration/parameter_transform_test.cpp)
+    SOURCES calibration/parameter_transform_test.cpp
+            calibration/market_dataset_test.cpp)
 
 # The calibrator suite fits a synthetic surface from several starts, which prices the
 # surface thousands of times; it runs in seconds, not milliseconds, so it is labelled

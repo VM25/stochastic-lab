@@ -280,10 +280,12 @@ Result<nlohmann::json> run_calibrate(const ConfigDocument& config, const Options
         similar.push_back(to_json(p));
     }
 
-    // A calibration that ended in non-uniqueness, a non-converged best, or quotes it
-    // could not fully evaluate is surfaced as a warning rather than a clean "ok": the
-    // number is real but there is something the reader must weigh before using it.
-    const bool clean = !result.non_unique && result.best.quotes_failed == 0 &&
+    // A calibration that ended in non-uniqueness, a non-converged best, or one that
+    // leaned on the penalty for quotes it could not evaluate is surfaced as a warning
+    // rather than a clean "ok": the number is real but there is something the reader
+    // must weigh before using it. A fit that relied on penalties is never clean -- part
+    // of its objective is penalty mass, not fit.
+    const bool clean = !result.non_unique && !result.relied_on_penalties &&
                        result.best.status == NelderMeadStatus::Converged;
 
     nlohmann::json document;
@@ -301,6 +303,7 @@ Result<nlohmann::json> run_calibrate(const ConfigDocument& config, const Options
                        {"starts", std::move(starts)},
                        {"residual_surface", std::move(residuals)},
                        {"non_unique", result.non_unique},
+                       {"relied_on_penalties", result.relied_on_penalties},
                        {"max_similar_fit_distance", result.max_similar_fit_distance},
                        {"similar_fits", std::move(similar)},
                        {"started_count", result.started_count},

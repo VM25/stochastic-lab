@@ -29,14 +29,6 @@ struct Evaluation {
     int quotes_failed{};
 };
 
-/// The penalty a single unpriceable or uninvertible quote adds to the objective. It is
-/// large against a typical squared residual (a per-quote implied-vol error of a
-/// percent squares to ~1e-4), so a region our quadrature cannot resolve is strongly
-/// discouraged -- but it is *finite*, so the optimizer descends on the quotes that do
-/// price rather than being walled onto an infinite plateau. The true parameters price
-/// cleanly, so the penalty never moves the minimum; it only shapes the path there.
-constexpr double kQuotePenalty = 1.0;
-
 }  // namespace
 
 const char* to_string(CalibrationObjectiveType type) noexcept {
@@ -125,7 +117,7 @@ Result<CalibrationResult> calibrate_heston(const VolatilitySurface& surface,
         if (!model) {
             // Feasible parameters always build a model, so this is a defensive path; a
             // fully penalised objective keeps it finite and repels the optimizer.
-            e.objective = kQuotePenalty * static_cast<double>(n) * 10.0;
+            e.objective = config.quote_penalty * static_cast<double>(n) * 10.0;
             e.quotes_failed = static_cast<int>(n);
             return e;
         }
@@ -139,7 +131,7 @@ Result<CalibrationResult> calibrate_heston(const VolatilitySurface& surface,
             const auto priced = HestonAnalyticEngine::price(
                 market.value(), options[i], model.value(), config.pricing);
             if (!priced) {
-                objective += kQuotePenalty;
+                objective += config.quote_penalty;
                 ++e.quotes_failed;
                 continue;
             }
@@ -180,7 +172,7 @@ Result<CalibrationResult> calibrate_heston(const VolatilitySurface& surface,
                 } else {
                     // The IV objective needs an implied volatility this quote could not
                     // supply: penalise it rather than fitting to a missing residual.
-                    objective += kQuotePenalty;
+                    objective += config.quote_penalty;
                     ++e.quotes_failed;
                 }
             } else {
@@ -286,6 +278,11 @@ Result<CalibrationResult> calibrate_heston(const VolatilitySurface& surface,
 
     result.best = result.starts[*best_index];
     result.objective_mean = objective_sum / static_cast<double>(result.started_count);
+
+    // The best fit leaned on the penalty if any quote at its parameters could not be
+    // priced or inverted. Such a calibration must not be reported as a clean success:
+    // part of its objective is penalty mass, not fit.
+    result.relied_on_penalties = result.best.quotes_failed > 0;
 
     // The residual surface at the best parameters.
     result.best_residuals = evaluate(result.best.calibrated, /*need_iv=*/true).residuals;

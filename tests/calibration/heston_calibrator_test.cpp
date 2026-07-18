@@ -136,6 +136,94 @@ TEST(HestonCalibratorTest, DoesNotFlagCoincidentGoodFitsAsNonUnique) {
 }
 
 // ---------------------------------------------------------------------------
+// Penalty sensitivity
+//
+// The finite penalty must do two things at once: prevent the optimizer freezing where
+// the quadrature cannot resolve a quote, and never let a region that leaves quotes
+// unpriceable look competitive with a clean fit.
+// ---------------------------------------------------------------------------
+
+// Forced into a corner it cannot price -- vol-of-variance pinned high, a short
+// maturity, and a low node count, so every quote fails -- the best fit leans entirely
+// on the penalty. It is flagged (relied_on_penalties), and its objective is exactly the
+// failed-quote count times the penalty, so it scales with the penalty and stays far
+// above a clean fit's tiny objective: a penalised fit is never competitive.
+TEST(HestonCalibratorTest, PenaltyGatesAndScalesAFailedFit) {
+    SyntheticSurfaceSpec spec;
+    spec.strikes = {90.0, 100.0, 110.0};
+    spec.maturities = {0.05, 0.5};
+    spec.parameters = params(0.04, 1.5, 0.05, 0.4, -0.6);
+    const auto surface = generate_heston_surface(spec);
+    ASSERT_TRUE(surface.ok()) << surface.error().describe();
+
+    const auto run_with_penalty = [&](double penalty) {
+        CalibrationConfig config;
+        config.pricing =
+            HestonAnalyticConfig{.quadrature_nodes = 32, .convergence_tolerance = 1e-6};
+        config.optimizer.max_iterations = 400;
+        config.quote_penalty = penalty;
+        // Vol-of-variance forced high, where the characteristic-function integrand is
+        // oscillatory and 32 nodes cannot resolve it: the whole feasible box fails.
+        config.bounds.lower.vol_of_variance = 2.5;
+        config.bounds.upper.vol_of_variance = 4.0;
+        config.initial_guesses = {params(0.04, 1.5, 0.05, 3.0, -0.6),
+                                  params(0.03, 2.0, 0.06, 3.5, -0.5)};
+        return calibrate_heston(surface.value(), config);
+    };
+
+    const auto low = run_with_penalty(1.0);
+    const auto high = run_with_penalty(50.0);
+    ASSERT_TRUE(low.ok()) << low.error().describe();
+    ASSERT_TRUE(high.ok()) << high.error().describe();
+
+    // Both leaned on the penalty and are flagged, so neither can be a clean success.
+    EXPECT_TRUE(low.value().relied_on_penalties);
+    EXPECT_TRUE(high.value().relied_on_penalties);
+    EXPECT_GT(low.value().best.quotes_failed, 0);
+
+    // The objective is the failed-quote count times the penalty -- it scales with the
+    // penalty, so raising it keeps a penalised region non-competitive.
+    EXPECT_NEAR(low.value().best.objective_value,
+                static_cast<double>(low.value().best.quotes_failed) * 1.0,
+                1e-9);
+    EXPECT_NEAR(high.value().best.objective_value,
+                static_cast<double>(high.value().best.quotes_failed) * 50.0,
+                1e-9);
+    // And it is far above a good fit's objective (~1e-4), so a clean fit always wins.
+    EXPECT_GT(low.value().best.objective_value, 1.0);
+}
+
+// The penalty shapes the path to the minimum, not the minimum itself: on a clean
+// surface the penalty never triggers, so its magnitude does not move the fit, and the
+// result is not flagged as penalty-reliant.
+TEST(HestonCalibratorTest, PenaltyMagnitudeDoesNotMoveACleanMinimum) {
+    const auto surface = generate_heston_surface(small_spec());
+    ASSERT_TRUE(surface.ok());
+
+    const auto run_with_penalty = [&](double penalty) {
+        CalibrationConfig config = fast_config();
+        config.quote_penalty = penalty;
+        config.initial_guesses = {params(0.03, 1.0, 0.06, 0.5, -0.5),
+                                  params(0.05, 2.0, 0.04, 0.5, -0.7)};
+        return calibrate_heston(surface.value(), config);
+    };
+
+    const auto low = run_with_penalty(1.0);
+    const auto high = run_with_penalty(100.0);
+    ASSERT_TRUE(low.ok());
+    ASSERT_TRUE(high.ok());
+
+    EXPECT_FALSE(low.value().relied_on_penalties);
+    EXPECT_FALSE(high.value().relied_on_penalties);
+    // The clean fit is identical regardless of the penalty magnitude.
+    EXPECT_NEAR(low.value().best.calibrated.vol_of_variance,
+                high.value().best.calibrated.vol_of_variance,
+                1e-6);
+    EXPECT_NEAR(
+        low.value().best.calibrated.correlation, high.value().best.calibrated.correlation, 1e-6);
+}
+
+// ---------------------------------------------------------------------------
 // What is refused, and what is recorded rather than refused
 // ---------------------------------------------------------------------------
 

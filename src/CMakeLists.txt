@@ -12,6 +12,7 @@ add_library(diffusionworks::core ALIAS diffusionworks_core)
 target_sources(
     diffusionworks_core
     PRIVATE calibration/heston_calibrator.cpp
+            calibration/market_dataset.cpp
             calibration/parameter_transform.cpp
             calibration/volatility_surface.cpp
             config/domain_parsers.cpp
