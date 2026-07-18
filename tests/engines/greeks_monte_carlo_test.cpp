@@ -2,6 +2,8 @@
 #include <diffusionworks/engines/black_scholes_analytic.hpp>
 #include <diffusionworks/engines/greeks_monte_carlo.hpp>
 
+#include "support/thread_agreement.hpp"
+
 #include <gtest/gtest.h>
 
 #include <cmath>
@@ -389,12 +391,37 @@ TEST(GreeksMonteCarloThreadingTest, EveryEstimatorAgreesAcrossThreadCounts) {
                 GreeksMonteCarloEngine::estimate(mk, option, md, greek, method, threaded(threads));
             ASSERT_TRUE(many.ok()) << to_string(method) << " " << to_string(greek)
                                    << " threads=" << threads << ": " << many.error().describe();
-            EXPECT_NEAR(many.value().value, one.value().value, 1e-9)
-                << to_string(method) << " " << to_string(greek) << " threads=" << threads;
-            EXPECT_NEAR(many.value().standard_error, one.value().standard_error, 1e-9)
-                << to_string(method) << " " << to_string(greek) << " threads=" << threads;
+            const std::string tag = std::string(to_string(method)) + " " +
+                                    std::string(to_string(greek)) +
+                                    " threads=" + std::to_string(threads);
+            // Scale-aware: a Greek's magnitude ranges from ~0.02 (gamma) to ~40 (vega),
+            // so a relative tolerance is the only one that means the same thing for each.
+            test::expect_mean_agrees(many.value().value, one.value().value, tag + " value");
+            test::expect_error_agrees(
+                many.value().standard_error, one.value().standard_error, tag + " standard error");
         }
     }
+}
+
+// More workers than paths must clamp rather than crash: the CRN estimator for each path
+// is a self-contained contribution, so oversubscription only changes the partition, and
+// the result agrees with the single-thread run to the scale-aware tolerance.
+TEST(GreeksMonteCarloThreadingTest, HandlesMoreThreadsThanPaths) {
+    const auto mk = market();
+    const auto md = model();
+    const auto option = call();
+
+    const auto one = GreeksMonteCarloEngine::estimate(
+        mk, option, md, GreekName::Delta, GreekMethod::FiniteDifference, threaded(1, 64));
+    ASSERT_TRUE(one.ok()) << one.error().describe();
+    const auto many = GreeksMonteCarloEngine::estimate(
+        mk, option, md, GreekName::Delta, GreekMethod::FiniteDifference, threaded(1024, 64));
+    ASSERT_TRUE(many.ok()) << "threads far exceeding paths must clamp, not fail: "
+                           << many.error().describe();
+    test::expect_mean_agrees(many.value().value, one.value().value, "value with threads > paths");
+    test::expect_error_agrees(many.value().standard_error,
+                              one.value().standard_error,
+                              "standard error with threads > paths");
 }
 
 TEST(GreeksMonteCarloThreadingTest, IsBitReproducibleAtAFixedThreadCount) {

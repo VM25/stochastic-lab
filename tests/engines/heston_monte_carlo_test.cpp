@@ -2,6 +2,8 @@
 #include <diffusionworks/engines/heston_analytic.hpp>
 #include <diffusionworks/engines/heston_monte_carlo.hpp>
 
+#include "support/thread_agreement.hpp"
+
 #include <gtest/gtest.h>
 
 #include <cmath>
@@ -354,10 +356,30 @@ TEST(HestonMonteCarloThreadingTest, MatchesTheSingleThreadedResultAcrossThreadCo
         const auto many =
             HestonMonteCarloEngine::price(mk, option, model, threaded(threads, 100, 120000));
         ASSERT_TRUE(many.ok()) << "threads=" << threads << ": " << many.error().describe();
-        EXPECT_NEAR(many.value().value, one.value().value, 1e-9) << "threads=" << threads;
-        EXPECT_NEAR(*many.value().standard_error, *one.value().standard_error, 1e-9)
-            << "threads=" << threads;
+        const std::string tag = "threads=" + std::to_string(threads);
+        test::expect_mean_agrees(many.value().value, one.value().value, tag + " value");
+        test::expect_error_agrees(
+            *many.value().standard_error, *one.value().standard_error, tag + " standard error");
     }
+}
+
+// More workers than paths must clamp rather than crash, and still agree with the
+// single-thread run to the scale-aware tolerance -- the counter-based streams make a
+// path a pure function of (seed, index) whatever the worker count.
+TEST(HestonMonteCarloThreadingTest, HandlesMoreThreadsThanPaths) {
+    const auto mk = market(100.0, 0.05, 0.0);
+    const auto option = call();
+    const auto model = benign();
+
+    const auto one = HestonMonteCarloEngine::price(mk, option, model, threaded(1, 20, 64));
+    ASSERT_TRUE(one.ok()) << one.error().describe();
+    const auto many = HestonMonteCarloEngine::price(mk, option, model, threaded(1024, 20, 64));
+    ASSERT_TRUE(many.ok()) << "threads far exceeding paths must clamp, not fail: "
+                           << many.error().describe();
+    test::expect_mean_agrees(many.value().value, one.value().value, "value with threads > paths");
+    test::expect_error_agrees(*many.value().standard_error,
+                              *one.value().standard_error,
+                              "standard error with threads > paths");
 }
 
 TEST(HestonMonteCarloThreadingTest, IsBitReproducibleAtAFixedThreadCount) {

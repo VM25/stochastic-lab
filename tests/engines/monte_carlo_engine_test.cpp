@@ -3,6 +3,8 @@
 #include <diffusionworks/engines/monte_carlo_engine.hpp>
 #include <diffusionworks/statistics/multi_seed.hpp>
 
+#include "support/thread_agreement.hpp"
+
 #include <gtest/gtest.h>
 
 #include <cmath>
@@ -559,7 +561,10 @@ MonteCarloConfig threaded_config(int threads, bool antithetic = false) {
 }
 
 // One thread is the sequential engine; more threads change the answer only by the
-// reassociation of the merge, which for this run is a few parts in 1e-10.
+// reassociation of the merge. The agreement is checked against a scale-aware tolerance
+// (support/thread_agreement.hpp): relative to the price and the standard error, not a
+// universal absolute constant, because reassociation scales with the magnitude of the
+// reduced quantity.
 TEST(MonteCarloThreadingTest, MatchesTheSingleThreadedResultAcrossThreadCounts) {
     const auto market = MarketState::create(100.0, 0.05, 0.0).value();
     const auto option = EuropeanOption::create(OptionType::Call, 100.0, 1.0).value();
@@ -571,12 +576,36 @@ TEST(MonteCarloThreadingTest, MatchesTheSingleThreadedResultAcrossThreadCounts) 
     for (const int threads : {2, 4, 8}) {
         const auto many = MonteCarloEngine::price(market, option, model, threaded_config(threads));
         ASSERT_TRUE(many.ok()) << "threads=" << threads << ": " << many.error().describe();
-        // The same paths, so the same price up to the documented reassociation of the
-        // reduction, and the same standard error to the same tolerance.
-        EXPECT_NEAR(many.value().value, one.value().value, 1e-9) << "threads=" << threads;
-        EXPECT_NEAR(*many.value().standard_error, *one.value().standard_error, 1e-9)
-            << "threads=" << threads;
+        const std::string tag = "threads=" + std::to_string(threads);
+        test::expect_mean_agrees(many.value().value, one.value().value, tag + " value");
+        test::expect_error_agrees(
+            *many.value().standard_error, *one.value().standard_error, tag + " standard error");
     }
+}
+
+// More workers than paths must be valid, not a crash: effective_worker_count clamps
+// the worker count to the path count, so there are no empty blocks, and the result
+// agrees with the single-thread run to the scale-aware tolerance. 1024 workers over 64
+// paths is a 16x oversubscription.
+TEST(MonteCarloThreadingTest, HandlesMoreThreadsThanPaths) {
+    const auto market = MarketState::create(100.0, 0.05, 0.0).value();
+    const auto option = EuropeanOption::create(OptionType::Call, 100.0, 1.0).value();
+    const auto model = BlackScholesModel::create(0.2).value();
+
+    MonteCarloConfig few = config_with(64, 1, kSeed);
+    few.threads = 1;
+    const auto one = MonteCarloEngine::price(market, option, model, few);
+    ASSERT_TRUE(one.ok()) << one.error().describe();
+
+    MonteCarloConfig oversubscribed = config_with(64, 1, kSeed);
+    oversubscribed.threads = 1024;
+    const auto many = MonteCarloEngine::price(market, option, model, oversubscribed);
+    ASSERT_TRUE(many.ok()) << "threads far exceeding paths must clamp, not fail: "
+                           << many.error().describe();
+    test::expect_mean_agrees(many.value().value, one.value().value, "value with threads > paths");
+    test::expect_error_agrees(*many.value().standard_error,
+                              *one.value().standard_error,
+                              "standard error with threads > paths");
 }
 
 // A fixed thread count is bit-for-bit reproducible: the partition and the reduction
@@ -605,7 +634,7 @@ TEST(MonteCarloThreadingTest, AntitheticIsConsistentAcrossThreadCounts) {
     const auto many = MonteCarloEngine::price(market, option, model, threaded_config(8, true));
     ASSERT_TRUE(one.ok()) << one.error().describe();
     ASSERT_TRUE(many.ok()) << many.error().describe();
-    EXPECT_NEAR(many.value().value, one.value().value, 1e-9);
+    test::expect_mean_agrees(many.value().value, one.value().value, "antithetic value");
 }
 
 TEST(MonteCarloThreadingTest, RejectsAnInvalidThreadCount) {
@@ -668,10 +697,11 @@ TEST(MonteCarloAsianThreadingTest, ControlVariateAgreesAcrossThreadCounts) {
         ASSERT_TRUE(many.ok()) << "threads=" << threads << ": " << many.error().describe();
 
         // The same production paths, so the price and its standard error agree up to
-        // the documented reassociation of the reduction.
-        EXPECT_NEAR(many.value().value, one.value().value, 1e-9) << "threads=" << threads;
-        EXPECT_NEAR(*many.value().standard_error, *one.value().standard_error, 1e-9)
-            << "threads=" << threads;
+        // the documented reassociation of the reduction, to a scale-aware tolerance.
+        const std::string tag = "threads=" + std::to_string(threads);
+        test::expect_mean_agrees(many.value().value, one.value().value, tag + " value");
+        test::expect_error_agrees(
+            *many.value().standard_error, *one.value().standard_error, tag + " standard error");
 
         // The pilot is sequential, so beta, the control expectation, and the pilot
         // correlation are the *same bits* regardless of how the main loop partitions.
@@ -718,8 +748,10 @@ TEST(MonteCarloAsianThreadingTest, ControlAndAntitheticCombinedAgreeAcrossThread
         MonteCarloEngine::price(market, option, model, threaded_asian_config(8, true, true));
     ASSERT_TRUE(one.ok()) << one.error().describe();
     ASSERT_TRUE(many.ok()) << many.error().describe();
-    EXPECT_NEAR(many.value().value, one.value().value, 1e-9);
-    EXPECT_NEAR(*many.value().standard_error, *one.value().standard_error, 1e-9);
+    test::expect_mean_agrees(many.value().value, one.value().value, "control+antithetic value");
+    test::expect_error_agrees(*many.value().standard_error,
+                              *one.value().standard_error,
+                              "control+antithetic standard error");
 }
 
 // The non-positive-state diagnostic must survive partitioning: the pilot's

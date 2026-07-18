@@ -36,9 +36,22 @@ race-free.
   is not associative, so combining `T` partial accumulators is not bit-identical to a
   single sequential pass. The difference is the reassociation of an exact reduction --
   **a documented numerical effect, not a race**. In practice it is a few parts in
-  `10^-10` on a `2*10^5`-path European price, far below the Monte Carlo standard error
-  (order `10^-2`), so it never affects a reported figure or its confidence interval. The
-  regression tests assert cross-thread agreement to `1e-9`.
+  `10^-13` on the mean and `10^-7` on the standard error, far below the Monte Carlo
+  standard error (order `10^-2`), so it never affects a reported figure or its
+  confidence interval.
+
+  The regression tests assert this with a **scale-aware** tolerance
+  (`tests/support/thread_agreement.hpp`), not a universal absolute constant: the bound
+  is relative to the magnitude of the quantity, because reassociation scales with it. A
+  mean-like estimator (a price, a Greek that ranges from `~0.02` gamma to `~40` vega) is
+  checked to `1e-9` relative; a standard error, whose variance accumulation carries more
+  cancellation, to `1e-5` relative -- both far above the reassociation actually observed
+  and far below the relative move a real data race would cause (`~10^-2` or more), so the
+  tolerance cannot mask a genuine disagreement while meaning the same thing across
+  engines whose figures span several orders of magnitude. Quantities that reduce
+  *exactly* -- warnings, failure statuses, path counts, knockout counts, and the Heston
+  variance diagnostics (integer sums and a `min`) -- are asserted bit-identical, not to a
+  tolerance.
 
 This is the distinction the exit gate asks to be documented: changing the thread count
 can change the last few bits of the estimate, and that is expected and bounded; it can

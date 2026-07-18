@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+#
+# Pre-commit formatting guard.
+#
+# Rejects a commit whose staged C++ would fail the pinned clang-format, so a
+# formatting slip is caught here -- before the commit exists -- rather than as a red
+# `clang-format` CI job discovered after several commits have already gone out. In
+# Phase 12 four engine increments were committed unformatted and each went red on the
+# fast (~7s) clang-format CI job while every substantive gate passed; this hook closes
+# that gap.
+#
+# Only clang-format runs here. It is fast (sub-second on a handful of files). The
+# slower checks -- clang-tidy, include hygiene -- stay in scripts/lint.sh and CI,
+# because a multi-minute pre-commit hook would just get bypassed with --no-verify.
+#
+# Enable once per clone:
+#
+#   git config core.hooksPath scripts/git-hooks
+#
+# The tool must be the pinned version, exactly as scripts/lint.sh documents:
+#
+#   pip install 'clang-format==20.1.7'
+#
+# A different major version formats differently, so an unpinned tool would make this
+# hook and CI disagree.
+
+set -euo pipefail
+
+cd "$(git rev-parse --show-toplevel)"
+
+find_clang_format() {
+    if command -v clang-format > /dev/null 2>&1; then
+        command -v clang-format
+        return 0
+    fi
+    # pip --user installs land outside PATH on some systems (matches scripts/lint.sh).
+    local candidate
+    for candidate in "$HOME/Library/Python/"*/bin/clang-format "$HOME/.local/bin/clang-format"; do
+        if [[ -x $candidate ]]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+CLANG_FORMAT=$(find_clang_format || true)
+if [[ -z ${CLANG_FORMAT:-} ]]; then
+    echo "pre-commit: clang-format not found; skipping the format check." >&2
+    echo "            install it with: pip install 'clang-format==20.1.7'" >&2
+    # A missing tool must not silently block committing; CI still enforces formatting.
+    exit 0
+fi
+
+# Staged, added/copied/modified C++ under the first-party trees only. The extension
+# and directory filter is a grep rather than a git pathspec, because pathspec wildcard
+# semantics vary between git versions while this grep does not.
+STAGED=()
+while IFS= read -r file; do
+    [[ -n $file ]] && STAGED+=("$file")
+done < <(git diff --cached --name-only --diff-filter=ACM \
+    | grep -E '^(include|src|tests|benchmarks)/.*\.(hpp|cpp)$' | sort || true)
+
+if [[ ${#STAGED[@]} -eq 0 ]]; then
+    exit 0
+fi
+
+if ! "$CLANG_FORMAT" --dry-run --Werror --style=file "${STAGED[@]}"; then
+    echo "" >&2
+    echo "pre-commit: the staged files above are not clang-format-clean." >&2
+    echo "            fix them with:  scripts/lint.sh --fix   (or clang-format -i)" >&2
+    echo "            then re-stage and commit. To bypass (not recommended): --no-verify" >&2
+    exit 1
+fi
+
+exit 0

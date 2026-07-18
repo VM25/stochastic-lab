@@ -4,6 +4,8 @@
 #include <diffusionworks/engines/black_scholes_analytic.hpp>
 #include <diffusionworks/engines/monte_carlo_engine.hpp>
 
+#include "support/thread_agreement.hpp"
+
 #include <gtest/gtest.h>
 
 #include <cmath>
@@ -567,9 +569,10 @@ TEST(BarrierMonteCarloThreadingTest, BridgeConventionAgreesAcrossThreadCounts) {
         const auto many =
             BarrierMonteCarloEngine::price(market(), option, model(), threaded(threads));
         ASSERT_TRUE(many.ok()) << "threads=" << threads << ": " << many.error().describe();
-        EXPECT_NEAR(many.value().value, one.value().value, 1e-9) << "threads=" << threads;
-        EXPECT_NEAR(*many.value().standard_error, *one.value().standard_error, 1e-9)
-            << "threads=" << threads;
+        const std::string tag = "threads=" + std::to_string(threads);
+        test::expect_mean_agrees(many.value().value, one.value().value, tag + " value");
+        test::expect_error_agrees(
+            *many.value().standard_error, *one.value().standard_error, tag + " standard error");
 
         // The knock counts are exact integer reductions: identical, not merely close.
         EXPECT_EQ(integer_diagnostic(many.value(), "knocked_at_observation"), at_obs)
@@ -595,7 +598,8 @@ TEST(BarrierMonteCarloThreadingTest, DiscreteConventionAgreesAcrossThreadCounts)
         const auto many =
             BarrierMonteCarloEngine::price(market(), option, model(), threaded(threads));
         ASSERT_TRUE(many.ok()) << "threads=" << threads << ": " << many.error().describe();
-        EXPECT_NEAR(many.value().value, one.value().value, 1e-9) << "threads=" << threads;
+        const std::string tag = "threads=" + std::to_string(threads);
+        test::expect_mean_agrees(many.value().value, one.value().value, tag + " value");
         EXPECT_EQ(integer_diagnostic(many.value(), "knocked_at_observation"), at_obs)
             << "threads=" << threads;
         EXPECT_EQ(integer_diagnostic(many.value(), "knocked_by_bridge_only"), 0)
@@ -623,6 +627,28 @@ TEST(BarrierMonteCarloThreadingTest, RejectsAnInvalidThreadCount) {
     const auto priced = BarrierMonteCarloEngine::price(market(), option, model(), threaded(0));
     ASSERT_FALSE(priced.ok());
     EXPECT_EQ(priced.error().code, ErrorCode::InvalidArgument);
+}
+
+// More workers than paths must clamp rather than crash, even with the early-knockout
+// break in play: each path's monitoring loop is self-contained, so oversubscription
+// only changes the partition. The knock counts stay bit-identical and the price agrees
+// to the scale-aware tolerance.
+TEST(BarrierMonteCarloThreadingTest, HandlesMoreThreadsThanPaths) {
+    const auto option =
+        monitored(BarrierType::DownAndOut, MonitoringConvention::BrownianBridge, 90.0, 25);
+
+    const auto one = BarrierMonteCarloEngine::price(market(), option, model(), threaded(1, 64));
+    ASSERT_TRUE(one.ok()) << one.error().describe();
+    const auto many = BarrierMonteCarloEngine::price(market(), option, model(), threaded(1024, 64));
+    ASSERT_TRUE(many.ok()) << "threads far exceeding paths must clamp, not fail: "
+                           << many.error().describe();
+    test::expect_mean_agrees(many.value().value, one.value().value, "value with threads > paths");
+    EXPECT_EQ(integer_diagnostic(many.value(), "knocked_at_observation"),
+              integer_diagnostic(one.value(), "knocked_at_observation"))
+        << "the observation-knock count moved under oversubscription";
+    EXPECT_EQ(integer_diagnostic(many.value(), "knocked_by_bridge_only"),
+              integer_diagnostic(one.value(), "knocked_by_bridge_only"))
+        << "the bridge-only knock count moved under oversubscription";
 }
 
 }  // namespace

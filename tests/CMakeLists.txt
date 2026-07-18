@@ -22,6 +22,11 @@ function(add_dw_test target_name)
 
     add_executable(${target_name} ${ARG_SOURCES})
 
+    # Header-only test support (e.g. support/thread_agreement.hpp) lives alongside the
+    # tests and is included as "support/...". Adding the tests root to the include path
+    # keeps that a stable, source-relative include rather than a fragile "../" chain.
+    target_include_directories(${target_name} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+
     # GTest::gtest_main already carries GTest::gtest, and the targets in ARG_LIBS
     # already carry diffusionworks::core; naming either again only produces a
     # duplicate on the link line.
