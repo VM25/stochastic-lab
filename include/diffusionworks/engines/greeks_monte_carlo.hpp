@@ -58,6 +58,17 @@ struct GreeksMonteCarloConfig {
 
     /// The volatility bump for finite-difference vega, in absolute volatility units.
     double volatility_bump{1e-2};
+
+    /// Worker threads for the path loop. One is sequential and bit-identical to the
+    /// single-threaded engine (ADR-011). More partition the paths deterministically
+    /// across fixed workers with thread-local accumulators reduced in block order, so a
+    /// fixed thread count is reproducible and different counts differ only by the
+    /// floating-point reassociation of the merge -- a documented effect, not a race.
+    /// Each path's whole common-random-number contribution (every bumped re-price
+    /// sharing that path's one draw) is computed for a single index and added to one
+    /// accumulator, so partitioning by index keeps each estimator contribution within a
+    /// single worker: the shared draw is never split across threads.
+    int threads{1};
 };
 
 /// One estimator's answer: a value, its sampling uncertainty, and what it cost.

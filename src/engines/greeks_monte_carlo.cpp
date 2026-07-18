@@ -1,3 +1,4 @@
+#include <diffusionworks/concurrency/parallel_reduce.hpp>
 #include <diffusionworks/engines/greeks_monte_carlo.hpp>
 #include <diffusionworks/random/random_stream.hpp>
 #include <diffusionworks/statistics/online_moments.hpp>
@@ -6,6 +7,7 @@
 
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -134,6 +136,12 @@ Result<GreekEstimate> GreeksMonteCarloEngine::estimate(const MarketState& market
             fmt::format("a Monte Carlo Greek needs at least 2 paths to have a standard error, got "
                         "{}",
                         config.paths),
+            kContext);
+    }
+    if (config.threads < 1 || config.threads > 1024) {
+        return Result<GreekEstimate>::failure(
+            ErrorCode::InvalidArgument,
+            fmt::format("threads must be between 1 and 1024 but is {}", config.threads),
             kContext);
     }
 
@@ -300,11 +308,29 @@ Result<GreekEstimate> GreeksMonteCarloEngine::estimate(const MarketState& market
         return 0.0;
     };
 
-    OnlineMoments samples;
-    for (std::int64_t i = 0; i < config.paths; ++i) {
+    // Each worker accumulates into its own OnlineMoments; nothing is shared and
+    // mutated across workers (ADR-011). The `contribution` lambda only *reads* the
+    // shared const inputs, so there is no data race, and the whole common-random-number
+    // estimator for a path -- every bumped re-price against that path's single draw --
+    // is evaluated inside one `contribution` call, so it stays within one worker and one
+    // accumulator. The stream is keyed by (seed, AssetShock, index), so a path draws the
+    // same normal in whichever worker owns it.
+    struct Local {
+        OnlineMoments samples;
+    };
+    const auto make_local = [] { return Local{}; };
+    const auto body = [&](std::int64_t i, Local& local) -> Status {
         RandomStream stream(config.seed, StreamPurpose::AssetShock, static_cast<std::uint64_t>(i));
-        samples.add(contribution(stream.next_normal()));
+        local.samples.add(contribution(stream.next_normal()));
+        return Status::success();
+    };
+    const auto reduce = [](Local& into, const Local& from) { into.samples.merge(from.samples); };
+
+    auto reduced = parallel_reduce<Local>(config.paths, config.threads, make_local, body, reduce);
+    if (!reduced.ok()) {
+        return Result<GreekEstimate>::failure(reduced.error());
     }
+    const OnlineMoments& samples = reduced.value().samples;
 
     const auto standard_error = samples.standard_error();
     if (!standard_error.ok()) {

@@ -145,6 +145,9 @@ Result<nlohmann::json> run_greeks(const ConfigDocument& config, const Options& o
         }
         mc.paths = value.value();
     }
+    if (options.threads.has_value()) {
+        mc.threads = static_cast<int>(options.threads.value());
+    }
 
     // --- The seed set -------------------------------------------------------
     //

@@ -343,5 +343,80 @@ TEST(GreeksMonteCarloTest, EveryEstimateCarriesUncertaintyAndRuntime) {
     EXPECT_EQ(estimate.value().paths, 200000);
 }
 
+// ---------------------------------------------------------------------------
+// Multithreading (Phase 12)
+//
+// The path loop runs across deterministic worker partitions with thread-local
+// accumulators reduced in block order (ADR-011). One thread is the sequential
+// reference; a fixed thread count is reproducible; different counts agree up to the
+// reassociation of the merge. Crucially, each path's whole common-random-number
+// contribution -- for the finite-difference estimators the up and down (and, for
+// gamma, mid) re-prices against the path's single shared draw -- is computed inside
+// one `contribution` call, so it stays within one worker and one accumulator. Were
+// the paired re-prices split across threads they would decorrelate and the estimate
+// would move far more than reassociation, which the 1e-9 cross-count agreement rules
+// out.
+// ---------------------------------------------------------------------------
+
+GreeksMonteCarloConfig
+threaded(int threads, std::int64_t paths = 120000, std::uint64_t seed = 20260717) {
+    GreeksMonteCarloConfig c = config(paths, seed);
+    c.threads = threads;
+    return c;
+}
+
+TEST(GreeksMonteCarloThreadingTest, EveryEstimatorAgreesAcrossThreadCounts) {
+    const auto mk = market();
+    const auto md = model();
+    const auto option = call();
+
+    const std::tuple<GreekName, GreekMethod> cases[] = {
+        {GreekName::Delta, GreekMethod::FiniteDifference},
+        {GreekName::Gamma, GreekMethod::FiniteDifference},
+        {GreekName::Vega, GreekMethod::FiniteDifference},
+        {GreekName::Delta, GreekMethod::Pathwise},
+        {GreekName::Vega, GreekMethod::Pathwise},
+        {GreekName::Delta, GreekMethod::LikelihoodRatio},
+    };
+
+    for (const auto& [greek, method] : cases) {
+        const auto one =
+            GreeksMonteCarloEngine::estimate(mk, option, md, greek, method, threaded(1));
+        ASSERT_TRUE(one.ok()) << one.error().describe();
+
+        for (const int threads : {2, 4, 8}) {
+            const auto many =
+                GreeksMonteCarloEngine::estimate(mk, option, md, greek, method, threaded(threads));
+            ASSERT_TRUE(many.ok()) << to_string(method) << " " << to_string(greek)
+                                   << " threads=" << threads << ": " << many.error().describe();
+            EXPECT_NEAR(many.value().value, one.value().value, 1e-9)
+                << to_string(method) << " " << to_string(greek) << " threads=" << threads;
+            EXPECT_NEAR(many.value().standard_error, one.value().standard_error, 1e-9)
+                << to_string(method) << " " << to_string(greek) << " threads=" << threads;
+        }
+    }
+}
+
+TEST(GreeksMonteCarloThreadingTest, IsBitReproducibleAtAFixedThreadCount) {
+    const auto mk = market();
+    const auto md = model();
+    const auto option = call();
+    const auto first = GreeksMonteCarloEngine::estimate(
+        mk, option, md, GreekName::Delta, GreekMethod::FiniteDifference, threaded(4));
+    const auto second = GreeksMonteCarloEngine::estimate(
+        mk, option, md, GreekName::Delta, GreekMethod::FiniteDifference, threaded(4));
+    ASSERT_TRUE(first.ok());
+    ASSERT_TRUE(second.ok());
+    EXPECT_EQ(first.value().value, second.value().value);
+    EXPECT_EQ(first.value().standard_error, second.value().standard_error);
+}
+
+TEST(GreeksMonteCarloThreadingTest, RejectsAnInvalidThreadCount) {
+    const auto estimate = GreeksMonteCarloEngine::estimate(
+        market(), call(), model(), GreekName::Delta, GreekMethod::Pathwise, threaded(0));
+    ASSERT_FALSE(estimate.ok());
+    EXPECT_EQ(estimate.error().code, ErrorCode::InvalidArgument);
+}
+
 }  // namespace
 }  // namespace diffusionworks
