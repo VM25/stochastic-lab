@@ -74,6 +74,9 @@ COOLDOWN_HIGH_MIN_S = 45  # minimum cool-down after a >= 4-thread case
 COOLDOWN_LOW_MIN_S = 10
 COOLDOWN_RESTORE_MAX_S = 900  # bound on restoring conditions after the minimum cool-down
 MAX_CASE_RETRIES = 3
+MAX_REAL_ATTEMPTS = 3    # the stopping rule: completed-or-session-void controlled runs
+WAITING_RETRY_S = 300    # after a waiting-only void, pause before re-soaking
+TOTAL_HORIZON_S = 6 * 3600  # bound the whole unattended wait (not indefinite)
 SPREAD_GATE = 0.05       # session-to-session median spread
 CV_GATE = 0.03           # within-case coefficient of variation
 POSITION_CORR_GATE = 0.30   # |Pearson(position, residual)| above this is order drift
@@ -239,10 +242,14 @@ def inject_metadata(context: dict, planned: list, actual: list) -> None:
     context["dw_actual_order"] = [f"{e}/{t}" for e, t in actual]
 
 
-def capture_session(index: int, session_dir: pathlib.Path) -> dict | None:
+def capture_session(index: int, session_dir: pathlib.Path) -> tuple[str, dict | None]:
+    """Returns (status, data): "ok" with the merged record, "void_waiting" if the soak
+    could not reach controlled conditions (no session began -- not an attempt), or
+    "void_started" if the session began but external interference then made a case or a
+    cool-down impossible (a voided environmental *attempt*)."""
     session_dir.mkdir(parents=True, exist_ok=True)
     if not soak(SOAK_HOLD_S, f"session{index}", SOAK_MAX_WAIT_S):
-        return None
+        return "void_waiting", None
 
     planned = balanced_schedule(index)
     actual: list[tuple[str, int]] = []
@@ -261,11 +268,11 @@ def capture_session(index: int, session_dir: pathlib.Path) -> dict | None:
                 break
             log(f"    retry {engine}/{threads} ({attempt}/{MAX_CASE_RETRIES}) after cool-down")
             if not cool_down(COOLDOWN_HIGH_MIN_S, f"retry-{engine}-{threads}"):
-                log(f"session{index}: conditions unrestorable during retry -> VOID_ENVIRONMENT")
-                return None
+                log(f"session{index}: conditions unrestorable during retry -> void_started")
+                return "void_started", None
         if record is None:
-            log(f"session{index}: {engine}/{threads} retries exhausted -> VOID_ENVIRONMENT")
-            return None
+            log(f"session{index}: {engine}/{threads} retries exhausted -> void_started")
+            return "void_started", None
 
         if context is None:
             context = dict(record["context"])
@@ -280,8 +287,8 @@ def capture_session(index: int, session_dir: pathlib.Path) -> dict | None:
         if not cool_down(
             COOLDOWN_HIGH_MIN_S if threads >= 4 else COOLDOWN_LOW_MIN_S, f"{engine}-{threads}"
         ):
-            log(f"session{index}: conditions unrestorable after case -> VOID_ENVIRONMENT")
-            return None
+            log(f"session{index}: conditions unrestorable after case -> void_started")
+            return "void_started", None
 
     assert context is not None
     inject_metadata(context, planned, actual)
@@ -289,7 +296,7 @@ def capture_session(index: int, session_dir: pathlib.Path) -> dict | None:
     merged = {"context": context, "benchmarks": merged_benchmarks}
     (session_dir / "session.json").write_text(json.dumps(merged, indent=2) + "\n")
     log(f"session{index}: complete")
-    return merged
+    return "ok", merged
 
 
 def parse(record: dict) -> dict[tuple[str, int], dict]:
@@ -389,41 +396,85 @@ def evaluate(sessions: list[dict]) -> str:
     return verdict
 
 
-def main() -> int:
-    SCRATCH.mkdir(parents=True, exist_ok=True)
-    run_dir = SCRATCH / f"run-{datetime.datetime.now():%Y%m%d-%H%M%S}"
+def one_controlled_run(run_dir: pathlib.Path) -> tuple[str, list[dict]]:
+    """One full 3-session capture. Returns (outcome, sessions):
+      "accepted"       -- three sessions passed every gate;
+      "reject"         -- three sessions completed but failed cv/spread/order (an attempt);
+      "void_started"   -- a session began then interference voided it (an attempt);
+      "void_waiting"   -- the soak never reached controlled conditions (NOT an attempt)."""
     run_dir.mkdir(parents=True, exist_ok=True)
-    log(f"=== controlled scaling capture, {SESSIONS} sessions -> {run_dir} ===")
-    log(f"note: {THERMAL_PROBE_NOTE}")
-
-    if not BIN.exists():
-        log(f"error: benchmark binary missing ({BIN}); build the benchmark preset first")
-        return 2
-
     sessions: list[dict] = []
     for index in range(SESSIONS):
         if index > 0:
             log(f"inter-session idle: {INTER_SESSION_IDLE_S}s (not back-to-back)")
             time.sleep(INTER_SESSION_IDLE_S)
-        session = capture_session(index, run_dir / f"session{index}")
-        if session is None:
-            (run_dir / "VERDICT").write_text("VOID_ENVIRONMENT\n")
-            log("run VOID_ENVIRONMENT: could not hold controlled conditions")
-            return 3
-        sessions.append(session)
-
+        status, data = capture_session(index, run_dir / f"session{index}")
+        if status != "ok":
+            (run_dir / "VERDICT").write_text(
+                ("VOID_ENVIRONMENT (session began)\n" if status == "void_started"
+                 else "VOID_ENVIRONMENT (waiting only)\n")
+            )
+            return status, sessions
+        assert data is not None
+        sessions.append(data)
     verdict = evaluate(sessions)
     (run_dir / "VERDICT").write_text(verdict + "\n")
+    return ("accepted" if verdict == "ACCEPTED" else "reject"), sessions
 
-    if verdict == "ACCEPTED":
-        CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
-        for i, session in enumerate(sessions):
-            (CAPTURE_DIR / f"monte_carlo_scaling.controlled_session{i}.json").write_text(
-                json.dumps(session, indent=2) + "\n"
-            )
-        log(f"wrote {SESSIONS} accepted session records to {CAPTURE_DIR} for review and commit")
-        return 0
-    log(f"rejected run kept in {run_dir} as methodological evidence; nothing published")
+
+def main() -> int:
+    """Persistent unattended waiter (points 4, 5). Re-soaks after a waiting-only void
+    without spending an attempt; counts a completed rejection or a session-began void as
+    one of the three attempts; stops on acceptance, on three attempts (move the harness
+    unchanged to a dedicated machine), or when the total horizon is exceeded."""
+    SCRATCH.mkdir(parents=True, exist_ok=True)
+    log("=== persistent controlled scaling waiter ===")
+    log(f"note: {THERMAL_PROBE_NOTE}")
+    if not BIN.exists():
+        log(f"error: benchmark binary missing ({BIN}); build the benchmark preset first")
+        return 2
+
+    started = time.monotonic()
+    attempts = 0  # completed rejections + session-began voids (point 5)
+    waiting_voids = 0
+    while attempts < MAX_REAL_ATTEMPTS and (time.monotonic() - started) < TOTAL_HORIZON_S:
+        run_dir = SCRATCH / f"run-{datetime.datetime.now():%Y%m%d-%H%M%S}"
+        outcome, sessions = one_controlled_run(run_dir)
+
+        if outcome == "accepted":
+            CAPTURE_DIR.mkdir(parents=True, exist_ok=True)
+            for i, session in enumerate(sessions):
+                (CAPTURE_DIR / f"monte_carlo_scaling.controlled_session{i}.json").write_text(
+                    json.dumps(session, indent=2) + "\n"
+                )
+            log(f"ACCEPTED after {attempts} prior attempt(s); wrote records to {CAPTURE_DIR}")
+            (SCRATCH / "FINAL_VERDICT").write_text("ACCEPTED\n")
+            return 0
+
+        if outcome == "void_waiting":
+            waiting_voids += 1
+            log(f"waiting-only void #{waiting_voids} (not an attempt); re-soaking in {WAITING_RETRY_S}s")
+            time.sleep(WAITING_RETRY_S)
+            continue
+
+        # "reject" or "void_started" both consume one real attempt, distinction preserved.
+        attempts += 1
+        log(f"real attempt {attempts}/{MAX_REAL_ATTEMPTS} outcome: {outcome.upper()}")
+
+    if attempts >= MAX_REAL_ATTEMPTS:
+        msg = (
+            f"UNSUITABLE_MOVE_TO_DEDICATED: {MAX_REAL_ATTEMPTS} controlled attempts did not "
+            "produce an accepted multi-thread baseline; move the harness UNCHANGED to a "
+            "dedicated fixed machine."
+        )
+    else:
+        msg = (
+            f"HORIZON_EXCEEDED: {TOTAL_HORIZON_S // 3600}h elapsed with {waiting_voids} "
+            "waiting-only voids and no controlled window; the machine stayed in use. "
+            "Re-arm later or use a dedicated machine."
+        )
+    log(msg)
+    (SCRATCH / "FINAL_VERDICT").write_text(msg + "\n")
     return 1
 
 
