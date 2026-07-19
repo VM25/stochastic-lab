@@ -85,6 +85,8 @@ TOTAL_HORIZON_S = 6 * 3600
 
 SPREAD_GATE = 0.05
 CV_GATE = 0.03
+MIN_CPU_SAMPLES = 2          # a case with fewer monitoring samples is rejected (point 3)
+SOAK_MEDIAN_DRIFT_GATE = 15.0  # reject if a later session's soak median shifts this much (point 1)
 POSITION_CORR_GATE = 0.30
 SESSION_DRIFT_GATE = 0.03
 AGG_CORR_GATE = 0.30      # effect-size threshold on |Pearson(agg cpu, residual)|
@@ -236,10 +238,12 @@ def derive_ceiling(samples: list[float]) -> tuple[float, float, float]:
 
 def run_case(
     engine: str, threads: int, out_path: pathlib.Path, agg_ceiling: float
-) -> tuple[dict, float, float, float] | None:
+) -> tuple[dict, float, float, float, int] | None:
     """Run one isolated, warmed-up case; monitor unrelated interference throughout against
     the frozen aggregate ceiling (points 2-4). Returns (record, max aggregate unrelated
-    %CPU, mean aggregate unrelated %CPU, max single unrelated %CPU), or None if aborted."""
+    %CPU, mean aggregate unrelated %CPU, max single unrelated %CPU, monitoring-sample
+    count), or None if aborted -- including when too few monitoring samples were collected
+    to trust the case."""
     proc = subprocess.Popen(
         [
             str(BIN),
@@ -280,9 +284,13 @@ def run_case(
     if proc.returncode != 0:
         log(f"    ABORT {engine}/{threads}: process exit {proc.returncode}")
         return None
-    max_agg = max(agg_samples) if agg_samples else 0.0
-    mean_agg = sum(agg_samples) / len(agg_samples) if agg_samples else 0.0
-    return json.loads(out_path.read_text()), max_agg, mean_agg, peak_max
+    if len(agg_samples) < MIN_CPU_SAMPLES:
+        log(f"    ABORT {engine}/{threads}: only {len(agg_samples)} monitoring sample(s) "
+            f"(< {MIN_CPU_SAMPLES}); the case is too short to trust")
+        return None
+    max_agg = max(agg_samples)
+    mean_agg = sum(agg_samples) / len(agg_samples)
+    return json.loads(out_path.read_text()), max_agg, mean_agg, peak_max, len(agg_samples)
 
 
 def _rotate(seq: list, k: int) -> list:
@@ -329,6 +337,8 @@ def run_session(
     context: dict | None = None
     positions: dict[str, int] = {}
     unrelated: dict[str, dict] = {}
+    retries: dict[str, int] = {}
+    total_aborts = 0
 
     for position, (engine, threads) in enumerate(planned):
         out_path = session_dir / f"case_{engine}_{threads}.json"
@@ -337,6 +347,8 @@ def run_session(
             result = run_case(engine, threads, out_path, ceiling)
             if result is not None:
                 break
+            total_aborts += 1
+            retries[f"{engine}/{threads}"] = attempt
             log(f"    retry {engine}/{threads} ({attempt}/{MAX_CASE_RETRIES}) after cool-down")
             if not cool_down(COOLDOWN_HIGH_MIN_S, f"retry-{engine}-{threads}"):
                 return "void_started", None
@@ -344,7 +356,7 @@ def run_session(
             log(f"session{index}: {engine}/{threads} retries exhausted -> void_started")
             return "void_started", None
 
-        record, max_agg, mean_agg, max_proc = result
+        record, max_agg, mean_agg, max_proc, n_samples = result
         if context is None:
             context = dict(record["context"])
         merged_benchmarks.extend(record["benchmarks"])
@@ -353,6 +365,7 @@ def run_session(
             "max_agg": round(max_agg, 1),
             "mean_agg": round(mean_agg, 1),
             "max_proc": round(max_proc, 1),
+            "n_samples": n_samples,
         }
         actual.append((engine, threads))
         median_ms = next(
@@ -369,12 +382,14 @@ def run_session(
     assert context is not None
     inject_metadata(context, planned, actual, unrelated)
     context["dw_case_positions"] = positions
-    context["dw_agg_soak_median"] = round(ceiling_info[0], 1)
+    context["dw_agg_soak_median"] = round(ceiling_info[0], 1)  # this session's own soak
     context["dw_agg_soak_mad"] = round(ceiling_info[1], 1)
-    context["dw_agg_incase_ceiling"] = round(ceiling, 1)
+    context["dw_agg_incase_ceiling"] = round(ceiling, 1)       # frozen from session 0
+    context["dw_case_aborts"] = total_aborts
+    context["dw_case_retries"] = retries
     merged = {"context": context, "benchmarks": merged_benchmarks}
     (session_dir / "session.json").write_text(json.dumps(merged, indent=2) + "\n")
-    log(f"session{index}: complete")
+    log(f"session{index}: complete ({total_aborts} case abort(s)/retries)")
     return "ok", merged
 
 
@@ -446,6 +461,27 @@ def evaluate(sessions: list[dict]) -> str:
     if len(commits) != 1 or len(topos) != 1:
         log(f"VACUOUS: inconsistent metadata (commits={commits}, topologies={topos})")
         vacuous = True
+
+    # Point 1: every session's soak median is recorded; a later session whose soak median
+    # shifts materially from session 0 signals a changed environment across sessions.
+    soak_medians = [s["context"].get("dw_agg_soak_median") for s in sessions]
+    if any(m is None for m in soak_medians):
+        log("VACUOUS: a session is missing its soak median")
+        vacuous = True
+    else:
+        drift = [abs(m - soak_medians[0]) for m in soak_medians]
+        log(f"soak:    medians {soak_medians}%, drift-from-s0 {[round(d, 1) for d in drift]}% "
+            f"(gate <{SOAK_MEDIAN_DRIFT_GATE}%)")
+        if max(drift) > SOAK_MEDIAN_DRIFT_GATE:
+            log("  REJECT: a later session's soak median shifted materially from session 0")
+            vacuous = True
+
+    # Point 3: every accepted case must carry enough monitoring samples.
+    for i, s in enumerate(sessions):
+        for case, stats in s["context"].get("dw_case_unrelated_cpu", {}).items():
+            if stats.get("n_samples", 0) < MIN_CPU_SAMPLES:
+                log(f"VACUOUS: session{i} {case} has {stats.get('n_samples')} monitoring samples")
+                vacuous = True
 
     log("acceptance evaluation (medians in ms):")
     log(f"{'engine':<24}{'thr':>4}" + "".join(f"{f's{i}':>10}" for i in range(n)) + f"{'spread':>8}{'max cv':>8}")
@@ -556,12 +592,18 @@ def one_controlled_run(run_dir: pathlib.Path) -> tuple[str, list[dict]]:
             )
             return status, sessions
 
+        # Every session's own soak median/MAD are recorded (point 1); only session 0's
+        # ceiling is frozen and applied to all four.
+        median_i, mad_i, ceiling_i = derive_ceiling(samples)
         if frozen_ceiling is None:
-            median, mad, ceiling = derive_ceiling(samples)
-            frozen_ceiling, ceiling_info = ceiling, (median, mad)
-            log(f"calibrated in-case aggregate ceiling: {ceiling:.0f}% "
-                f"(soak median {median:.0f}%, MAD {mad:.1f}%, cap {AGG_CEIL_CAP:.0f}%) -- "
-                "frozen for all four sessions")
+            frozen_ceiling = ceiling_i
+            log(f"calibrated in-case aggregate ceiling: {ceiling_i:.0f}% "
+                f"(session-0 soak median {median_i:.0f}%, MAD {mad_i:.1f}%, cap {AGG_CEIL_CAP:.0f}%) "
+                "-- frozen for all four sessions")
+        else:
+            log(f"session{index} soak median {median_i:.0f}%, MAD {mad_i:.1f}% "
+                f"(ceiling stays frozen at {frozen_ceiling:.0f}%)")
+        ceiling_info = (median_i, mad_i)
 
         status, data = run_session(index, run_dir / f"session{index}", frozen_ceiling, ceiling_info)
         if status != "ok":
