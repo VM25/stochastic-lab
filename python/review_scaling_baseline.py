@@ -41,8 +41,10 @@ POSITION_CORR_GATE = 0.30
 SESSION_DRIFT_GATE = 0.03
 AGG_CORR_GATE = 0.30
 AGG_SLOPE_EFFECT_GATE = 0.02
-SOAK_MEDIAN_DRIFT_GATE = 15.0
-MIN_CPU_SAMPLES = 2
+SOAK_DRIFT_MAX_PP = 10.0
+SOAK_DRIFT_MIN_PP = 5.0
+SOAK_DRIFT_MAD_K = 3.0
+MIN_CPU_SAMPLES = 8
 
 failures: list[str] = []
 
@@ -70,6 +72,11 @@ def per_rep_seconds(record: dict) -> dict[tuple[str, int], list[float]]:
         key = (parts[0], int(parts[1]))
         reps.setdefault(key, []).append(row["real_time"] * unit_scale(row.get("time_unit", "ns")))
     return reps
+
+
+def mad(xs: list[float]) -> float:
+    med = statistics.median(xs)
+    return statistics.median([abs(x - med) for x in xs])
 
 
 def pearson(xs: list[float], ys: list[float]) -> float:
@@ -141,13 +148,30 @@ def main() -> int:
 
         ceiling = ctx.get("dw_agg_incase_ceiling")
         unrel = ctx.get("dw_case_unrelated_cpu", {})
-        mean_agg.append({k: v.get("mean_agg") for k, v in unrel.items()})
+        # Recompute count/mean/max from the RAW per-case samples, not the orchestrator's
+        # derived fields.
+        recomputed_mean = {}
         for case, stats in unrel.items():
-            if stats.get("n_samples", 0) < MIN_CPU_SAMPLES:
-                fail(f"session{i} {case}: {stats.get('n_samples')} monitoring samples")
-            if ceiling is not None and stats.get("max_agg", 0) > ceiling:
-                fail(f"session{i} {case}: peak aggregate {stats['max_agg']}% exceeded ceiling {ceiling}%")
-        print(f"session{i}: soak median {ctx.get('dw_agg_soak_median')}% MAD {ctx.get('dw_agg_soak_mad')}% "
+            samples = stats.get("samples")
+            if not samples:
+                fail(f"session{i} {case}: no raw CPU samples recorded")
+                continue
+            n_samples = len(samples)
+            if n_samples < MIN_CPU_SAMPLES:
+                fail(f"session{i} {case}: {n_samples} monitoring samples (< {MIN_CPU_SAMPLES})")
+            if ceiling is not None and max(samples) > ceiling:
+                fail(f"session{i} {case}: peak aggregate {max(samples)}% exceeded ceiling {ceiling}%")
+            if not stats.get("covered_warmup_and_reps"):
+                fail(f"session{i} {case}: monitoring did not cover warm-up and repetitions")
+            recomputed_mean[case] = statistics.fmean(samples)
+        mean_agg.append(recomputed_mean)
+        # Recompute the soak median/MAD from the raw soak samples for the drift check below.
+        soak_samples = ctx.get("dw_agg_soak_samples") or []
+        rmed = statistics.median(soak_samples) if soak_samples else None
+        rmad = mad(soak_samples) if soak_samples else None
+        ctx["_recomputed_soak_median"] = rmed
+        ctx["_recomputed_soak_mad"] = rmad
+        print(f"session{i}: soak median {rmed}% MAD {rmad}% (from {len(soak_samples)} samples) "
               f"ceiling {ceiling}% aborts {ctx.get('dw_case_aborts')} "
               f"commit {str(ctx.get('git_commit'))[:9]}")
 
@@ -163,14 +187,22 @@ def main() -> int:
         else:
             print(f"  thread {t}: rounds {rounds} -> complete")
 
-    # Soak-median drift.
-    soak_medians = [s["context"].get("dw_agg_soak_median") for s in sessions]
-    if all(m is not None for m in soak_medians):
-        drift = [abs(m - soak_medians[0]) for m in soak_medians]
-        print(f"\nsoak medians {soak_medians}%  drift-from-s0 {[round(d, 1) for d in drift]}% "
-              f"(gate <{SOAK_MEDIAN_DRIFT_GATE}%)")
-        if max(drift) > SOAK_MEDIAN_DRIFT_GATE:
-            fail(f"soak median drift {max(drift):.1f}% exceeds {SOAK_MEDIAN_DRIFT_GATE}%")
+    # Soak-median drift, from the independently recomputed medians/MADs, with the robust
+    # per-session bound min(10, max(5, 3*(MAD_0 + MAD_j))) pp.
+    rmeds = [s["context"].get("_recomputed_soak_median") for s in sessions]
+    rmads = [s["context"].get("_recomputed_soak_mad") for s in sessions]
+    print("\n=== soak-median drift (recomputed from raw samples) ===")
+    if all(m is not None for m in rmeds) and all(a is not None for a in rmads):
+        for j in range(1, n):
+            bound = min(SOAK_DRIFT_MAX_PP, max(SOAK_DRIFT_MIN_PP, SOAK_DRIFT_MAD_K * (rmads[0] + rmads[j])))
+            drift = abs(rmeds[j] - rmeds[0])
+            status = "ok" if drift <= bound else "DRIFT"
+            print(f"  s{j}: median {rmeds[j]}% vs s0 {rmeds[0]}% -> drift {drift:.1f}pp "
+                  f"(bound {bound:.1f}pp) {status}")
+            if drift > bound:
+                fail(f"session {j} soak median drift {drift:.1f}pp exceeds bound {bound:.1f}pp")
+    else:
+        fail("a session is missing recomputable soak samples")
 
     # CV, spread, and the residual-based effects, all recomputed here.
     print("\n=== recomputed medians (ms), spread, max cv ===")

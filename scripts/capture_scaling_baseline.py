@@ -44,6 +44,7 @@ from __future__ import annotations
 import datetime
 import json
 import math
+import os
 import pathlib
 import re
 import subprocess
@@ -85,8 +86,15 @@ TOTAL_HORIZON_S = 6 * 3600
 
 SPREAD_GATE = 0.05
 CV_GATE = 0.03
-MIN_CPU_SAMPLES = 2          # a case with fewer monitoring samples is rejected (point 3)
-SOAK_MEDIAN_DRIFT_GATE = 15.0  # reject if a later session's soak median shifts this much (point 1)
+# Monitoring must be dense enough to catch between-sample interference: sample ~4x/second
+# and require at least eight samples per case (a case with fewer is aborted and retried).
+MONITOR_CADENCE_S = 0.25
+MIN_CPU_SAMPLES = 8
+# Soak-median drift bound, robust and hard-capped at 10 pp (not 15): a later session may
+# differ from session 0 by at most min(10, max(5, 3*(MAD_0 + MAD_j))) percentage points.
+SOAK_DRIFT_MAX_PP = 10.0
+SOAK_DRIFT_MIN_PP = 5.0
+SOAK_DRIFT_MAD_K = 3.0
 POSITION_CORR_GATE = 0.30
 SESSION_DRIFT_GATE = 0.03
 AGG_CORR_GATE = 0.30      # effect-size threshold on |Pearson(agg cpu, residual)|
@@ -165,8 +173,23 @@ def unrelated_stats(exclude: set[int], table: list) -> tuple[float, str, float]:
     return max_cpu, max_comm, aggregate
 
 
+def measurement_exclude(table: list, benchmark_pid: int | None = None) -> set[int]:
+    """The measurement process tree -- this orchestrator, the benchmark it launched (a
+    child), and any transient `ps` children -- so the harness's own CPU is not counted as
+    interference. A stale/concurrent benchmark is a *different* tree and still counts."""
+    exclude = active_tree(os.getpid(), table)
+    if benchmark_pid is not None:
+        exclude |= active_tree(benchmark_pid, table)
+    return exclude
+
+
+def measured_aggregate(benchmark_pid: int | None = None) -> tuple[float, str, float]:
+    table = process_table()
+    return unrelated_stats(measurement_exclude(table, benchmark_pid), table)
+
+
 def idle_conditions() -> tuple[bool, str]:
-    """Conditions when the benchmark is NOT running."""
+    """Conditions when the benchmark is NOT running (the harness itself is excluded)."""
     if not power_is_ac():
         return False, "not on AC power"
     if thermal_warning():
@@ -174,7 +197,7 @@ def idle_conditions() -> tuple[bool, str]:
     current = load1()
     if current >= LOAD_CEIL:
         return False, f"load {current:.2f} >= {LOAD_CEIL}"
-    max_cpu, comm, aggregate = unrelated_stats(set(), process_table())
+    max_cpu, comm, aggregate = measured_aggregate()
     if max_cpu >= CPU_CEIL:
         return False, f"{comm.split('/')[-1]} at {max_cpu:.0f}%"
     if aggregate >= AGG_SOAK_CEIL:
@@ -194,8 +217,8 @@ def soak(hold_s: int, label: str, max_wait_s: int) -> tuple[bool, list[float]]:
         ok, detail = idle_conditions()
         if ok:
             held += 10
-            _, _, aggregate = unrelated_stats(set(), process_table())
-            samples.append(aggregate)
+            _, _, aggregate = measured_aggregate()
+            samples.append(round(aggregate, 1))
         else:
             held = 0
             samples.clear()
@@ -238,12 +261,13 @@ def derive_ceiling(samples: list[float]) -> tuple[float, float, float]:
 
 def run_case(
     engine: str, threads: int, out_path: pathlib.Path, agg_ceiling: float
-) -> tuple[dict, float, float, float, int] | None:
-    """Run one isolated, warmed-up case; monitor unrelated interference throughout against
-    the frozen aggregate ceiling (points 2-4). Returns (record, max aggregate unrelated
-    %CPU, mean aggregate unrelated %CPU, max single unrelated %CPU, monitoring-sample
-    count), or None if aborted -- including when too few monitoring samples were collected
-    to trust the case."""
+) -> tuple[dict, dict] | None:
+    """Run one isolated, warmed-up case; monitor unrelated interference throughout at
+    MONITOR_CADENCE_S against the frozen aggregate ceiling (points 2-4). Monitoring starts
+    before the warm-up and runs to process exit, so it covers both the warm-up and the
+    reported repetitions. Returns (benchmark_record, monitoring), or None if aborted --
+    including when fewer than MIN_CPU_SAMPLES were collected (too short to trust)."""
+    started = time.monotonic()
     proc = subprocess.Popen(
         [
             str(BIN),
@@ -262,9 +286,9 @@ def run_case(
     peak_max = 0.0
     while proc.poll() is None:
         table = process_table()
-        exclude = active_tree(proc.pid, table)
+        exclude = measurement_exclude(table, proc.pid)
         max_cpu, comm, aggregate = unrelated_stats(exclude, table)
-        agg_samples.append(aggregate)
+        agg_samples.append(round(aggregate, 1))
         peak_max = max(peak_max, max_cpu)
         reason = None
         if max_cpu >= CPU_CEIL:
@@ -280,7 +304,8 @@ def run_case(
             proc.wait()
             log(f"    ABORT {engine}/{threads}: {reason} during the case")
             return None
-        time.sleep(1.5)
+        time.sleep(MONITOR_CADENCE_S)
+    duration = time.monotonic() - started
     if proc.returncode != 0:
         log(f"    ABORT {engine}/{threads}: process exit {proc.returncode}")
         return None
@@ -288,9 +313,18 @@ def run_case(
         log(f"    ABORT {engine}/{threads}: only {len(agg_samples)} monitoring sample(s) "
             f"(< {MIN_CPU_SAMPLES}); the case is too short to trust")
         return None
-    max_agg = max(agg_samples)
-    mean_agg = sum(agg_samples) / len(agg_samples)
-    return json.loads(out_path.read_text()), max_agg, mean_agg, peak_max, len(agg_samples)
+    monitoring = {
+        "samples": agg_samples,
+        "n_samples": len(agg_samples),
+        "max_agg": round(max(agg_samples), 1),
+        "mean_agg": round(sum(agg_samples) / len(agg_samples), 1),
+        "max_proc": round(peak_max, 1),
+        "duration_s": round(duration, 2),
+        "interval_s": MONITOR_CADENCE_S,
+        "warmup_s": float(WARMUP_TIME),
+        "covered_warmup_and_reps": True,
+    }
+    return json.loads(out_path.read_text()), monitoring
 
 
 def _rotate(seq: list, k: int) -> list:
@@ -324,7 +358,11 @@ def inject_metadata(context: dict, planned: list, actual: list, unrelated: dict)
 
 
 def run_session(
-    index: int, session_dir: pathlib.Path, ceiling: float, ceiling_info: tuple[float, float]
+    index: int,
+    session_dir: pathlib.Path,
+    ceiling: float,
+    ceiling_info: tuple[float, float],
+    soak_samples: list[float],
 ) -> tuple[str, dict | None]:
     """Run one session's cases against the frozen aggregate ceiling. The caller has
     already soaked; this does not soak. Returns ("ok", record) or ("void_started", None)."""
@@ -356,24 +394,20 @@ def run_session(
             log(f"session{index}: {engine}/{threads} retries exhausted -> void_started")
             return "void_started", None
 
-        record, max_agg, mean_agg, max_proc, n_samples = result
+        record, monitoring = result
         if context is None:
             context = dict(record["context"])
         merged_benchmarks.extend(record["benchmarks"])
         positions[f"{engine}/{threads}"] = position
-        unrelated[f"{engine}/{threads}"] = {
-            "max_agg": round(max_agg, 1),
-            "mean_agg": round(mean_agg, 1),
-            "max_proc": round(max_proc, 1),
-            "n_samples": n_samples,
-        }
+        unrelated[f"{engine}/{threads}"] = monitoring
         actual.append((engine, threads))
         median_ms = next(
             (b["real_time"] for b in record["benchmarks"] if b.get("aggregate_name") == "median"),
             float("nan"),
         )
         log(f"    {engine}/{threads}  pos {position:2d}  median {median_ms:.3f} ms  "
-            f"agg-cpu mean {mean_agg:.0f}% max {max_agg:.0f}% (ceiling {ceiling:.0f}%)")
+            f"agg-cpu mean {monitoring['mean_agg']:.0f}% max {monitoring['max_agg']:.0f}% "
+            f"n={monitoring['n_samples']} dur={monitoring['duration_s']:.1f}s (ceiling {ceiling:.0f}%)")
         if not cool_down(
             COOLDOWN_HIGH_MIN_S if threads >= 4 else COOLDOWN_LOW_MIN_S, f"{engine}-{threads}"
         ):
@@ -384,6 +418,7 @@ def run_session(
     context["dw_case_positions"] = positions
     context["dw_agg_soak_median"] = round(ceiling_info[0], 1)  # this session's own soak
     context["dw_agg_soak_mad"] = round(ceiling_info[1], 1)
+    context["dw_agg_soak_samples"] = soak_samples             # raw, for independent recompute
     context["dw_agg_incase_ceiling"] = round(ceiling, 1)       # frozen from session 0
     context["dw_case_aborts"] = total_aborts
     context["dw_case_retries"] = retries
@@ -462,25 +497,30 @@ def evaluate(sessions: list[dict]) -> str:
         log(f"VACUOUS: inconsistent metadata (commits={commits}, topologies={topos})")
         vacuous = True
 
-    # Point 1: every session's soak median is recorded; a later session whose soak median
-    # shifts materially from session 0 signals a changed environment across sessions.
-    soak_medians = [s["context"].get("dw_agg_soak_median") for s in sessions]
-    if any(m is None for m in soak_medians):
-        log("VACUOUS: a session is missing its soak median")
+    # Point 1: each session's soak median/MAD is recorded; a later session whose soak
+    # median shifts from session 0 by more than min(10, max(5, 3*(MAD_0+MAD_j))) pp signals
+    # a changed environment across sessions.
+    medians = [s["context"].get("dw_agg_soak_median") for s in sessions]
+    mads = [s["context"].get("dw_agg_soak_mad") for s in sessions]
+    if any(m is None for m in medians) or any(a is None for a in mads):
+        log("VACUOUS: a session is missing its soak median/MAD")
         vacuous = True
     else:
-        drift = [abs(m - soak_medians[0]) for m in soak_medians]
-        log(f"soak:    medians {soak_medians}%, drift-from-s0 {[round(d, 1) for d in drift]}% "
-            f"(gate <{SOAK_MEDIAN_DRIFT_GATE}%)")
-        if max(drift) > SOAK_MEDIAN_DRIFT_GATE:
-            log("  REJECT: a later session's soak median shifted materially from session 0")
-            vacuous = True
+        for j in range(1, len(sessions)):
+            bound = min(SOAK_DRIFT_MAX_PP, max(SOAK_DRIFT_MIN_PP, SOAK_DRIFT_MAD_K * (mads[0] + mads[j])))
+            drift = abs(medians[j] - medians[0])
+            log(f"soak:    s{j} median {medians[j]}% vs s0 {medians[0]}% -> drift {drift:.1f}pp "
+                f"(bound {bound:.1f}pp)")
+            if drift > bound:
+                log(f"  REJECT: session {j} soak median drifted {drift:.1f}pp from session 0")
+                vacuous = True
 
     # Point 3: every accepted case must carry enough monitoring samples.
     for i, s in enumerate(sessions):
         for case, stats in s["context"].get("dw_case_unrelated_cpu", {}).items():
             if stats.get("n_samples", 0) < MIN_CPU_SAMPLES:
-                log(f"VACUOUS: session{i} {case} has {stats.get('n_samples')} monitoring samples")
+                log(f"VACUOUS: session{i} {case} has {stats.get('n_samples')} monitoring samples "
+                    f"(< {MIN_CPU_SAMPLES})")
                 vacuous = True
 
     log("acceptance evaluation (medians in ms):")
@@ -605,7 +645,9 @@ def one_controlled_run(run_dir: pathlib.Path) -> tuple[str, list[dict]]:
                 f"(ceiling stays frozen at {frozen_ceiling:.0f}%)")
         ceiling_info = (median_i, mad_i)
 
-        status, data = run_session(index, run_dir / f"session{index}", frozen_ceiling, ceiling_info)
+        status, data = run_session(
+            index, run_dir / f"session{index}", frozen_ceiling, ceiling_info, samples
+        )
         if status != "ok":
             (run_dir / "VERDICT").write_text("VOID_ENVIRONMENT (session began)\n")
             return status, sessions
