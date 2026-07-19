@@ -64,7 +64,14 @@ MIN_TIME = "0.4s"
 WARMUP_TIME = "0.15"     # excluded warm-up per case, in seconds (point 4; a bare double)
 LOAD_CEIL = 2.0          # 1-minute load ceiling, used only when the benchmark is idle
 CPU_CEIL = 25.0          # busiest unrelated process %CPU
-AGG_CPU_CEIL = 120.0     # aggregate unrelated %CPU (baseline is ~45% idle here)
+# The in-case aggregate-unrelated-CPU ceiling is calibrated from the pre-run soak, not
+# fixed: ceiling = min(AGG_CEIL_CAP, soak_median + max(AGG_CEIL_MARGIN, k*MAD)). On macOS
+# ~100% is one fully occupied logical core, so a hard cap well below that keeps unrelated
+# work from consuming a whole core during 4/8-thread measurement on this 4P+4E chip.
+AGG_SOAK_CEIL = 60.0     # the soak establishes a clean baseline below this aggregate
+AGG_CEIL_CAP = 70.0      # the calibrated in-case ceiling is hard-capped here (< one core)
+AGG_CEIL_MARGIN = 20.0   # minimum margin above the soak median
+AGG_CEIL_MAD_K = 3.0     # MAD multiplier for the margin
 SOAK_HOLD_S = 120
 SOAK_MAX_WAIT_S = 1800
 INTER_SESSION_IDLE_S = 600
@@ -80,7 +87,8 @@ SPREAD_GATE = 0.05
 CV_GATE = 0.03
 POSITION_CORR_GATE = 0.30
 SESSION_DRIFT_GATE = 0.03
-AGG_CORR_GATE = 0.30
+AGG_CORR_GATE = 0.30      # effect-size threshold on |Pearson(agg cpu, residual)|
+AGG_SLOPE_EFFECT_GATE = 0.02  # reject if the fitted slope implies >2% runtime over the CPU range
 
 THERMAL_PROBE_NOTE = (
     "pmset reports no OS-recorded thermal warning; this does NOT prove the absence of "
@@ -167,38 +175,71 @@ def idle_conditions() -> tuple[bool, str]:
     max_cpu, comm, aggregate = unrelated_stats(set(), process_table())
     if max_cpu >= CPU_CEIL:
         return False, f"{comm.split('/')[-1]} at {max_cpu:.0f}%"
-    if aggregate >= AGG_CPU_CEIL:
+    if aggregate >= AGG_SOAK_CEIL:
         return False, f"aggregate unrelated {aggregate:.0f}%"
     return True, "ok"
 
 
-def soak(hold_s: int, label: str, max_wait_s: int) -> bool:
+def soak(hold_s: int, label: str, max_wait_s: int) -> tuple[bool, list[float]]:
+    """Wait until idle conditions hold continuously for hold_s. Returns (ok, samples),
+    where samples are the aggregate-unrelated-CPU readings across the successful hold
+    streak -- used to calibrate the in-case aggregate ceiling."""
     log(f"soak[{label}]: need {hold_s}s of AC + no thermal warning + load<{LOAD_CEIL} + "
-        f"max-proc<{CPU_CEIL}% + aggregate<{AGG_CPU_CEIL}%")
+        f"max-proc<{CPU_CEIL}% + aggregate<{AGG_SOAK_CEIL}%")
     held = waited = 0
+    samples: list[float] = []
     while held < hold_s:
         ok, detail = idle_conditions()
-        held = held + 10 if ok else 0
-        if not ok:
+        if ok:
+            held += 10
+            _, _, aggregate = unrelated_stats(set(), process_table())
+            samples.append(aggregate)
+        else:
+            held = 0
+            samples.clear()
             log(f"soak[{label}]: reset ({detail})")
         time.sleep(10)
         waited += 10
         if waited > max_wait_s:
             log(f"soak[{label}]: TIMEOUT after {max_wait_s}s")
-            return False
+            return False, []
     log(f"soak[{label}]: held {hold_s}s")
-    return True
+    return True, samples
 
 
 def cool_down(minimum_s: int, label: str) -> bool:
     time.sleep(minimum_s)
-    return soak(20, f"cooldown-{label}", COOLDOWN_RESTORE_MAX_S)
+    ok, _ = soak(20, f"cooldown-{label}", COOLDOWN_RESTORE_MAX_S)
+    return ok
 
 
-def run_case(engine: str, threads: int, out_path: pathlib.Path) -> tuple[dict, float, float] | None:
-    """Run one isolated, warmed-up case; monitor unrelated interference throughout
-    (points 2-4). Returns (record, peak aggregate unrelated %CPU, peak max unrelated %CPU),
-    or None if aborted."""
+def _median(xs: list[float]) -> float:
+    ordered = sorted(xs)
+    n = len(ordered)
+    if n == 0:
+        return 0.0
+    mid = n // 2
+    return ordered[mid] if n % 2 else 0.5 * (ordered[mid - 1] + ordered[mid])
+
+
+def derive_ceiling(samples: list[float]) -> tuple[float, float, float]:
+    """Calibrate the in-case aggregate ceiling from the soak samples (points 1-4):
+    median + max(margin, k * MAD), capped. MAD is the median absolute deviation, a robust
+    dispersion measure. Returns (median, mad, ceiling), frozen for the whole attempt."""
+    if not samples:
+        return 0.0, 0.0, AGG_CEIL_CAP
+    median = _median(samples)
+    mad = _median([abs(s - median) for s in samples])
+    ceiling = min(AGG_CEIL_CAP, median + max(AGG_CEIL_MARGIN, AGG_CEIL_MAD_K * mad))
+    return median, mad, ceiling
+
+
+def run_case(
+    engine: str, threads: int, out_path: pathlib.Path, agg_ceiling: float
+) -> tuple[dict, float, float, float] | None:
+    """Run one isolated, warmed-up case; monitor unrelated interference throughout against
+    the frozen aggregate ceiling (points 2-4). Returns (record, max aggregate unrelated
+    %CPU, mean aggregate unrelated %CPU, max single unrelated %CPU), or None if aborted."""
     proc = subprocess.Popen(
         [
             str(BIN),
@@ -213,18 +254,19 @@ def run_case(engine: str, threads: int, out_path: pathlib.Path) -> tuple[dict, f
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    peak_agg = peak_max = 0.0
+    agg_samples: list[float] = []
+    peak_max = 0.0
     while proc.poll() is None:
         table = process_table()
         exclude = active_tree(proc.pid, table)
         max_cpu, comm, aggregate = unrelated_stats(exclude, table)
-        peak_agg = max(peak_agg, aggregate)
+        agg_samples.append(aggregate)
         peak_max = max(peak_max, max_cpu)
         reason = None
         if max_cpu >= CPU_CEIL:
             reason = f"unrelated {comm.split('/')[-1]} at {max_cpu:.0f}%"
-        elif aggregate >= AGG_CPU_CEIL:
-            reason = f"aggregate unrelated {aggregate:.0f}%"
+        elif aggregate >= agg_ceiling:
+            reason = f"aggregate unrelated {aggregate:.0f}% >= ceiling {agg_ceiling:.0f}%"
         elif thermal_warning():
             reason = "pmset thermal warning"
         elif not power_is_ac():
@@ -238,7 +280,9 @@ def run_case(engine: str, threads: int, out_path: pathlib.Path) -> tuple[dict, f
     if proc.returncode != 0:
         log(f"    ABORT {engine}/{threads}: process exit {proc.returncode}")
         return None
-    return json.loads(out_path.read_text()), peak_agg, peak_max
+    max_agg = max(agg_samples) if agg_samples else 0.0
+    mean_agg = sum(agg_samples) / len(agg_samples) if agg_samples else 0.0
+    return json.loads(out_path.read_text()), max_agg, mean_agg, peak_max
 
 
 def _rotate(seq: list, k: int) -> list:
@@ -271,11 +315,12 @@ def inject_metadata(context: dict, planned: list, actual: list, unrelated: dict)
     context["dw_case_unrelated_cpu"] = unrelated  # per case: {"agg": peak, "max": peak}
 
 
-def capture_session(index: int, session_dir: pathlib.Path) -> tuple[str, dict | None]:
+def run_session(
+    index: int, session_dir: pathlib.Path, ceiling: float, ceiling_info: tuple[float, float]
+) -> tuple[str, dict | None]:
+    """Run one session's cases against the frozen aggregate ceiling. The caller has
+    already soaked; this does not soak. Returns ("ok", record) or ("void_started", None)."""
     session_dir.mkdir(parents=True, exist_ok=True)
-    if not soak(SOAK_HOLD_S, f"session{index}", SOAK_MAX_WAIT_S):
-        return "void_waiting", None
-
     planned = balanced_schedule(index)
     actual: list[tuple[str, int]] = []
     log(f"session{index} planned order: " + ", ".join(f"{e}/{t}" for e, t in planned))
@@ -289,7 +334,7 @@ def capture_session(index: int, session_dir: pathlib.Path) -> tuple[str, dict | 
         out_path = session_dir / f"case_{engine}_{threads}.json"
         result = None
         for attempt in range(1, MAX_CASE_RETRIES + 1):
-            result = run_case(engine, threads, out_path)
+            result = run_case(engine, threads, out_path, ceiling)
             if result is not None:
                 break
             log(f"    retry {engine}/{threads} ({attempt}/{MAX_CASE_RETRIES}) after cool-down")
@@ -299,19 +344,23 @@ def capture_session(index: int, session_dir: pathlib.Path) -> tuple[str, dict | 
             log(f"session{index}: {engine}/{threads} retries exhausted -> void_started")
             return "void_started", None
 
-        record, peak_agg, peak_max = result
+        record, max_agg, mean_agg, max_proc = result
         if context is None:
             context = dict(record["context"])
         merged_benchmarks.extend(record["benchmarks"])
         positions[f"{engine}/{threads}"] = position
-        unrelated[f"{engine}/{threads}"] = {"agg": round(peak_agg, 1), "max": round(peak_max, 1)}
+        unrelated[f"{engine}/{threads}"] = {
+            "max_agg": round(max_agg, 1),
+            "mean_agg": round(mean_agg, 1),
+            "max_proc": round(max_proc, 1),
+        }
         actual.append((engine, threads))
         median_ms = next(
             (b["real_time"] for b in record["benchmarks"] if b.get("aggregate_name") == "median"),
             float("nan"),
         )
         log(f"    {engine}/{threads}  pos {position:2d}  median {median_ms:.3f} ms  "
-            f"peak-agg-cpu {peak_agg:.0f}%")
+            f"agg-cpu mean {mean_agg:.0f}% max {max_agg:.0f}% (ceiling {ceiling:.0f}%)")
         if not cool_down(
             COOLDOWN_HIGH_MIN_S if threads >= 4 else COOLDOWN_LOW_MIN_S, f"{engine}-{threads}"
         ):
@@ -320,6 +369,9 @@ def capture_session(index: int, session_dir: pathlib.Path) -> tuple[str, dict | 
     assert context is not None
     inject_metadata(context, planned, actual, unrelated)
     context["dw_case_positions"] = positions
+    context["dw_agg_soak_median"] = round(ceiling_info[0], 1)
+    context["dw_agg_soak_mad"] = round(ceiling_info[1], 1)
+    context["dw_agg_incase_ceiling"] = round(ceiling, 1)
     merged = {"context": context, "benchmarks": merged_benchmarks}
     (session_dir / "session.json").write_text(json.dumps(merged, indent=2) + "\n")
     log(f"session{index}: complete")
@@ -353,6 +405,21 @@ def _pearson(xs: list[float], ys: list[float]) -> float:
     if sxx <= 0 or syy <= 0:
         return 0.0
     return sxy / math.sqrt(sxx * syy)
+
+
+def _slope_effect(xs: list[float], ys: list[float]) -> float:
+    """The predicted change in y across the observed x range from an ordinary-least-
+    squares fit (effect size), so a material slope is rejected even when a small sample
+    leaves the correlation's significance inconclusive."""
+    n = len(xs)
+    if n < 3:
+        return 0.0
+    mx, my = sum(xs) / n, sum(ys) / n
+    sxx = sum((x - mx) ** 2 for x in xs)
+    if sxx <= 0:
+        return 0.0
+    slope = sum((x - mx) * (y - my) for x, y in zip(xs, ys)) / sxx
+    return slope * (max(xs) - min(xs))
 
 
 def evaluate(sessions: list[dict]) -> str:
@@ -423,7 +490,7 @@ def evaluate(sessions: list[dict]) -> str:
                 pos = positions[i].get(f"{engine}/{threads}")
                 if pos is not None:
                     residual_points.append((float(pos), residual))
-                agg = unrelated[i].get(f"{engine}/{threads}", {}).get("agg")
+                agg = unrelated[i].get(f"{engine}/{threads}", {}).get("mean_agg")
                 if agg is not None:
                     agg_points.append((float(agg), residual))
         cells = "".join(f"{m:>10.3f}" if m else f"{'-':>10}" for m in medians)
@@ -435,21 +502,27 @@ def evaluate(sessions: list[dict]) -> str:
         corr_pos = _pearson([p for p, _ in residual_points], [r for _, r in residual_points])
         session_means = [sum(rs) / len(rs) if rs else 0.0 for rs in session_residuals]
         drift = max(session_means) - min(session_means)
-        corr_agg = _pearson([a for a, _ in agg_points], [r for _, r in agg_points]) if len(agg_points) >= 3 else 0.0
+        if len(agg_points) >= 3:
+            corr_agg = _pearson([a for a, _ in agg_points], [r for _, r in agg_points])
+            agg_effect = _slope_effect([a for a, _ in agg_points], [r for _, r in agg_points])
+        else:
+            corr_agg = agg_effect = 0.0
         log("")
         log(f"order:   Pearson(position, residual) = {corr_pos:+.3f} (gate |r|<{POSITION_CORR_GATE})")
         log(f"session: mean residuals {[f'{m:+.2%}' for m in session_means]} "
             f"range {drift:.2%} (gate <{SESSION_DRIFT_GATE:.0%})")
-        log(f"cpu:     Pearson(aggregate unrelated cpu, residual) = {corr_agg:+.3f} "
-            f"(gate |r|<{AGG_CORR_GATE})")
+        log(f"cpu:     Pearson(mean agg cpu, residual) = {corr_agg:+.3f} (gate |r|<{AGG_CORR_GATE}); "
+            f"slope effect over cpu range = {agg_effect:+.2%} (gate |e|<{AGG_SLOPE_EFFECT_GATE:.0%})")
         if abs(corr_pos) > POSITION_CORR_GATE:
             log("  REJECT: runtime depends on execution position")
             order_ok = False
         if drift > SESSION_DRIFT_GATE:
             log("  REJECT: systematic session-level slowdown")
             order_ok = False
-        if abs(corr_agg) > AGG_CORR_GATE:
-            log("  REJECT: runtime correlates with unrelated aggregate CPU")
+        # Effect size, not only significance: reject a material correlation OR a material
+        # fitted slope even when the small sample leaves the p-value inconclusive.
+        if abs(corr_agg) > AGG_CORR_GATE or abs(agg_effect) > AGG_SLOPE_EFFECT_GATE:
+            log("  REJECT: runtime tracks unrelated aggregate CPU (correlation or slope)")
             order_ok = False
     else:
         log("VACUOUS: too few residual points for the order/CPU checks")
@@ -464,19 +537,39 @@ def evaluate(sessions: list[dict]) -> str:
 def one_controlled_run(run_dir: pathlib.Path) -> tuple[str, list[dict]]:
     run_dir.mkdir(parents=True, exist_ok=True)
     sessions: list[dict] = []
+    frozen_ceiling: float | None = None
+    ceiling_info: tuple[float, float] = (0.0, 0.0)
+
     for index in range(SESSIONS):
         if index > 0:
             log(f"inter-session idle: {INTER_SESSION_IDLE_S}s (not back-to-back)")
             time.sleep(INTER_SESSION_IDLE_S)
-        status, data = capture_session(index, run_dir / f"session{index}")
-        if status != "ok":
+
+        soak_ok, samples = soak(SOAK_HOLD_S, f"session{index}", SOAK_MAX_WAIT_S)
+        if not soak_ok:
+            # A soak timeout before any session began is waiting-only (not an attempt);
+            # after measurement has begun it voids the started attempt.
+            status = "void_waiting" if not sessions else "void_started"
             (run_dir / "VERDICT").write_text(
-                "VOID_ENVIRONMENT (session began)\n" if status == "void_started"
-                else "VOID_ENVIRONMENT (waiting only)\n"
+                "VOID_ENVIRONMENT (waiting only)\n" if status == "void_waiting"
+                else "VOID_ENVIRONMENT (session began, later soak timed out)\n"
             )
+            return status, sessions
+
+        if frozen_ceiling is None:
+            median, mad, ceiling = derive_ceiling(samples)
+            frozen_ceiling, ceiling_info = ceiling, (median, mad)
+            log(f"calibrated in-case aggregate ceiling: {ceiling:.0f}% "
+                f"(soak median {median:.0f}%, MAD {mad:.1f}%, cap {AGG_CEIL_CAP:.0f}%) -- "
+                "frozen for all four sessions")
+
+        status, data = run_session(index, run_dir / f"session{index}", frozen_ceiling, ceiling_info)
+        if status != "ok":
+            (run_dir / "VERDICT").write_text("VOID_ENVIRONMENT (session began)\n")
             return status, sessions
         assert data is not None
         sessions.append(data)
+
     verdict = evaluate(sessions)
     (run_dir / "VERDICT").write_text(verdict + "\n")
     return ("accepted" if verdict == "ACCEPTED" else "reject"), sessions
