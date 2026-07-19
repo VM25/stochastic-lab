@@ -45,6 +45,42 @@ CORES=$(getconf _NPROCESSORS_ONLN 2> /dev/null || sysctl -n hw.ncpu 2> /dev/null
 read_load1() { uptime | sed -E 's/.*load averages?: *([0-9.]+).*/\1/'; }
 LOAD_PRE=$(read_load1)
 
+# Cool-down before measuring, so every session starts from a comparable thermal and load
+# state. Back-to-back all-core runs heat the CPU and its sustained multi-core frequency
+# drops without a pmset thermal warning, which shifts the whole session's medians -- the
+# instability the session-to-session stability gate exists to catch.
+#
+# Two parts, decoupled so brief background blips (a Shortcuts run, an iCloud sync tick)
+# do not stall it forever:
+#   1. A fixed idle soak of DW_COOLDOWN_S seconds. The benchmark is the machine's real
+#      heat source and it is not running during the soak, so the die cools even with the
+#      occasional short blip; requiring a *perfect* quiet streak here was too strict and
+#      simply never completed on this machine.
+#   2. A capture-start gate: after the soak, do not begin timing until the 1-minute load
+#      is below DW_COOLDOWN_LOAD (default 1.8), so no unrelated work is running as the
+#      measurement starts. Give up after 10 minutes -- the machine will not settle.
+cool_down() {
+    local soak=${DW_COOLDOWN_S:-0}
+    [[ ${soak} -le 0 ]] && return 0
+    local ceiling=${DW_COOLDOWN_LOAD:-1.8}
+    echo "==> cool-down: ${soak}s idle thermal soak, then wait for load < ${ceiling}"
+    sleep "${soak}"
+    local waited=0 l1
+    while :; do
+        l1=$(read_load1)
+        if awk -v l="${l1}" -v cap="${ceiling}" 'BEGIN { exit !(l < cap) }'; then break; fi
+        sleep 15
+        waited=$((waited + 15))
+        if ((waited > 600)); then
+            echo "error: load stayed above ${ceiling} for 10 min after the soak (${l1})." >&2
+            echo "       The machine will not settle; capture on a dedicated machine instead." >&2
+            exit 1
+        fi
+    done
+    echo "    soak complete, load ${l1} < ${ceiling}; measuring."
+    LOAD_PRE=$(read_load1)
+}
+
 # CPU topology. On Apple Silicon the performance and efficiency cores are not
 # homogeneous, so 1/2/4/8-thread scaling must be read against this split, not as
 # ordinary linear multicore scaling.
@@ -95,7 +131,9 @@ echo "==> configuring and building the benchmark preset (release)"
 cmake --preset benchmark > /dev/null
 cmake --build build/benchmark --target dw_bench_monte_carlo_scaling > /dev/null
 
-# --- Measure ---------------------------------------------------------------
+# --- Cool-down (thermal + load reset), then measure ------------------------
+
+cool_down
 
 mkdir -p results/benchmarks
 
