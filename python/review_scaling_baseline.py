@@ -8,6 +8,18 @@ import the orchestrator.
 
 Checks (the operator's four-session acceptance review):
   - all 20 engine/thread combinations appear exactly once in each session;
+  - build/host metadata identity across all four sessions (compiler, build_type,
+    build_flags, cxx_standard, seed, dw_version, os, cpu_brand, git_commit, cpu topology),
+    and dw_planned_order == dw_actual_order within each session;
+  - a single per-repetition iteration-row count shared by every case and session, and a
+    single monitoring interval_s / warmup_s shared by every case and session;
+  - monitoring internal consistency per case: recorded n_samples == len(samples), and the
+    sample count fits the duration/interval budget (n_samples <= duration_s/interval_s + 2,
+    and n_samples >= 8);
+  - retry-frequency bias: no case retried more than twice in a session, and no case retried
+    in three or more of the four sessions (a case whose environment systematically differs);
+  - exactly 20 cases per session, each present exactly once -- iteration rows equal the
+    shared constant, not a multiple of it (catches a duplicated retried block);
   - every thread count occupies every Latin-square round position across the four sessions;
   - each session's soak median does not drift materially from session 0;
   - every case carried enough monitoring samples, and no accepted case's peak aggregate
@@ -45,6 +57,9 @@ SOAK_DRIFT_MAX_PP = 10.0
 SOAK_DRIFT_MIN_PP = 5.0
 SOAK_DRIFT_MAD_K = 3.0
 MIN_CPU_SAMPLES = 8
+CASES_PER_SESSION = 20
+MAX_RETRIES_PER_CASE = 2   # a single case may retry at most twice in one session
+MAX_RETRY_SESSIONS = 2     # a case retried in > 2 (i.e. 3+) sessions is selective-environment bias
 
 failures: list[str] = []
 
@@ -113,6 +128,116 @@ def load_sessions(args: list[str]) -> list[dict]:
     return [json.loads(p.read_text()) for p in paths]
 
 
+def check_metadata_identity(sessions: list[dict]) -> None:
+    """Check 1: build/host metadata identical across all sessions, and each session's
+    planned order equals its actual order. A silent build/flag/seed difference between
+    sessions would make the four-session comparison meaningless, so it fails loudly."""
+    print("\n=== metadata identity across sessions ===")
+    identity_keys = [
+        "git_commit", "dw_cpu_topology", "compiler", "build_type", "build_flags",
+        "cxx_standard", "seed", "dw_version", "os", "cpu_brand",
+    ]
+    for key in identity_keys:
+        values = [s["context"].get(key) for s in sessions]
+        distinct = {json.dumps(v, sort_keys=True) for v in values}
+        if len(distinct) != 1:
+            fail(f"metadata '{key}' differs across sessions: {values}")
+        elif values[0] is None:
+            fail(f"metadata '{key}' missing in all sessions")
+        else:
+            print(f"  {key:<16} {str(values[0])[:56]}")
+    for i, s in enumerate(sessions):
+        planned = s["context"].get("dw_planned_order")
+        actual = s["context"].get("dw_actual_order")
+        if planned is None or actual is None:
+            fail(f"session{i}: missing dw_planned_order/dw_actual_order")
+        elif planned != actual:
+            fail(f"session{i}: dw_actual_order != dw_planned_order")
+        else:
+            print(f"  session{i}: planned order == actual order ({len(actual)} cases)")
+
+
+def check_workload_consistency(
+    iter_counts: list[dict[tuple[str, int], int]],
+    interval_values: list,
+    warmup_values: list,
+) -> int | None:
+    """Check 2: one iteration-row count shared by every case/session, and one monitoring
+    interval_s / warmup_s shared by every case/session. Returns the shared iteration
+    constant (the most common value when it varies, so check 5 can pinpoint offenders)."""
+    print("\n=== workload / repetition / warm-up consistency ===")
+    all_counts = [c for counts in iter_counts for c in counts.values()]
+    constant: int | None = None
+    if not all_counts:
+        fail("no per-repetition iteration rows found in any session")
+    else:
+        tally: dict[int, int] = {}
+        for c in all_counts:
+            tally[c] = tally.get(c, 0) + 1
+        constant = max(tally, key=lambda k: tally[k])
+        if len(tally) != 1:
+            fail(f"per-repetition iteration-row count varies across cases/sessions: "
+                 f"{sorted(tally)} (most common {constant})")
+        else:
+            print(f"  per-case iteration rows: {constant} "
+                  f"(identical across {len(all_counts)} case blocks)")
+    for label, values in (("interval_s", interval_values), ("warmup_s", warmup_values)):
+        if not values:
+            fail(f"monitoring {label}: none recorded")
+            continue
+        distinct = {json.dumps(v) for v in values}
+        if len(distinct) != 1:
+            fail(f"monitoring {label} varies across cases/sessions: "
+                 f"{sorted(set(values), key=str)}")
+        elif values[0] is None:
+            fail(f"monitoring {label} missing on every case")
+        else:
+            print(f"  monitoring {label}: {values[0]} (identical everywhere)")
+    return constant
+
+
+def check_case_counts(iter_counts: list[dict[tuple[str, int], int]], constant: int | None) -> None:
+    """Check 5: exactly CASES_PER_SESSION cases per session, each contributing the shared
+    iteration constant exactly once. A multiple of the constant signals a duplicated block
+    -- e.g. a retried run whose benchmark rows were appended twice."""
+    print("\n=== case-count exactness ===")
+    for i, counts in enumerate(iter_counts):
+        if len(counts) != CASES_PER_SESSION:
+            fail(f"session{i}: {len(counts)} distinct cases (expected {CASES_PER_SESSION})")
+        if constant:
+            for key in sorted(counts):
+                cnt = counts[key]
+                if cnt != constant:
+                    hint = ""
+                    if cnt % constant == 0 and cnt // constant > 1:
+                        hint = f" ({cnt // constant}x the {constant}-row block -- duplicated?)"
+                    fail(f"session{i} {key[0]}/{key[1]}: {cnt} iteration rows != "
+                         f"constant {constant}{hint}")
+        print(f"  session{i}: {len(counts)} cases")
+
+
+def check_retry_bias(retries: list[dict[str, int]]) -> None:
+    """Check 4: no case retried more than MAX_RETRIES_PER_CASE times in a session, and no
+    case retried in more than MAX_RETRY_SESSIONS of the four sessions -- a case that keeps
+    retrying selectively indicts its own environment, not the code under test."""
+    print("\n=== retry-frequency bias ===")
+    sessions_with_retry: dict[str, int] = {}
+    for i, session_retries in enumerate(retries):
+        for case, count in session_retries.items():
+            if count > MAX_RETRIES_PER_CASE:
+                fail(f"session{i} {case}: {count} retries (> {MAX_RETRIES_PER_CASE} allowed)")
+            if count >= 1:
+                sessions_with_retry[case] = sessions_with_retry.get(case, 0) + 1
+    for case in sorted(sessions_with_retry):
+        k = sessions_with_retry[case]
+        if k > MAX_RETRY_SESSIONS:
+            fail(f"{case}: retried in {k} of {len(retries)} sessions "
+                 f"(> {MAX_RETRY_SESSIONS}; selective-environment bias)")
+        print(f"  {case}: retried in {k} session(s)")
+    if not sessions_with_retry:
+        print("  no case retried in any session")
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         print(__doc__)
@@ -128,6 +253,10 @@ def main() -> int:
     per_case_cv: list[dict[tuple[str, int], float]] = []
     positions: list[dict[str, int]] = []
     mean_agg: list[dict[str, float]] = []
+    iter_counts_per_session: list[dict[tuple[str, int], int]] = []
+    interval_values: list = []
+    warmup_values: list = []
+    retries_per_session: list[dict[str, int]] = []
 
     for i, s in enumerate(sessions):
         ctx = s["context"]
@@ -145,6 +274,8 @@ def main() -> int:
         per_case_median.append(medians)
         per_case_cv.append(cvs)
         positions.append(ctx.get("dw_case_positions", {}))
+        iter_counts_per_session.append({key: len(vals) for key, vals in reps.items()})
+        retries_per_session.append(ctx.get("dw_case_retries", {}))
 
         ceiling = ctx.get("dw_agg_incase_ceiling")
         unrel = ctx.get("dw_case_unrelated_cpu", {})
@@ -152,6 +283,10 @@ def main() -> int:
         # derived fields.
         recomputed_mean = {}
         for case, stats in unrel.items():
+            # Collect interval/warmup for the cross-case consistency check (check 2), even
+            # for a case whose samples are otherwise broken.
+            interval_values.append(stats.get("interval_s"))
+            warmup_values.append(stats.get("warmup_s"))
             samples = stats.get("samples")
             if not samples:
                 fail(f"session{i} {case}: no raw CPU samples recorded")
@@ -163,6 +298,22 @@ def main() -> int:
                 fail(f"session{i} {case}: peak aggregate {max(samples)}% exceeded ceiling {ceiling}%")
             if not stats.get("covered_warmup_and_reps"):
                 fail(f"session{i} {case}: monitoring did not cover warm-up and repetitions")
+            # Check 3: monitoring internal consistency. The recorded n_samples must match the
+            # raw list, and the sample count must fit the duration/interval budget: the
+            # monitor sleeps interval_s (plus ps-call overhead) per sample, so it can never
+            # collect MORE than duration_s/interval_s samples, give or take rounding.
+            recorded_n = stats.get("n_samples")
+            if recorded_n != n_samples:
+                fail(f"session{i} {case}: recorded n_samples {recorded_n} != len(samples) {n_samples}")
+            duration_s = stats.get("duration_s")
+            interval_s = stats.get("interval_s")
+            if duration_s is None or not interval_s:
+                fail(f"session{i} {case}: missing duration_s/interval_s for the monitoring-cadence check")
+            else:
+                budget = duration_s / interval_s + 2
+                if n_samples > budget:
+                    fail(f"session{i} {case}: n_samples {n_samples} exceeds duration/interval budget "
+                         f"{budget:.1f} (duration {duration_s}s / interval {interval_s}s + 2)")
             recomputed_mean[case] = statistics.fmean(samples)
         mean_agg.append(recomputed_mean)
         # Recompute the soak median/MAD from the raw soak samples for the drift check below.
@@ -174,6 +325,13 @@ def main() -> int:
         print(f"session{i}: soak median {rmed}% MAD {rmad}% (from {len(soak_samples)} samples) "
               f"ceiling {ceiling}% aborts {ctx.get('dw_case_aborts')} "
               f"commit {str(ctx.get('git_commit'))[:9]}")
+
+    # New acceptance checks: metadata identity, workload/rep/warm-up consistency, retry
+    # bias, and case-count exactness -- each fails loudly through the same fail() helper.
+    check_metadata_identity(sessions)
+    iter_constant = check_workload_consistency(iter_counts_per_session, interval_values, warmup_values)
+    check_case_counts(iter_counts_per_session, iter_constant)
+    check_retry_bias(retries_per_session)
 
     # Latin-square: every thread count occupies every round position across sessions.
     print("\n=== Latin-square positional balance ===")
