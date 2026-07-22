@@ -33,6 +33,17 @@ reached controlled conditions -- no session began, not an attempt); a completed 
 or a session that began then voided spends one of three attempts, the distinction
 preserved; it stops on acceptance, three attempts, or a six-hour horizon.
 
+Single-instance and accounting integrity: exactly one waiter may run at a time (an
+exclusive fcntl lock; a second invocation exits without touching anything), after the
+2026-07-19 corruption in which two concurrent instances contaminated each other's
+measurements. Every state transition is appended to an O_APPEND ledger (state.jsonl), and
+the counted-attempt total is re-derived from that ledger and cross-checked against the
+in-memory counter, so a double-count or a partially-written run cannot corrupt the
+stopping-rule decision. The ledger is append-only history: a fresh invocation logs how
+many prior records it found and starts its OWN accounting clean (it does not resume a
+half-finished run -- a run interrupted before a terminal ledger record simply never
+counts, and the next invocation starts a new run).
+
 On acceptance the four session records are written to a *review* directory, not to
 results/ -- the human operator inspects the raw metadata, re-confirms the comparison
 independently, checks for vacuous passes, and only then commits. This script commits
@@ -42,6 +53,7 @@ nothing and publishes nothing on its own.
 from __future__ import annotations
 
 import datetime
+import fcntl
 import json
 import math
 import os
@@ -51,8 +63,13 @@ import subprocess
 import sys
 import time
 
-REPO = pathlib.Path("/Users/vatsal/Documents/stochastic-lab")
-BIN = REPO / "build/benchmark/benchmarks/dw_bench_monte_carlo_scaling"
+# Resolve the repository root from this file's location, so the harness runs unchanged on
+# a dedicated machine wherever the clone lives (no hard-coded path). The benchmark binary
+# is overridable with DW_BENCH_BIN for out-of-tree build layouts.
+REPO = pathlib.Path(__file__).resolve().parents[1]
+BIN = pathlib.Path(
+    os.environ.get("DW_BENCH_BIN", REPO / "build/benchmark/benchmarks/dw_bench_monte_carlo_scaling")
+)
 REVIEW_DIR = pathlib.Path(sys.argv[1]) if len(sys.argv) > 1 else REPO / ".capture_review"
 SCRATCH = pathlib.Path(sys.argv[2]) if len(sys.argv) > 2 else REPO / ".capture_scratch"
 
@@ -109,6 +126,78 @@ THERMAL_PROBE_NOTE = (
 
 def log(message: str) -> None:
     print(f"{datetime.datetime.now():%H:%M:%S} {message}", flush=True)
+
+
+# --- Single-instance lock and append-only state ledger ----------------------
+#
+# The overnight run of 2026-07-19 was corrupted because two waiter processes ran at once
+# (an earlier instance survived undetected beside a newly launched one): each saw the
+# other's benchmark as unrelated interference, they clobbered a shared log, and they
+# collided on a same-second run-directory name. Root cause: nothing stopped a second
+# instance. The fixes below make that impossible and give attempt-accounting an auditable,
+# process-independent source of truth. None of this touches the measurement methodology.
+
+# The states a run can terminate in that COUNT toward the three-attempt stopping rule: a
+# session that began then voided, or a completed capture that failed the numeric gates. A
+# waiting-only void (no session began) and an acceptance do not count as failed attempts.
+COUNTED_TERMINAL_STATES = frozenset({"run_void_started", "run_reject"})
+
+
+def acquire_singleton_lock() -> "object | None":
+    """Take a non-blocking exclusive lock so only one waiter runs at a time. Returns the
+    held file object (keep it alive for the process lifetime) or None if another instance
+    holds it. This is THE fix for the concurrent-instance corruption of 2026-07-19."""
+    SCRATCH.mkdir(parents=True, exist_ok=True)
+    lock_file = open(SCRATCH / ".waiter.lock", "w", encoding="utf-8")  # noqa: SIM115
+    try:
+        fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        lock_file.close()
+        return None
+    lock_file.write(f"pid={os.getpid()} since={datetime.datetime.now().isoformat(timespec='seconds')}\n")
+    lock_file.flush()
+    return lock_file
+
+
+def append_state(waiter_id: str, state: str, run_id: str | None = None, **fields) -> None:
+    """Append one transition record to the append-only ledger (opened O_APPEND per write,
+    so even an unexpected second writer could not clobber a record)."""
+    record = {
+        "ts": datetime.datetime.now().isoformat(timespec="seconds"),
+        "pid": os.getpid(),
+        "ppid": os.getppid(),
+        "waiter_id": waiter_id,
+        "run_id": run_id,
+        "state": state,
+        **fields,
+    }
+    with open(SCRATCH / "state.jsonl", "a", encoding="utf-8") as ledger:
+        ledger.write(json.dumps(record) + "\n")
+
+
+def read_ledger() -> list[dict]:
+    path = SCRATCH / "state.jsonl"
+    if not path.exists():
+        return []
+    return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+
+
+def counted_attempt_run_ids(records: list[dict], waiter_id: str | None = None) -> set[str]:
+    """The set of run ids that count toward the stopping rule, derived from the ledger.
+
+    A run counts iff it reached a counted-terminal state. De-duplicated by run_id, so a
+    replayed or duplicated ledger record can never double-count (a run appears at most
+    once); a run with no terminal record -- e.g. the process died between creating the run
+    directory and finishing -- is never counted. When `waiter_id` is given, only that
+    waiter's runs count, so a restart's accounting starts clean while the ledger preserves
+    the full history."""
+    return {
+        r["run_id"]
+        for r in records
+        if r.get("state") in COUNTED_TERMINAL_STATES
+        and r.get("run_id")
+        and (waiter_id is None or r.get("waiter_id") == waiter_id)
+    }
 
 
 def _run(cmd: list[str]) -> str:
@@ -610,8 +699,10 @@ def evaluate(sessions: list[dict]) -> str:
     return verdict
 
 
-def one_controlled_run(run_dir: pathlib.Path) -> tuple[str, list[dict]]:
+def one_controlled_run(run_dir: pathlib.Path, waiter_id: str) -> tuple[str, list[dict]]:
     run_dir.mkdir(parents=True, exist_ok=True)
+    run_id = run_dir.name
+    append_state(waiter_id, "run_start", run_id)
     sessions: list[dict] = []
     frozen_ceiling: float | None = None
     ceiling_info: tuple[float, float] = (0.0, 0.0)
@@ -621,6 +712,7 @@ def one_controlled_run(run_dir: pathlib.Path) -> tuple[str, list[dict]]:
             log(f"inter-session idle: {INTER_SESSION_IDLE_S}s (not back-to-back)")
             time.sleep(INTER_SESSION_IDLE_S)
 
+        append_state(waiter_id, "soak_start", run_id, session_index=index)
         soak_ok, samples = soak(SOAK_HOLD_S, f"session{index}", SOAK_MAX_WAIT_S)
         if not soak_ok:
             # A soak timeout before any session began is waiting-only (not an attempt);
@@ -630,7 +722,10 @@ def one_controlled_run(run_dir: pathlib.Path) -> tuple[str, list[dict]]:
                 "VOID_ENVIRONMENT (waiting only)\n" if status == "void_waiting"
                 else "VOID_ENVIRONMENT (session began, later soak timed out)\n"
             )
+            append_state(waiter_id, f"run_{status}", run_id, session_index=index,
+                         detail="soak timeout")
             return status, sessions
+        append_state(waiter_id, "soak_held", run_id, session_index=index)
 
         # Every session's own soak median/MAD are recorded (point 1); only session 0's
         # ceiling is frozen and applied to all four.
@@ -640,38 +735,78 @@ def one_controlled_run(run_dir: pathlib.Path) -> tuple[str, list[dict]]:
             log(f"calibrated in-case aggregate ceiling: {ceiling_i:.0f}% "
                 f"(session-0 soak median {median_i:.0f}%, MAD {mad_i:.1f}%, cap {AGG_CEIL_CAP:.0f}%) "
                 "-- frozen for all four sessions")
+            append_state(waiter_id, "ceiling_calibrated", run_id, session_index=index,
+                         detail=f"ceiling={ceiling_i:.0f}% median={median_i:.0f}% mad={mad_i:.1f}%")
         else:
             log(f"session{index} soak median {median_i:.0f}%, MAD {mad_i:.1f}% "
                 f"(ceiling stays frozen at {frozen_ceiling:.0f}%)")
         ceiling_info = (median_i, mad_i)
 
+        append_state(waiter_id, "session_start", run_id, session_index=index)
         status, data = run_session(
             index, run_dir / f"session{index}", frozen_ceiling, ceiling_info, samples
         )
         if status != "ok":
             (run_dir / "VERDICT").write_text("VOID_ENVIRONMENT (session began)\n")
+            append_state(waiter_id, "run_void_started", run_id, session_index=index,
+                         detail="case retries exhausted")
             return status, sessions
+        append_state(waiter_id, "session_complete", run_id, session_index=index)
         assert data is not None
         sessions.append(data)
 
     verdict = evaluate(sessions)
     (run_dir / "VERDICT").write_text(verdict + "\n")
+    append_state(waiter_id, "run_accepted" if verdict == "ACCEPTED" else "run_reject", run_id,
+                 detail=verdict)
     return ("accepted" if verdict == "ACCEPTED" else "reject"), sessions
 
 
 def main() -> int:
     SCRATCH.mkdir(parents=True, exist_ok=True)
+
+    # Refuse to run a second instance concurrently (the 2026-07-19 corruption). The lock is
+    # released in the finally below, on every exit path.
+    lock = acquire_singleton_lock()
+    if lock is None:
+        log("another waiter instance holds the lock; exiting (this prevents the "
+            "concurrent-instance corruption of 2026-07-19)")
+        return 4
+    try:
+        return _run_waiter()
+    finally:
+        lock.close()
+
+
+def _run_waiter() -> int:
+    """The waiter loop, run under the singleton lock held by main()."""
     log("=== persistent controlled scaling waiter (4-session Latin square) ===")
     log(f"note: {THERMAL_PROBE_NOTE}")
     if not BIN.exists():
         log(f"error: benchmark binary missing ({BIN}); build the benchmark preset first")
         return 2
 
+    # This invocation's identity: its own accounting starts clean, but the append-only
+    # ledger preserves earlier invocations' history for audit.
+    waiter_id = f"{datetime.datetime.now():%Y%m%d-%H%M%S}-p{os.getpid()}"
+    prior = read_ledger()
+    if prior:
+        log(f"state ledger has {len(prior)} prior record(s) from earlier invocation(s); "
+            "this invocation's attempt accounting starts clean")
+    append_state(waiter_id, "waiter_start", detail=f"prior_records={len(prior)}")
+
     started = time.monotonic()
-    attempts = waiting_voids = 0
+    attempts = waiting_voids = run_seq = 0
     while attempts < MAX_REAL_ATTEMPTS and (time.monotonic() - started) < TOTAL_HORIZON_S:
-        run_dir = SCRATCH / f"run-{datetime.datetime.now():%Y%m%d-%H%M%S}"
-        outcome, sessions = one_controlled_run(run_dir)
+        # A monotonic per-invocation sequence guarantees a unique run id even when two runs
+        # begin in the same wall-clock second (the second-resolution timestamp and pid alone
+        # would collide, silently de-duplicating distinct attempts in the ledger). The pid
+        # still distinguishes processes were the lock ever bypassed.
+        run_seq += 1
+        run_dir = SCRATCH / (
+            f"run-{datetime.datetime.now():%Y%m%d-%H%M%S}-p{os.getpid()}-{run_seq:03d}"
+        )
+        outcome, sessions = one_controlled_run(run_dir, waiter_id)
 
         if outcome == "accepted":
             REVIEW_DIR.mkdir(parents=True, exist_ok=True)
@@ -682,6 +817,7 @@ def main() -> int:
             log(f"ACCEPTED_PENDING_REVIEW after {attempts} prior attempt(s); records in {REVIEW_DIR}")
             log("NOT published: the operator must inspect metadata, re-confirm the four-session "
                 "comparison independently, and check for vacuous passes before committing.")
+            append_state(waiter_id, "final_verdict", detail="ACCEPTED_PENDING_REVIEW")
             (SCRATCH / "FINAL_VERDICT").write_text("ACCEPTED_PENDING_REVIEW\n")
             return 0
 
@@ -691,14 +827,27 @@ def main() -> int:
             time.sleep(WAITING_RETRY_S)
             continue
 
+        # A started-session void or a completed numeric rejection consumes one attempt. The
+        # ledger is the audit authority: re-derive the count from it and assert the in-memory
+        # counter agrees, so an accounting drift or a double-count would fail loudly.
         attempts += 1
-        log(f"real attempt {attempts}/{MAX_REAL_ATTEMPTS} outcome: {outcome.upper()}")
+        append_state(waiter_id, "attempt_counted", run_dir.name,
+                     detail=f"outcome={outcome} attempt={attempts}")
+        ledger_count = len(counted_attempt_run_ids(read_ledger(), waiter_id))
+        if ledger_count != attempts:
+            log(f"ACCOUNTING ERROR: in-memory attempts={attempts} but ledger-derived "
+                f"count={ledger_count}; aborting to avoid a wrong stopping-rule decision")
+            append_state(waiter_id, "final_verdict", detail="ACCOUNTING_ERROR")
+            (SCRATCH / "FINAL_VERDICT").write_text("ACCOUNTING_ERROR\n")
+            return 5
+        log(f"real attempt {attempts}/{MAX_REAL_ATTEMPTS} outcome: {outcome.upper()} "
+            f"(ledger-confirmed)")
 
     if attempts >= MAX_REAL_ATTEMPTS:
         msg = (
             f"UNSUITABLE_MOVE_TO_DEDICATED: {MAX_REAL_ATTEMPTS} controlled attempts did not "
-            "produce an accepted multi-thread baseline; move the harness UNCHANGED to a "
-            "dedicated fixed machine."
+            "produce an accepted multi-thread baseline; move the harness to a dedicated fixed "
+            "machine (workloads and measurement methodology preserved unchanged)."
         )
     else:
         msg = (
@@ -706,6 +855,7 @@ def main() -> int:
             "waiting-only voids and no controlled window; re-arm later or use a dedicated machine."
         )
     log(msg)
+    append_state(waiter_id, "final_verdict", detail=msg.split(":")[0])
     (SCRATCH / "FINAL_VERDICT").write_text(msg + "\n")
     return 1
 

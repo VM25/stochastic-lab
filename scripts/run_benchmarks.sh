@@ -52,17 +52,18 @@ LOAD_PRE=$(read_load1)
 #
 # Two parts, decoupled so brief background blips (a Shortcuts run, an iCloud sync tick)
 # do not stall it forever:
-#   1. A fixed idle soak of DW_COOLDOWN_S seconds. The benchmark is the machine's real
-#      heat source and it is not running during the soak, so the die cools even with the
-#      occasional short blip; requiring a *perfect* quiet streak here was too strict and
-#      simply never completed on this machine.
+#   1. A fixed idle soak of DW_COOLDOWN_S seconds (default 240). The benchmark is the
+#      machine's real heat source and it is not running during the soak, so the die cools
+#      even with the occasional short blip; requiring a *perfect* quiet streak here was too
+#      strict and simply never completed on this machine. Set DW_COOLDOWN_S=0 to opt out.
 #   2. A capture-start gate: after the soak, do not begin timing until the 1-minute load
-#      is below DW_COOLDOWN_LOAD (default 1.8), so no unrelated work is running as the
-#      measurement starts. Give up after 10 minutes -- the machine will not settle.
+#      is below DW_COOLDOWN_LOAD (default 2.0, matching the controlled-capture soak gate),
+#      so no unrelated work is running as the measurement starts. Give up after 10 minutes
+#      -- the machine will not settle.
 cool_down() {
-    local soak=${DW_COOLDOWN_S:-0}
+    local soak=${DW_COOLDOWN_S:-240}
     [[ ${soak} -le 0 ]] && return 0
-    local ceiling=${DW_COOLDOWN_LOAD:-1.8}
+    local ceiling=${DW_COOLDOWN_LOAD:-2.0}
     echo "==> cool-down: ${soak}s idle thermal soak, then wait for load < ${ceiling}"
     sleep "${soak}"
     local waited=0 l1
