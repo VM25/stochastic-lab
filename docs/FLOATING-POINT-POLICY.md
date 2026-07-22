@@ -120,7 +120,6 @@ Stated explicitly, because the absence of a claim is easy to miss:
   addition is not associative; summing paths in a different order changes the
   last bits. Phase 12 fixes the reduction order deterministically and measures
   the residual difference.
-* **Not** a measured performance cost for disabling contraction. Phase 13.
 
 Where a result must be reproduced exactly, reproduce it on the recorded platform.
 Every artifact carries its compiler, version, flags, OS, and CPU for this reason.

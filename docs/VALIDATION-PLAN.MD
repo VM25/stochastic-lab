@@ -10,7 +10,7 @@ Validation is complete only when every required method passes justified tests or
 
 ## 1. Validation Principles
 
-1. Validate before optimizing.
+1. Validate before drawing conclusions.
 2. Prefer independent references.
 3. Use method-specific tolerances.
 4. Separate bias, variance, discretization error, and floating-point error.
@@ -383,7 +383,6 @@ From a clean checkout, verify that stored commands regenerate:
 * reference prices;
 * validation tables;
 * experiment results;
-* benchmark inputs;
 * published charts.
 
 Record:

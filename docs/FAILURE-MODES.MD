@@ -159,7 +159,7 @@ If any completion-blocking failure remains, continue iterating until it is corre
 * single-run error is presented as estimator quality;
 * variance reduction is judged from one sample.
 
-**Why it fails:** Random error is confused with method performance.
+**Why it fails:** Random error is confused with estimator quality.
 
 **Required remediation:**
 
@@ -256,52 +256,7 @@ If any completion-blocking failure remains, continue iterating until it is corre
 
 ---
 
-## 13. Performance Claims Are Invalid
-
-**Warning signs:**
-
-* debug builds are benchmarked;
-* best runs alone are reported;
-* methods are compared at unequal accuracy;
-* hardware or compiler settings are missing;
-* “low latency” or “production-grade” appears without evidence.
-
-**Why it fails:** Fast incorrect or incomparable results are meaningless.
-
-**Required remediation:**
-
-* rerun release benchmarks;
-* use repeated measurements;
-* compare equivalent accuracy;
-* disclose methodology and environment;
-* remove unsupported language.
-
-**Completion blocker:** Any public performance claim lacks reproducible evidence.
-
----
-
-## 14. Premature Optimization Damages the System
-
-**Warning signs:**
-
-* custom allocators, SIMD, or complex templates appear before profiling;
-* readability and validation decline;
-* optimized results differ materially from baseline.
-
-**Why it fails:** Complexity increases without proving value.
-
-**Required remediation:**
-
-* restore validated baseline;
-* profile;
-* optimize measured bottlenecks only;
-* revalidate after every change.
-
-**Completion blocker:** Performance work reduces correctness, reproducibility, or auditability.
-
----
-
-## 15. C++ Looks Superficial
+## 13. C++ Looks Superficial
 
 **Warning signs:**
 
@@ -318,14 +273,13 @@ If any completion-blocking failure remains, continue iterating until it is corre
 * clarify domain types and ownership;
 * separate numerical components;
 * remove unnecessary abstraction;
-* profile allocations;
 * improve testing and build discipline.
 
 **Completion blocker:** Core methods cannot be independently understood, tested, or maintained.
 
 ---
 
-## 16. Failures Return Plausible Values
+## 14. Failures Return Plausible Values
 
 **Warning signs:**
 
@@ -347,7 +301,7 @@ If any completion-blocking failure remains, continue iterating until it is corre
 
 ---
 
-## 17. Tests Pass for the Wrong Reasons
+## 15. Tests Pass for the Wrong Reasons
 
 **Warning signs:**
 
@@ -369,7 +323,7 @@ If any completion-blocking failure remains, continue iterating until it is corre
 
 ---
 
-## 18. Results Cannot Be Reproduced
+## 16. Results Cannot Be Reproduced
 
 **Warning signs:**
 
@@ -391,7 +345,7 @@ If any completion-blocking failure remains, continue iterating until it is corre
 
 ---
 
-## 19. Documentation Becomes Aspirational
+## 17. Documentation Becomes Aspirational
 
 **Warning signs:**
 
@@ -412,14 +366,13 @@ If any completion-blocking failure remains, continue iterating until it is corre
 
 ---
 
-## 20. Final Identity Is Lost
+## 18. Final Identity Is Lost
 
 **Warning signs:**
 
 * the project is presented as a generic options calculator;
 * C++ is hidden behind the website;
-* mathematical evidence is difficult to locate;
-* performance overshadows correctness.
+* mathematical evidence is difficult to locate.
 
 **Why it fails:** DiffusionWorks no longer solves its primary profile objective.
 
@@ -444,7 +397,7 @@ DiffusionWorks is not done while any of the following remains:
 * external core implementation;
 * unfinished mandatory scope;
 * documentation-code mismatch;
-* unreliable test or benchmark;
+* unreliable test;
 * presentation stronger than the underlying engine.
 
 Do not explain around a failed requirement. Fix it, rerun it, and produce evidence.

@@ -8,15 +8,15 @@ namespace diffusionworks {
 
 /// Provenance of a published run.
 ///
-/// PROJECT-SPEC "Required Output Metadata" and BENCHMARK-PLAN section 2 require
-/// every published run to identify the code, the toolchain, and the machine that
-/// produced it. Fields split by when they are knowable:
+/// PROJECT-SPEC "Required Output Metadata" requires every published run to
+/// identify the code, the toolchain, and the machine that produced it. Fields
+/// split by when they are knowable:
 ///
 ///   - compile time: version, compiler, build type, flags, standard, git commit
 ///   - run time:     OS, CPU, cores, host, timestamp
 ///
-/// CPU and OS are resolved at run time because the machine that executes a
-/// benchmark is not necessarily the machine that compiled the binary.
+/// CPU and OS are resolved at run time because the machine that executes a run
+/// is not necessarily the machine that compiled the binary.
 struct BuildInfo {
     // --- Compile-time provenance ---
     std::string version;

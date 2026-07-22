@@ -87,7 +87,7 @@ public:
     /// 0.2% by a few hundred observations, so this costs nothing at production
     /// path counts while remaining correct at small ones -- where a normal
     /// approximation would quietly under-cover, which is precisely the defect
-    /// EXP-15 exists to detect.
+    /// EXP-14 exists to detect.
     [[nodiscard]] Result<ConfidenceInterval> confidence_interval(double level = 0.95) const;
 
 private:

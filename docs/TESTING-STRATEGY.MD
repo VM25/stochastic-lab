@@ -62,8 +62,7 @@ Verify complete workflows:
 * configuration to simulation;
 * configuration to validation;
 * configuration to experiment;
-* configuration to calibration;
-* configuration to benchmark output.
+* configuration to calibration.
 
 Check:
 
@@ -189,7 +188,6 @@ simulate
 validate
 experiment
 calibrate
-benchmark
 ```
 
 Verify:
@@ -235,8 +233,6 @@ Required jobs:
 7. static analysis;
 8. example configuration execution.
 
-Benchmarks must not become CI pass/fail gates on uncontrolled shared hardware.
-
 ---
 
 ## 13. Test Data
@@ -279,8 +275,7 @@ Separate:
 
 * fast developer tests;
 * extended statistical tests;
-* full validation tests;
-* benchmarks.
+* full validation tests.
 
 Slow tests must remain automated and runnable through documented commands.
 

@@ -81,18 +81,16 @@ Deliver:
 
 **Gate:** Prices match independent references and calibration passes synthetic recovery.
 
-### Milestone 7 — Performance Engineering
+### Milestone 7 — Multithreading
 
 Deliver:
 
 * deterministic multithreading;
-* profiling;
-* release benchmarks;
-* thread scaling;
-* memory analysis;
-* accuracy-adjusted comparisons.
+* deterministic reductions;
+* thread-count controls;
+* race-safety tests.
 
-**Gate:** Every performance claim is reproducible and correctness-equivalent.
+**Gate:** One-thread equivalence, fixed-count reproducibility, and clean race detection hold; no throughput, scaling, or speedup claim is made.
 
 ### Milestone 8 — Research Evidence
 
@@ -102,7 +100,6 @@ Deliver:
 * raw results;
 * charts;
 * validation report;
-* benchmark report;
 * technical paper.
 
 **Gate:** Every headline conclusion traces to generated evidence.
@@ -131,7 +128,7 @@ Required:
 * required Greeks;
 * variance reduction;
 * Heston calibration;
-* validation, experiments, and benchmarks;
+* validation and experiments;
 * CLI, tests, documentation, paper, and results site.
 
 Nothing outside this scope may delay completion.
@@ -194,7 +191,6 @@ Version 1.0 is not complete if:
 * validation or experiments remain unresolved;
 * documentation describes unfinished behavior;
 * the website advances ahead of the engine;
-* performance work precedes correctness;
 * published results cannot be reproduced;
 * scope continues expanding without a stable final release.
 

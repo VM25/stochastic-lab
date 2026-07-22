@@ -1,19 +1,31 @@
-# Phase 14 Readiness Audit
+# Phase 13 Readiness Audit
 
-**A read-only, Phase 13 preparatory artifact. It advances nothing.** It records the state
-of the experiment catalog so Phase 14 (the full experiment program) can be planned, and it
-does not run experiments, regenerate results, or create configs, plotters, experiment
-implementations, results, figures, or methodology documents. Phase 13 remains open; Phase 14
-must not begin until it closes.
+**A read-only preparatory artifact for Phase 13 (Full Experiment Program).** It records the
+state of the experiment catalog so Phase 13 can be planned. It advances nothing: it does not
+run experiments, regenerate results, or create configs, plotters, experiment
+implementations, results, figures, or methodology documents.
 
 - **Audit date:** 2026-07-22
-- **Audited commit:** `2f81fd3bea1d951ddacf5cc3fdb4a8c0692095a4`
+- **Audited commit:** the scope-change increment that removed the benchmarking/optimization
+  scope and renumbered the phases and experiments (the commit that introduces this file).
 - **No experiments were run and no results were regenerated** while producing this audit. It
   was built by inspecting committed files only.
 
+## Scope note
+
+The benchmarking-and-optimization phase was removed from the project. The phases were
+renumbered so that **Phase 13 is now the Full Experiment Program** (formerly Phase 14),
+followed by Phase 14 Documentation and Technical Paper, Phase 15 Public Results Site, and
+Phase 16 Final Acceptance. The experiment catalog was renumbered accordingly: the former
+EXP-13 (Parallel Monte Carlo Scaling) was removed, EXP-13 is now **Cross-Method Accuracy and
+Agreement** (formerly EXP-14, reframed away from performance toward accuracy and agreement),
+EXP-14 is Statistical Confidence Coverage (formerly EXP-15), and EXP-15 is Numerical Edge
+Cases (formerly EXP-16). The catalog now mandates **EXP-01 through EXP-15**. There is no
+longer any benchmarking dependency, so nothing in the catalog is externally blocked.
+
 ## Authoritative sources inspected
 
-- `docs/EXPERIMENT-CATALOG.MD` — the mandatory experiment definitions (EXP-01 through EXP-16)
+- `docs/EXPERIMENT-CATALOG.MD` — the mandatory experiment definitions (EXP-01 through EXP-15)
   and the required-artifacts / final-gate criteria.
 - `configs/experiment/` — stored experiment configurations and its `README.md`
   (config → experiment mapping); `configs/calibration/synthetic_surface.json`.
@@ -22,9 +34,8 @@ must not begin until it closes.
 - `docs/figures/` — committed charts.
 - `src/cli/experiment_command.cpp` — the CLI dispatch that determines which IDs are runnable.
 - `src/experiments/`, `include/diffusionworks/experiments/` — experiment implementations.
-- `python/` — `plot_convergence.py`, `plot_benchmarks.py` (the only chart generators present).
-- `docs/*METHODOLOGY*.md`, `BENCHMARK-PLAN.MD`, `BENCHMARK-CAPTURE-METHODOLOGY.md`,
-  `FAILURE-MODES.md` — methodology notes.
+- `python/` — `plot_convergence.py` (the only chart generator present).
+- `docs/*METHODOLOGY*.md`, `FAILURE-MODES.MD` — methodology notes.
 
 ## Status labels
 
@@ -34,13 +45,8 @@ must not begin until it closes.
 | `PARTIAL` | Implemented and a result is committed, but a chart and/or methodology note is missing. |
 | `IMPLEMENTED_NOT_GENERATED` | Runnable (config + CLI dispatch + data present) but no committed result or chart. |
 | `NOT_IMPLEMENTED` | No experiment implementation and no stored config; not runnable. |
-| `BLOCKED` | Cannot proceed until the open Phase 13 baseline is accepted. |
 
-Note on scope: the catalog mandates **EXP-01 through EXP-16**, not only EXP-01–12. EXP-13
-(parallel Monte Carlo scaling) is the Phase 13 baseline itself and lives in the benchmark
-harness, not the `experiment` CLI; EXP-14/15/16 are further mandatory experiments.
-
-## EXP-01 – EXP-16 readiness table
+## EXP-01 – EXP-15 readiness table
 
 | EXP | Readiness | Required config | Implementation (CLI-dispatchable) | Stored result | Chart | Documentation | Known warning/failure | Missing dependency |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -56,63 +62,58 @@ harness, not the `experiment` CLI; EXP-14/15/16 are further mandatory experiment
 | 10 Heston variance discretization | `IMPLEMENTED_NOT_GENERATED` | `heston_simulation.json` | yes | none | none | HESTON-SIMULATION-METHODOLOGY | not yet generated | run + commit result; chart tooling + figure |
 | 11 Heston calibration recovery | `IMPLEMENTED_NOT_GENERATED` | `calibration.json` (+ `configs/calibration/synthetic_surface.json`) | yes | none | none | CALIBRATION-METHODOLOGY | not yet generated | run + commit result; chart tooling + figure |
 | 12 Market-surface stability | `IMPLEMENTED_NOT_GENERATED` | `calibration_stability.json` (+ `data/market/spy_options_2026-07-17.json`) | yes | none | none | CALIBRATION-METHODOLOGY | not yet generated | run + commit result; residual-by-strike/maturity charts |
-| 13 Parallel MC scaling | `BLOCKED` | benchmark harness (`scripts/capture_scaling_baseline.py`) | external to experiment CLI | none (baseline pending) | none | BENCHMARK-PLAN / BENCHMARK-CAPTURE-METHODOLOGY | environment unsuitable during the 2026-07-19 window; capture not yet accepted | accepted four-session multithread baseline + independent review (open Phase 13) |
-| 14 Accuracy per unit compute | `NOT_IMPLEMENTED` | none | no | none | none | none | not implemented | config + cross-method experiment implementation |
-| 15 Statistical confidence coverage | `NOT_IMPLEMENTED` | none (named only in an `online_moments.hpp` comment) | no | none | none | none | not implemented | config + experiment implementation |
-| 16 Numerical edge cases | `NOT_IMPLEMENTED` | none | no | none | none | FAILURE-MODES exists (engine-level) | not implemented | config + experiment implementation |
+| 13 Cross-method accuracy and agreement | `NOT_IMPLEMENTED` | none | no | none | none | none | not implemented (new experiment; reframed from the former accuracy-per-computation study) | config + cross-method experiment implementation + plotter |
+| 14 Statistical confidence coverage | `NOT_IMPLEMENTED` | none | no | none | none | none | not implemented | config + experiment implementation |
+| 15 Numerical edge cases | `NOT_IMPLEMENTED` | none | no | none | none | FAILURE-MODES exists (engine-level) | not implemented | config + experiment implementation |
 
-## Corrected gap synthesis
+## Gap synthesis
 
-Counts by readiness label (total = 16):
+Counts by readiness label (total = 15):
 
 | Readiness | Count | Experiments |
 | --- | --- | --- |
 | `READY` | 4 | EXP-01, EXP-02, EXP-03, EXP-04 |
 | `PARTIAL` | 3 | EXP-06, EXP-07, EXP-08 |
 | `IMPLEMENTED_NOT_GENERATED` | 3 | EXP-10, EXP-11, EXP-12 |
-| `NOT_IMPLEMENTED` | 5 | EXP-05, EXP-09, EXP-14, EXP-15, EXP-16 |
-| `BLOCKED` | 1 | EXP-13 |
+| `NOT_IMPLEMENTED` | 5 | EXP-05, EXP-09, EXP-13, EXP-14, EXP-15 |
 
 ```
 4  ready
 3  partially complete
 3  implemented but not generated
 5  not implemented
-1  blocked by Phase 13
-= 16 experiments
+= 15 experiments
 ```
 
 - **`READY` (4):** EXP-01–04 have config, result, chart, and methodology note. EXP-02's
-  documented warning is an input to Phase 14's theory/empirics reconciliation, not a blocker.
+  documented warning is an input to Phase 13's theory/empirics reconciliation, not a blocker.
 - **`PARTIAL` (3):** EXP-06, 07, 08 are implemented with committed results but have **no
   committed charts**, and there is no plotter for PDE / barrier / greeks — only
-  `plot_convergence.py` (01–04) and `plot_benchmarks.py` (13) exist. EXP-06 is also missing
-  its summary `.csv`; EXP-08 has no methodology note. The catalog's "all published charts can
-  be regenerated automatically" gate cannot pass for these yet.
+  `plot_convergence.py` (01–04) exists. EXP-06 is also missing its summary `.csv`; EXP-08 has
+  no methodology note. The catalog's "all published charts can be regenerated automatically"
+  gate cannot pass for these yet.
 - **`IMPLEMENTED_NOT_GENERATED` (3):** EXP-10, 11, 12 are CLI-dispatchable with stored configs
-  and their data dependencies present, but have no committed results and no charts. They do
-  not depend on Phase 13; generating them is a Phase 14 action and is deliberately not done
-  here.
-- **`NOT_IMPLEMENTED` (5):** EXP-05, 09, 14, 15, 16 have no config and no CLI dispatch (05 and
-  15 appear only as code comments). Each needs new experiment code before Phase 14 can
-  regenerate it.
-- **`BLOCKED` (1):** EXP-13 needs the accepted multithread scaling baseline that Phase 13 owes.
+  and their data dependencies present, but have no committed results and no charts. Generating
+  them is a Phase 13 action and is deliberately not done here.
+- **`NOT_IMPLEMENTED` (5):** EXP-05, 09, 13, 14, 15 have no config and no CLI dispatch (05 is
+  named only in code comments; 13 is the newly reframed cross-method experiment). Each needs
+  new experiment code before Phase 13 can regenerate it.
 
 The single largest cross-cutting dependency is **chart tooling**: six experiments (06, 07,
-08, 10, 11, 12) need plotters that do not yet exist.
+08, 10, 11, 12) need plotters that do not yet exist beyond `plot_convergence.py`.
 
-## Phase 13 dependency
+## Phase 13 execution
 
-EXP-13 is `BLOCKED` on the open Phase 13 benchmarking-and-optimization work. The Phase 13
-critical path is unchanged: **arm the hardened, single-instance-locked capture waiter during a
-genuine unattended window**, obtain an accepted four-session multithread baseline, pass it
-through independent review, commit the raw artifacts, then profile and (only where profiling
-proves a bottleneck) optimize with before/after evidence and full numerical revalidation.
-Phase 14 does not begin until Phase 13 closes.
+Phase 13 (Full Experiment Program) runs and reconciles this entire catalog: regenerate every
+mandatory experiment from stored configuration, collect raw JSON/CSV, generate all summary
+tables and charts, assign pass/warning/fail/inconclusive, reconcile theory with the
+empirical results, preserve disappointing and failed outcomes, and verify every headline
+claim traces to generated evidence. The existing EXP-01–12 work is input to Phase 13; it does
+not by itself complete it. Nothing in the catalog is externally blocked.
 
 ## Staleness
 
-This audit reflects commit `2f81fd3` only. Any later commit — a generated result, a new
-plotter, a new experiment implementation, or a Phase 13 baseline — can change a readiness
-status, and this document is **not** updated automatically. Re-run the audit against the then
-current commit before relying on it to plan Phase 14.
+This audit reflects the scope-change increment only. Any later commit — a generated result, a
+new plotter, or a new experiment implementation — can change a readiness status, and this
+document is **not** updated automatically. Re-run the audit against the then current commit
+before relying on it to plan the remaining Phase 13 work.

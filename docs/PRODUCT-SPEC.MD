@@ -4,7 +4,7 @@
 
 **DiffusionWorks: Stochastic Derivatives Numerics**
 
-**Subtitle:** A C++ Stochastic Derivatives Modeling, Validation and Performance Engine
+**Subtitle:** A C++ Stochastic Derivatives Modeling and Validation Engine
 
 ## Purpose
 
@@ -45,7 +45,6 @@ The final product must provide:
 * Heston calibration;
 * convergence experiments;
 * validation suites;
-* reproducible benchmarks;
 * CLI-driven execution;
 * machine-readable experiment outputs;
 * technical documentation and a public results presentation.
@@ -64,10 +63,6 @@ Compare outputs against analytic values, trusted references, financial invariant
 
 Run controlled convergence, stability, calibration, and estimator-comparison studies.
 
-### Benchmark
-
-Measure throughput, latency, scaling, memory behavior, and accuracy per unit of computation.
-
 ### Reproduce
 
 Rerun any published result using stored configuration, seed, environment, and build metadata.
@@ -80,7 +75,7 @@ Every run must produce only applicable fields:
 * confidence interval;
 * absolute and relative error;
 * convergence statistics;
-* runtime and throughput;
+* runtime;
 * model and method parameters;
 * random seed;
 * compiler and build metadata;
@@ -90,7 +85,7 @@ Every run must produce only applicable fields:
 
 ## Product Principles
 
-1. Correctness before optimization.
+1. Correctness before convenience.
 2. Validation before presentation.
 3. Measured evidence before claims.
 4. Reproducibility before publication.
@@ -127,7 +122,7 @@ The interface must be:
 * strict about invalid inputs;
 * readable for humans;
 * exportable for analysis;
-* consistent across pricing, validation, experiment, and benchmark commands.
+* consistent across pricing, validation, and experiment commands.
 
 The public website is secondary. It may present results but must not contain separate pricing logic.
 
@@ -140,7 +135,6 @@ The product succeeds only when:
 * theoretical convergence behavior is empirically tested;
 * stochastic outputs include valid uncertainty estimates;
 * calibration is tested using synthetic parameter recovery;
-* benchmarks are reproducible and methodologically fair;
 * all major claims are traceable to generated evidence;
 * a clean environment can build, test, and run the project;
 * technical reviewers can inspect assumptions, code, and failure cases;
@@ -152,7 +146,6 @@ The product is not done if:
 
 * any headline result lacks validation;
 * external libraries perform the central calculations;
-* benchmark claims omit hardware or methodology;
 * stochastic results depend on one favorable seed;
 * unstable cases are hidden;
 * the website is more complete than the engine;

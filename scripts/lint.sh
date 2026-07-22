@@ -56,7 +56,7 @@ CLANG_TIDY=$(find_tool clang-tidy)
 SOURCES=()
 while IFS= read -r file; do
     SOURCES+=("$file")
-done < <(find include src tests benchmarks -type f \
+done < <(find include src tests -type f \
     \( -name '*.hpp' -o -name '*.cpp' \) 2> /dev/null | sort)
 
 if [[ ${#SOURCES[@]} -eq 0 ]]; then

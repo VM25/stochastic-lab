@@ -84,7 +84,7 @@ Every output must retain model, numerical, seed, build, hardware, and runtime me
 
 ## ADR-008: Controlled Polymorphism
 
-**Decision:** Use runtime polymorphism for runtime engine selection and templates for performance-sensitive policies.
+**Decision:** Use runtime polymorphism for runtime engine selection and templates for compile-time policy selection.
 
 **Why:** Neither inheritance everywhere nor templates everywhere is justified.
 
@@ -152,7 +152,7 @@ Required fields where applicable:
 
 **Why:** Custom memory systems add complexity without guaranteed benefit.
 
-Add specialized layouts, allocators, or SIMD only after profiling identifies a measurable bottleneck.
+Do not add specialized layouts, allocators, or SIMD.
 
 ---
 
@@ -160,9 +160,8 @@ Add specialized layouts, allocators, or SIMD only after profiling identifies a m
 
 **Decision:** Reuse path buffers and thread-local scratch storage.
 
-**Why:** Per-step or per-path allocation distorts benchmarks and reduces throughput.
-
-A profiler must verify this requirement.
+**Why:** Per-step or per-path allocation is avoidable overhead and complicates
+thread-local buffer ownership under the deterministic reduction.
 
 ---
 
@@ -170,7 +169,7 @@ A profiler must verify this requirement.
 
 **Decision:** Use IEEE double precision for primary calculations.
 
-**Why:** It is the standard balance of precision and performance for this project.
+**Why:** It is the standard balance of precision and computational cost for this project.
 
 Use higher precision only for reference analysis or diagnosed numerical failure.
 
@@ -190,7 +189,7 @@ Use higher precision only for reference analysis or diagnosed numerical failure.
 
 **Decision:** Retain exact GBM simulation alongside Euler–Maruyama and Milstein.
 
-**Why:** It provides controlled strong-error, weak-error, and pricing benchmarks.
+**Why:** It provides controlled strong-error, weak-error, and pricing references.
 
 Approximate schemes must use common Brownian increments when compared.
 
@@ -286,28 +285,21 @@ No root, invalid price bounds, or non-convergence must produce explicit failure.
 
 ---
 
-## ADR-025: Benchmarks Require Correctness Equivalence
+## ADR-025: Benchmarks Require Correctness Equivalence — Withdrawn
 
-**Decision:** Compare performance only after outputs satisfy equivalent accuracy requirements.
-
-**Why:** Raw speed is meaningless when methods produce unequal-quality results.
-
-Primary performance measures include:
-
-* RMSE per second;
-* runtime to target error;
-* throughput;
-* parallel speedup.
+**Status:** Withdrawn. The benchmarking and optimization scope was removed from the
+project; there is no performance-measurement work to govern. The number is retained so
+earlier ADR cross-references stay stable. Multithreading, deterministic reductions, and
+race-safety remain in scope under ADR-010/011 and the multithreading methodology, but no
+throughput, scaling, or speedup measurement is performed or claimed.
 
 ---
 
-## ADR-026: Optimization Follows Profiling
+## ADR-026: Optimization Follows Profiling — Withdrawn
 
-**Decision:** Validate, benchmark, profile, optimize, then revalidate.
-
-**Why:** Premature optimization can obscure mathematics and introduce numerical defects.
-
-Every optimization must retain before-and-after evidence.
+**Status:** Withdrawn, with ADR-025. No profiling requirement or optimization workflow
+exists: correctness, validation, and reproducibility are the engineering contract, and
+the code is not tuned against performance measurements.
 
 ---
 
@@ -337,7 +329,7 @@ A limited WebAssembly demonstration is optional only after Version 1.0 completio
 
 * Black–Scholes and Heston;
 * European, Asian, and barrier options;
-* required analytic, Monte Carlo, finite-difference, Greek, calibration, validation, and benchmark work.
+* required analytic, Monte Carlo, finite-difference, Greek, calibration, and validation work.
 
 **Rejected until completion:**
 
@@ -370,8 +362,6 @@ The architecture is not complete if:
 * stochastic runs are not reproducible;
 * multithreading introduces hidden shared state;
 * numerical components cannot be tested independently;
-* optimizations lack profiling evidence;
-* benchmarks compare unequal accuracy;
 * calibration failures appear as successful outputs;
 * website logic diverges from the C++ engine;
 * abstractions are built for excluded models;

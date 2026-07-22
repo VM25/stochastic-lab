@@ -17,20 +17,19 @@ Result<Options> parse(std::initializer_list<std::string_view> args) {
     return parse_arguments(std::vector<std::string_view>(args));
 }
 
-constexpr std::array<CommandKind, 6> kAllCommands{
+constexpr std::array<CommandKind, 5> kAllCommands{
     CommandKind::Price,
     CommandKind::Simulate,
     CommandKind::Validate,
     CommandKind::Experiment,
     CommandKind::Calibrate,
-    CommandKind::Benchmark,
 };
 
 // ---------------------------------------------------------------------------
 // Commands
 // ---------------------------------------------------------------------------
 
-// PROJECT-SPEC "Interfaces" fixes these six command names. They are part of the
+// PROJECT-SPEC "Interfaces" fixes these five command names. They are part of the
 // published interface, so the round trip is pinned by test.
 TEST(CommandTest, EveryRequiredCommandParsesAndRoundTrips) {
     std::set<std::string_view> seen;
@@ -54,7 +53,6 @@ TEST(CommandTest, SpecRequiredNamesAreExact) {
     EXPECT_TRUE(parse_command("validate").has_value());
     EXPECT_TRUE(parse_command("experiment").has_value());
     EXPECT_TRUE(parse_command("calibrate").has_value());
-    EXPECT_TRUE(parse_command("benchmark").has_value());
 }
 
 TEST(CommandTest, RejectsUnknownCommand) {

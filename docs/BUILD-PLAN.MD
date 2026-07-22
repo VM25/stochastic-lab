@@ -17,7 +17,7 @@ Create a clean, reproducible C++ project skeleton.
 ### Build
 
 * CMake project and presets;
-* debug, release, sanitizer, and benchmark builds;
+* debug, release, and sanitizer builds;
 * dependency management;
 * testing framework;
 * formatting and static-analysis configuration;
@@ -423,45 +423,7 @@ Improve Monte Carlo throughput without damaging correctness or reproducibility.
 
 ---
 
-## Phase 13: Benchmarking and Optimization
-
-### Goal
-
-Measure and improve accuracy-adjusted computational performance.
-
-### Benchmark
-
-* GBM and Heston throughput;
-* path and step scaling;
-* thread scaling;
-* variance-reduction efficiency;
-* PDE runtime to target error;
-* Greek estimator performance;
-* calibration cost;
-* memory and allocation behavior;
-* RMSE per second.
-
-### Optimize
-
-Only after profiling:
-
-* remove proven allocation bottlenecks;
-* improve data layout;
-* reduce unnecessary copies;
-* improve hot numerical kernels.
-
-### Exit Gate
-
-* all benchmarks use release builds;
-* equivalent-accuracy comparisons are enforced;
-* hardware and methodology are disclosed;
-* before-and-after evidence supports every optimization;
-* revalidation passes after each optimization;
-* no unsupported low-latency or production claim remains.
-
----
-
-## Phase 14: Full Experiment Program
+## Phase 13: Full Experiment Program
 
 ### Goal
 
@@ -491,7 +453,7 @@ All experiments in `experiment-catalog.md`.
 
 ---
 
-## Phase 15: Documentation and Technical Paper
+## Phase 14: Documentation and Technical Paper
 
 ### Goal
 
@@ -504,7 +466,6 @@ Make the mathematics, implementation, results, and limitations independently aud
 * mathematical-method notes;
 * experiment interpretations;
 * validation report;
-* benchmark report;
 * technical paper;
 * exact reproduction instructions.
 
@@ -520,7 +481,7 @@ Do not write `README.md` yet.
 
 ---
 
-## Phase 16: Public Results Site
+## Phase 15: Public Results Site
 
 ### Goal
 
@@ -532,7 +493,6 @@ Present the completed technical work without turning it into another dashboard-f
 * methods;
 * convergence results;
 * validation results;
-* performance results;
 * architecture;
 * technical paper access;
 * repository links.
@@ -547,7 +507,7 @@ Present the completed technical work without turning it into another dashboard-f
 
 ---
 
-## Phase 17: Final Acceptance
+## Phase 16: Final Acceptance
 
 ### Goal
 
@@ -562,7 +522,6 @@ Verify that DiffusionWorks satisfies every completion requirement.
 * static analysis;
 * validation suite;
 * experiment regeneration;
-* benchmark reproduction;
 * documentation consistency audit;
 * website evidence audit.
 
@@ -574,7 +533,6 @@ The project is complete only when:
 * all completion-blocking tests and validations pass;
 * results are reproducible;
 * no core work depends on Python or QuantLib;
-* benchmark claims are fair and measured;
 * unresolved numerical failures are absent;
 * documentation matches reality;
 * the final product clearly proves stochastic mathematics and C++ engineering.

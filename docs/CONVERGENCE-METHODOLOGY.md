@@ -236,4 +236,3 @@ difference is >100× smaller than the same difference across independent seeds.
   reduction a nested design would offer if the correlation were modelled properly.
 - **EXP-04's work metric is a proxy.** `paths × steps` ignores per-path overhead and
   memory traffic, so its efficient frontier is indicative, not a performance claim.
-  Cost is measured properly in Phase 13.

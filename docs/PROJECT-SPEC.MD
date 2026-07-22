@@ -4,11 +4,11 @@
 
 **DiffusionWorks: Stochastic Derivatives Numerics**
 
-**Subtitle:** A C++ Stochastic Derivatives Modeling, Validation and Performance Engine
+**Subtitle:** A C++ Stochastic Derivatives Modeling and Validation Engine
 
 ## Objective
 
-Build a reproducible C++ system that implements stochastic derivatives models and numerical methods from first principles, then evaluates pricing accuracy, convergence, numerical stability, model calibration, and computational performance.
+Build a reproducible C++ system that implements stochastic derivatives models and numerical methods from first principles, then evaluates pricing accuracy, convergence, numerical stability, and model calibration.
 
 The project must demonstrate mathematical depth and professional C++ engineering through validated code and measurable results.
 
@@ -161,8 +161,7 @@ Calibration success cannot be judged only by a reduced objective value.
 8. Greek estimator comparison.
 9. Heston variance discretization behavior.
 10. Heston calibration recovery and stability.
-11. CPU thread scaling.
-12. Accuracy per unit of computation.
+11. Cross-method accuracy and agreement.
 
 Each experiment must define:
 
@@ -190,7 +189,6 @@ Required modules:
 * validation;
 * statistics;
 * experiments;
-* benchmarks;
 * CLI.
 
 Core pricing and simulation logic must remain independent from presentation code.
@@ -207,7 +205,6 @@ diffusionworks simulate
 diffusionworks validate
 diffusionworks experiment
 diffusionworks calibrate
-diffusionworks benchmark
 ```
 
 Every command must support reproducible configuration files and structured JSON or CSV outputs.
@@ -241,7 +238,6 @@ C++ owns:
 * Greeks;
 * calibration;
 * validation;
-* benchmarks;
 * experiment execution.
 
 ### Python
@@ -266,7 +262,6 @@ It must not perform any central implementation.
 * CMake;
 * Eigen;
 * GoogleTest or Catch2;
-* Google Benchmark;
 * `fmt`;
 * `nlohmann/json`;
 * Doxygen.
@@ -288,10 +283,9 @@ The project must include:
 * unit and regression tests;
 * sanitizer builds;
 * static analysis;
-* continuous integration;
-* reproducible release-mode benchmarks.
+* continuous integration.
 
-Do not add custom allocators, SIMD, GPU support, or lock-free structures before profiling proves they are necessary.
+Do not add custom allocators, SIMD, GPU support, or lock-free structures.
 
 ## Validation Requirements
 
@@ -311,30 +305,6 @@ Required validation includes:
 
 Numerical tolerances must be method-specific and justified.
 
-## Performance Requirements
-
-Measure:
-
-* paths per second;
-* steps per second;
-* valuation runtime;
-* thread scaling;
-* memory behavior;
-* Greek runtime;
-* RMSE per second;
-* accuracy at fixed computational budgets.
-
-No performance claim is valid without:
-
-* release build;
-* hardware disclosure;
-* compiler settings;
-* repeated measurements;
-* comparable workloads;
-* reported dispersion.
-
-Do not describe the project as low latency.
-
 ## Public Deliverables
 
 Version 1.0 must include:
@@ -343,7 +313,6 @@ Version 1.0 must include:
 * tests and CI;
 * experiment configurations;
 * validation artifacts;
-* benchmark artifacts;
 * generated charts and tables;
 * API documentation;
 * technical paper;
@@ -393,10 +362,9 @@ DiffusionWorks is complete only when a technical reviewer can verify that:
 2. numerical outputs converge toward defensible references;
 3. uncertainty, bias, and instability are measured;
 4. Heston calibration is validated rather than merely demonstrated;
-5. benchmark claims are reproducible and fair;
-6. published results can be regenerated from stored configurations;
-7. failure cases and limitations remain visible;
-8. the project proves both stochastic-finance knowledge and serious C++ engineering.
+5. published results can be regenerated from stored configurations;
+6. failure cases and limitations remain visible;
+7. the project proves both stochastic-finance knowledge and serious C++ engineering.
 
 ## Completion Blockers
 
@@ -406,7 +374,6 @@ The project is not done if:
 * central calculations rely on QuantLib or Python;
 * convergence is assumed rather than measured;
 * calibration lacks synthetic recovery testing;
-* benchmarks lack methodological disclosure;
 * stochastic conclusions rely on one seed;
 * unstable or incorrect cases are hidden;
 * tests, sanitizers, or CI fail;

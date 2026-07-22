@@ -16,7 +16,7 @@ The completed project must clearly present:
 
 **DiffusionWorks: Stochastic Derivatives Numerics**
 
-**A C++ Stochastic Derivatives Modeling, Validation and Performance Engine**
+**A C++ Stochastic Derivatives Modeling and Validation Engine**
 
 A reviewer must immediately recognize:
 
@@ -24,7 +24,7 @@ A reviewer must immediately recognize:
 * stochastic derivatives mathematics;
 * model and method validation;
 * convergence analysis;
-* reproducible performance research.
+* reproducible numerical research.
 
 The project must not read primarily as a dashboard, calculator, QuantLib wrapper, or classroom exercise.
 
@@ -157,7 +157,6 @@ From a clean checkout:
 * debug build succeeds;
 * release build succeeds;
 * sanitizer build succeeds;
-* benchmark build succeeds;
 * required dependencies resolve;
 * example configurations run;
 * generated outputs match their schemas.
@@ -186,30 +185,7 @@ Coverage alone does not satisfy this requirement.
 
 ---
 
-## 9. Performance
-
-Done means:
-
-* benchmarks use validated release builds;
-* workloads are equivalent;
-* measurements are repeated;
-* dispersion is reported;
-* hardware, compiler, flags, threads, and commit are disclosed;
-* Monte Carlo throughput is measured;
-* parallel scaling is measured;
-* PDE performance is measured;
-* Greek estimator performance is measured;
-* calibration cost is measured;
-* memory and allocation behavior are profiled;
-* accuracy-adjusted metrics are reported;
-* every optimization has before-and-after evidence;
-* all optimized paths are revalidated.
-
-Unsupported claims such as “low latency,” “production-grade,” or universal superiority must not appear.
-
----
-
-## 10. Reproducibility
+## 9. Reproducibility
 
 Done means every published result can be regenerated using:
 
@@ -228,7 +204,7 @@ A clean reproduction audit must succeed.
 
 ---
 
-## 11. Documentation
+## 10. Documentation
 
 Required documentation must:
 
@@ -246,7 +222,7 @@ The final `README.md` may be written only after all other acceptance gates pass.
 
 ---
 
-## 12. Public Results Site
+## 11. Public Results Site
 
 The completed site must:
 
@@ -256,14 +232,14 @@ The completed site must:
 * contain no independent pricing implementation;
 * expose methodology and limitations;
 * remain usable on desktop and mobile;
-* link to code, technical paper, validation, and benchmark evidence;
+* link to code, technical paper, and validation evidence;
 * avoid fake trading-terminal or dashboard-first presentation.
 
 The site cannot compensate for incomplete engine work.
 
 ---
 
-## 13. Final Acceptance Audit
+## 12. Final Acceptance Audit
 
 Before completion, run:
 
@@ -273,10 +249,9 @@ Before completion, run:
 4. sanitizer and static-analysis checks;
 5. full validation suite;
 6. all mandatory experiments;
-7. benchmark reproduction;
-8. chart and table regeneration;
-9. documentation-code consistency audit;
-10. public-claim evidence audit.
+7. chart and table regeneration;
+8. documentation-code consistency audit;
+9. public-claim evidence audit.
 
 Any failure returns the project to the relevant build phase.
 
@@ -295,8 +270,6 @@ DiffusionWorks is not done if any of the following remains:
 * external implementation of core logic;
 * calibration without synthetic recovery;
 * convergence claimed without measurement;
-* benchmark without accuracy equivalence;
-* unsupported performance claim;
 * documentation-code mismatch;
 * manually fabricated result or chart;
 * website stronger than the underlying engine;
@@ -308,6 +281,6 @@ DiffusionWorks is not done if any of the following remains:
 
 DiffusionWorks is complete only when a skeptical technical reviewer can independently verify:
 
-> The models were implemented natively in C++, the numerical methods behave as claimed, errors and limitations are measured, results are reproducible, performance comparisons are fair, and every public statement is supported by working evidence.
+> The models were implemented natively in C++, the numerical methods behave as claimed, errors and limitations are measured, results are reproducible, and every public statement is supported by working evidence.
 
 Until that standard is met, continue iterating.

@@ -406,73 +406,37 @@ Measure:
 
 ---
 
-## EXP-13: Parallel Monte Carlo Scaling
+## EXP-13: Cross-Method Accuracy and Agreement
 
-**Question:** How efficiently does the engine scale across CPU threads?
-
-Test:
-
-* one thread;
-* increasing powers of two;
-* available hardware maximum.
-
-Measure:
-
-[
-Speedup(p)=\frac{T_1}{T_p}
-]
-
-[
-Efficiency(p)=\frac{Speedup(p)}{p}
-]
-
-Also report:
-
-* throughput;
-* runtime dispersion;
-* deterministic-result differences;
-* saturation point.
-
-**Exit criteria:**
-
-* workloads are identical;
-* release builds are used;
-* hardware and compiler settings are disclosed;
-* scaling limitations are explained;
-* no near-linear claim is made unless supported.
-
----
-
-## EXP-14: Accuracy per Unit of Computation
-
-**Question:** Which method reaches a target pricing error most efficiently?
+**Question:** Where independent methods price the same instrument, do they agree within their justified tolerances?
 
 Compare where applicable:
 
 * analytic;
 * Monte Carlo;
+* variance-reduced Monte Carlo;
 * finite difference;
-* Heston integration;
-* variance-reduced Monte Carlo.
+* Heston characteristic-function integration.
 
 Measure:
 
-* runtime to target error;
-* RMSE per second;
-* memory usage;
-* setup cost;
-* scalability.
+* pairwise price differences between methods;
+* agreement within each method's stated uncertainty or tolerance;
+* Monte Carlo confidence-interval coverage of the analytic or reference value;
+* convergence of each method toward the shared reference;
+* discrepancies attributable to discretization or sampling.
 
 **Exit criteria:**
 
-* methods are compared at equivalent accuracy;
+* methods that price the same instrument agree within justified tolerances;
 * each method is tested only on supported instruments;
-* flexibility and path dependence are considered alongside speed;
-* raw speed without correctness equivalence is never reported as superiority.
+* disagreements are explained by known bias or uncertainty, not hidden;
+* no method is presented as a reference for a regime it cannot price;
+* agreement is never claimed without correctness equivalence.
 
 ---
 
-## EXP-15: Statistical Confidence Coverage
+## EXP-14: Statistical Confidence Coverage
 
 **Question:** Do reported Monte Carlo confidence intervals achieve their intended coverage?
 
@@ -498,7 +462,7 @@ Measure:
 
 ---
 
-## EXP-16: Numerical Edge Cases
+## EXP-15: Numerical Edge Cases
 
 **Question:** Does the system fail safely or remain correct under limiting and difficult inputs?
 

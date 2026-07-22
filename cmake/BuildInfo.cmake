@@ -6,8 +6,8 @@
 #   compile time - compiler id/version, build type, flags, C++ standard, commit
 #   run time     - OS, CPU brand, core count, host, timestamp, thread count
 #
-# CPU and OS are resolved at run time because the machine that executes a
-# benchmark is not necessarily the machine that compiled it.
+# CPU and OS are resolved at run time because the machine that executes an
+# experiment is not necessarily the machine that compiled it.
 
 set(DW_GENERATED_DIR "${CMAKE_BINARY_DIR}/generated/diffusionworks/core")
 file(MAKE_DIRECTORY "${DW_GENERATED_DIR}")

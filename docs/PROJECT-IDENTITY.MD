@@ -6,7 +6,7 @@
 
 ## Subtitle
 
-**A C++ Stochastic Derivatives Modeling, Validation and Performance Engine**
+**A C++ Stochastic Derivatives Modeling and Validation Engine**
 
 ## Repository
 
@@ -19,8 +19,7 @@ DiffusionWorks is a C++ computational-finance system that implements stochastic 
 * pricing accuracy;
 * numerical convergence;
 * statistical reliability;
-* model validation;
-* computational performance.
+* model validation.
 
 It is not primarily an options calculator, dashboard, trading simulator, or QuantLib wrapper.
 
@@ -50,7 +49,6 @@ DiffusionWorks must visibly demonstrate:
 * model calibration;
 * modern C++ engineering;
 * testing and validation;
-* performance measurement;
 * quantitative research judgment.
 
 The project must read as mathematical and computational work first, not visual product work.
@@ -107,7 +105,7 @@ Use the following consistently across all documentation and public materials:
 
 * **DiffusionWorks** — short project name.
 * **DiffusionWorks: Stochastic Derivatives Numerics** — full project name.
-* **A C++ Stochastic Derivatives Modeling, Validation and Performance Engine** — official subtitle.
+* **A C++ Stochastic Derivatives Modeling and Validation Engine** — official subtitle.
 * **`stochastic-lab`** — repository and local folder name.
 
 Do not rename the project, abbreviate it as `DW`, or substitute generic labels such as “pricing engine,” “quant platform,” or “stochastic lab” as the primary public identity.

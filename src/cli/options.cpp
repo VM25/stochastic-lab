@@ -54,8 +54,6 @@ std::string_view to_string(CommandKind kind) noexcept {
             return "experiment";
         case CommandKind::Calibrate:
             return "calibrate";
-        case CommandKind::Benchmark:
-            return "benchmark";
     }
     return "unknown";
 }
@@ -78,9 +76,6 @@ std::optional<CommandKind> parse_command(std::string_view text) noexcept {
     }
     if (text == "calibrate") {
         return CommandKind::Calibrate;
-    }
-    if (text == "benchmark") {
-        return CommandKind::Benchmark;
     }
     return std::nullopt;
 }
@@ -131,7 +126,7 @@ Result<Options> parse_arguments(const std::vector<std::string_view>& args) {
         return Result<Options>::failure(
             ErrorCode::InvalidArgument,
             fmt::format("unknown command '{}'; expected one of: price, simulate, greeks, validate, "
-                        "experiment, calibrate, benchmark",
+                        "experiment, calibrate",
                         command_text),
             kContext);
     }
@@ -267,7 +262,6 @@ Commands:
   validate    Check results against references and financial invariants
   experiment  Run a configured numerical experiment
   calibrate   Fit Heston parameters to an implied-volatility surface
-  benchmark   Measure runtime, throughput, and accuracy per unit of computation
 
 Options:
   -c, --config <path>    Configuration file (JSON)
@@ -322,11 +316,6 @@ std::string command_usage_text(CommandKind kind) {
             detail = "Reports residuals, convergence status, evaluation count, and sensitivity to\n"
                      "the initial guess. A converged optimizer is not by itself a successful\n"
                      "calibration.";
-            break;
-        case CommandKind::Benchmark:
-            description = "Measure runtime, throughput, and accuracy per unit of computation.";
-            detail = "Requires a release build. Records hardware, compiler, flags, and repetition\n"
-                     "count alongside every measurement.";
             break;
     }
 

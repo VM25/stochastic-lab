@@ -59,7 +59,7 @@ STAGED=()
 while IFS= read -r file; do
     [[ -n $file ]] && STAGED+=("$file")
 done < <(git diff --cached --name-only --diff-filter=ACM \
-    | grep -E '^(include|src|tests|benchmarks)/.*\.(hpp|cpp)$' | sort || true)
+    | grep -E '^(include|src|tests)/.*\.(hpp|cpp)$' | sort || true)
 
 if [[ ${#STAGED[@]} -eq 0 ]]; then
     exit 0

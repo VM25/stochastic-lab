@@ -3,7 +3,7 @@
 # Pinned to exact tags so a clean checkout resolves identical dependency
 # versions. Per ARCHITECTURE-DECISIONS ADR-001/003, none of these implement the
 # project's models, pricing, simulation, Greeks, or calibration; they provide
-# formatting, JSON, testing, and benchmarking support only.
+# formatting, JSON, and testing support only.
 
 include(FetchContent)
 
@@ -55,25 +55,6 @@ if(DW_BUILD_TESTS)
 
     FetchContent_MakeAvailable(googletest)
     include(GoogleTest)
-endif()
-
-# --- Google Benchmark -------------------------------------------------------
-
-if(DW_BUILD_BENCHMARKS)
-    set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
-    set(BENCHMARK_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
-    set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
-    set(BENCHMARK_ENABLE_WERROR OFF CACHE BOOL "" FORCE)
-
-    FetchContent_Declare(
-        benchmark
-        GIT_REPOSITORY https://github.com/google/benchmark.git
-        GIT_TAG v1.9.0
-        GIT_SHALLOW TRUE
-        SYSTEM
-        FIND_PACKAGE_ARGS NAMES benchmark)
-
-    FetchContent_MakeAvailable(benchmark)
 endif()
 
 # --- QuantLib (optional, external validation only) --------------------------

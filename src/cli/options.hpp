@@ -35,7 +35,6 @@ enum class CommandKind {
     Validate,
     Experiment,
     Calibrate,
-    Benchmark,
 };
 
 [[nodiscard]] std::string_view to_string(CommandKind kind) noexcept;

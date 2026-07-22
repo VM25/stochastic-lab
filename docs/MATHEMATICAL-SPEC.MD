@@ -958,7 +958,6 @@ The mathematical work is not done if:
 * calibration quality is judged only by objective reduction;
 * unstable PDE outputs are presented as valid;
 * discontinuous payoffs use unjustified Greek estimators;
-* benchmark comparisons use unequal accuracy targets;
 * numerical tolerances are arbitrary;
 * equations, code, and reported results disagree;
 * failed or contradictory experiments are removed instead of explained.

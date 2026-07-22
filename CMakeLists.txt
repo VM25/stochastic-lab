@@ -41,9 +41,9 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 #     Carlo run with 100,000 paths. Contraction perturbs each step's rounding,
 #     and an iteration seeking the last representable digit cannot settle.
 #
-# The cost is that FMA is unavailable in numeric kernels. That is measured in
-# Phase 13 rather than assumed, and disclosed with every benchmark: build flags
-# are part of the published metadata (BENCHMARK-PLAN section 2).
+# The cost is that FMA is unavailable in numeric kernels. Build flags are part of
+# every result's published metadata, so a reader can tell which floating-point
+# semantics produced the numbers they are looking at.
 #
 # This deliberately does not disable FMA formation the compiler cannot observe
 # (a library exp may still use it internally); the guarantee is over this
@@ -70,7 +70,6 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 # ---------------------------------------------------------------------------
 
 option(DW_BUILD_TESTS "Build the DiffusionWorks test suite" ON)
-option(DW_BUILD_BENCHMARKS "Build the DiffusionWorks benchmark suite" OFF)
 option(DW_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
 option(DW_ENABLE_ASAN "Enable AddressSanitizer" OFF)
 option(DW_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer" OFF)
@@ -98,10 +97,6 @@ if(DW_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
-if(DW_BUILD_BENCHMARKS)
-    add_subdirectory(benchmarks)
-endif()
-
 # ---------------------------------------------------------------------------
 # Configuration summary
 # ---------------------------------------------------------------------------
@@ -112,7 +107,6 @@ message(STATUS "  Build type          : ${CMAKE_BUILD_TYPE}")
 message(STATUS "  C++ standard        : ${CMAKE_CXX_STANDARD}")
 message(STATUS "  Compiler            : ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "  Tests               : ${DW_BUILD_TESTS}")
-message(STATUS "  Benchmarks          : ${DW_BUILD_BENCHMARKS}")
 message(STATUS "  Warnings as errors  : ${DW_WARNINGS_AS_ERRORS}")
 message(STATUS "  ASan / UBSan / TSan : ${DW_ENABLE_ASAN} / ${DW_ENABLE_UBSAN} / ${DW_ENABLE_TSAN}")
 message(STATUS "  QuantLib validation : ${DW_ENABLE_QUANTLIB}")

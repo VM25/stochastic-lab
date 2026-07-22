@@ -63,7 +63,6 @@ namespace {
         case cli::CommandKind::Calibrate:
             return cli::run_calibrate(config.value(), options);
         case cli::CommandKind::Validate:
-        case cli::CommandKind::Benchmark:
             break;
     }
 

@@ -30,7 +30,7 @@ IncludeCategories:
     Priority: 1
   - Regex: '^"'
     Priority: 2
-  - Regex: '^<(gtest|gmock|benchmark)/'
+  - Regex: '^<(gtest|gmock)/'
     Priority: 4
   - Regex: '^<(nlohmann|fmt)/'
     Priority: 3

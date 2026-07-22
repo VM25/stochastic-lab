@@ -23,7 +23,6 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "DW_BUILD_TESTS": "ON",
-        "DW_BUILD_BENCHMARKS": "OFF",
         "DW_WARNINGS_AS_ERRORS": "ON"
       }
     },
@@ -35,7 +34,6 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "DW_BUILD_TESTS": "ON",
-        "DW_BUILD_BENCHMARKS": "OFF",
         "DW_WARNINGS_AS_ERRORS": "ON"
       }
     },
@@ -47,7 +45,6 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "DW_BUILD_TESTS": "ON",
-        "DW_BUILD_BENCHMARKS": "OFF",
         "DW_WARNINGS_AS_ERRORS": "ON",
         "DW_ENABLE_ASAN": "ON",
         "DW_ENABLE_UBSAN": "ON"
@@ -61,21 +58,8 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
         "DW_BUILD_TESTS": "ON",
-        "DW_BUILD_BENCHMARKS": "OFF",
         "DW_WARNINGS_AS_ERRORS": "ON",
         "DW_ENABLE_TSAN": "ON"
-      }
-    },
-    {
-      "name": "benchmark",
-      "inherits": "base",
-      "displayName": "Benchmark",
-      "description": "Release build with the Google Benchmark suite enabled",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release",
-        "DW_BUILD_TESTS": "OFF",
-        "DW_BUILD_BENCHMARKS": "ON",
-        "DW_WARNINGS_AS_ERRORS": "ON"
       }
     }
   ],
@@ -83,8 +67,7 @@
     { "name": "debug", "configurePreset": "debug" },
     { "name": "release", "configurePreset": "release" },
     { "name": "sanitize", "configurePreset": "sanitize" },
-    { "name": "tsan", "configurePreset": "tsan" },
-    { "name": "benchmark", "configurePreset": "benchmark" }
+    { "name": "tsan", "configurePreset": "tsan" }
   ],
   "testPresets": [
     {

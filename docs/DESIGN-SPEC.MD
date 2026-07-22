@@ -11,8 +11,7 @@ The interface must help users understand:
 * convergence;
 * pricing error;
 * validation;
-* calibration;
-* computational performance.
+* calibration.
 
 It must not exist as decoration around the engine.
 
@@ -55,7 +54,6 @@ The completed site must feel like:
 * a computational-finance laboratory;
 * a numerical research instrument;
 * a stochastic-calculus workspace;
-* an engineering benchmark system;
 * a quantitative model-validation environment.
 
 It must communicate:
@@ -159,17 +157,6 @@ Show:
 * Heston validation;
 * calibration recovery;
 * unresolved limitations.
-
-### Performance
-
-Show:
-
-* throughput;
-* scaling;
-* runtime to target accuracy;
-* RMSE per second;
-* memory behavior;
-* optimization evidence.
 
 ### Architecture
 
@@ -380,7 +367,6 @@ Required chart types include:
 * error versus path count;
 * error versus time-step size;
 * runtime versus accuracy;
-* thread scaling;
 * confidence coverage;
 * calibration residual surfaces;
 * parameter sensitivity;
@@ -590,7 +576,7 @@ Use specialist design and visual-QA tools for this process.
 The design is complete only when:
 
 * the visual identity clearly belongs to DiffusionWorks;
-* mathematics, C++, validation, and performance dominate the experience;
+* mathematics, C++, validation, and convergence dominate the experience;
 * every chart contributes to a research question;
 * all displayed results come from engine artifacts;
 * the interface avoids every forbidden pattern;

@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Define the C++ architecture, interfaces, data flow, ownership, concurrency, configuration, and performance rules for DiffusionWorks.
+Define the C++ architecture, interfaces, data flow, ownership, concurrency, and configuration for DiffusionWorks.
 
-The design must remain simple enough to audit and efficient enough to benchmark. Abstraction is justified only when it improves correctness, reuse, testability, or measured performance.
+The design must remain simple enough to audit. Abstraction is justified only when it improves correctness, reuse, or testability.
 
 ---
 
@@ -56,7 +56,6 @@ src/
 └── cli/
 
 tests/
-benchmarks/
 experiments/
 configs/
 data/
@@ -82,7 +81,6 @@ struct PricingRequest;
 struct PricingResult;
 struct SimulationConfig;
 struct CalibrationResult;
-struct BenchmarkMetadata;
 ```
 
 Prefer:
@@ -270,7 +268,7 @@ Hot numerical loops must:
 * minimize pointer chasing;
 * separate orchestration from numeric kernels.
 
-Start with standard containers. Introduce specialized layouts only after profiling.
+Start with standard containers. Do not introduce specialized layouts speculatively.
 
 ---
 
@@ -426,7 +424,6 @@ diffusionworks simulate
 diffusionworks validate
 diffusionworks experiment
 diffusionworks calibrate
-diffusionworks benchmark
 ```
 
 Each command must support:
@@ -497,7 +494,6 @@ Permitted:
 * CMake;
 * Eigen;
 * GoogleTest or Catch2;
-* Google Benchmark;
 * `fmt`;
 * `nlohmann/json`;
 * Doxygen;
@@ -515,8 +511,7 @@ Required presets:
 
 * debug;
 * release;
-* sanitizer;
-* benchmark.
+* sanitizer.
 
 Required compiler support:
 
@@ -541,34 +536,9 @@ CI must run:
 * static analysis;
 * clean configuration validation.
 
-Benchmarks should not run as pass/fail CI tests unless a stable environment exists.
-
 ---
 
-## 24. Performance Rules
-
-Optimize only after:
-
-1. correctness is established;
-2. a benchmark exists;
-3. profiling identifies a bottleneck;
-4. equivalent outputs are verified.
-
-Record before-and-after measurements.
-
-Do not sacrifice:
-
-* reproducibility;
-* numerical stability;
-* readable ownership;
-* testability;
-* diagnostics
-
-for marginal speed improvements.
-
----
-
-## 25. Python Boundary
+## 24. Python Boundary
 
 Python may consume generated outputs for:
 
@@ -583,7 +553,7 @@ Any Python cross-check must be clearly labeled as external analysis.
 
 ---
 
-## 26. Website Boundary
+## 25. Website Boundary
 
 The public website may display precomputed results or call a deliberately limited WebAssembly demonstration.
 
@@ -598,7 +568,7 @@ The C++ engine remains the source of truth.
 
 ---
 
-## 27. Completion Criteria
+## 26. Completion Criteria
 
 The technical design is successfully implemented only when:
 
@@ -610,13 +580,12 @@ The technical design is successfully implemented only when:
 * core calculations are native C++;
 * clean builds work from documented presets;
 * tests and sanitizers pass;
-* benchmark results come from release builds;
 * generated outputs contain complete metadata;
 * architecture supports every required Version 1.0 experiment.
 
 ---
 
-## 28. Completion Blockers
+## 27. Completion Blockers
 
 The project is not done if:
 
@@ -631,5 +600,4 @@ The project is not done if:
 * QuantLib performs central calculations;
 * configuration conventions are ambiguous;
 * equations and implementation diverge;
-* optimization precedes validation;
 * the architecture cannot reproduce published results.

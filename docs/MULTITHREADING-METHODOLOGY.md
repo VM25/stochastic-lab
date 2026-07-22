@@ -120,5 +120,5 @@ thread counts), and integer sums or `min` for the diagnostics (exact at every th
 count). The counter-based generator is what makes it safe -- every path is a pure
 function of `(seed, index)`, so there is no shared mutable random state to contend on.
 
-Speed-up is not claimed here -- that is Phase 13's benchmark. This phase's contract is
-correctness and reproducibility under threading, not throughput.
+Speed-up is not claimed or measured. This methodology's contract is correctness and
+reproducibility under threading, not throughput; the project performs no benchmarking.

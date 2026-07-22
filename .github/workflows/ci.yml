@@ -308,7 +308,7 @@ jobs:
       - name: Check formatting
         run: |
           set -euo pipefail
-          find include src tests benchmarks -type f \
+          find include src tests -type f \
             \( -name '*.hpp' -o -name '*.cpp' \) \
             -exec clang-format --dry-run --Werror --style=file {} +
           echo "OK: formatting is clean"

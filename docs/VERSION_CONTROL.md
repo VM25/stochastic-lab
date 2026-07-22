@@ -78,7 +78,6 @@ Commit and push after every meaningful:
 * test or validation addition;
 * bug fix;
 * refactor;
-* optimization;
 * configuration change;
 * documentation update;
 * file addition, deletion, or relocation;
