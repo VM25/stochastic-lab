@@ -6,6 +6,7 @@
 #include <diffusionworks/market/market_state.hpp>
 #include <diffusionworks/models/heston.hpp>
 
+#include <complex>
 #include <cstdint>
 
 namespace diffusionworks {
@@ -76,6 +77,28 @@ public:
                                                      const EuropeanOption& option,
                                                      const HestonModel& model,
                                                      const HestonAnalyticConfig& config = {});
+
+    /// Evaluates the little-trap characteristic function of the log-price directly,
+    /// exposed so the object the price is built from can be validated in its own
+    /// right (EXP-09), not only through the price it produces.
+    ///
+    /// Returns \f$ \phi_j(u) = \mathbb{E}^{j}[e^{i u \ln S_T}] \f$ for the
+    /// two-probability decomposition index `j`. Index 2 is the genuine risk-neutral
+    /// log-price characteristic function; index 1 is its counterpart under the share
+    /// measure. The argument `u` is complex so that identities off the real axis can
+    /// be checked -- in particular the martingale identity
+    /// \f$ \phi_2(-i) = S_0 e^{(r-q)T} \f$, which pins the drift.
+    ///
+    /// Refuses a non-positive maturity and a non-positive vol-of-variance for the
+    /// same reasons `price` does: the formula divides by \f$\xi^2\f$, and at
+    /// \f$\xi = 0\f$ the variance is deterministic and this integral does not
+    /// represent the model. `index` must be 1 or 2.
+    [[nodiscard]] static Result<std::complex<double>>
+    log_price_characteristic_function(const MarketState& market,
+                                      const HestonModel& model,
+                                      double maturity,
+                                      std::complex<double> u,
+                                      int index = 2);
 };
 
 }  // namespace diffusionworks

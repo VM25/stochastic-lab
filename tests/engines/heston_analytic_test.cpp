@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <complex>
 #include <cstdint>
 #include <limits>
 #include <string>
@@ -300,6 +301,128 @@ TEST(HestonModelTest, ReportsTheFellerConditionWithoutRejecting) {
     const auto violated = heston(0.09, 2.0, 0.09, 1.0, -0.5);
     EXPECT_FALSE(violated.satisfies_feller());
     EXPECT_LT(violated.feller_ratio(), 1.0);
+}
+
+// ---------------------------------------------------------------------------
+// The characteristic function itself
+//
+// The price is an integral of this object, so validating it directly -- not only
+// through the price -- is what EXP-09 rests on. These are properties the function
+// must have because it is the characteristic function of a real log-price under a
+// risk-neutral measure, checked here as permanent regressions on the engine.
+// ---------------------------------------------------------------------------
+
+using Complex = std::complex<double>;
+
+// A spread of regimes, including a Feller violation and a strong correlation.
+struct CfRegime {
+    double spot, rate, dividend, maturity, v0, kappa, theta, xi, rho;
+};
+
+const CfRegime kCfRegimes[] = {
+    {100.0, 0.05, 0.02, 1.5, 0.04, 1.5, 0.04, 0.6, -0.7},   // ordinary
+    {100.0, 0.03, 0.00, 5.0, 0.09, 2.0, 0.09, 1.0, -0.3},   // Feller-violating (0.36 < 1)
+    {80.0, 0.01, 0.04, 0.25, 0.02, 3.0, 0.05, 0.4, 0.5},    // short maturity, positive rho
+    {120.0, 0.06, 0.01, 10.0, 0.06, 1.0, 0.05, 0.7, -0.9},  // long maturity, strong rho
+};
+
+TEST(HestonCharacteristicFunctionTest, IsOneAtTheOrigin) {
+    // phi_j(0) = E^j[1] = 1 for both probability measures.
+    for (const CfRegime& r : kCfRegimes) {
+        const auto mk = market(r.spot, r.rate, r.dividend);
+        const auto model = heston(r.v0, r.kappa, r.theta, r.xi, r.rho);
+        for (const int index : {1, 2}) {
+            const auto phi = HestonAnalyticEngine::log_price_characteristic_function(
+                mk, model, r.maturity, Complex{0.0, 0.0}, index);
+            ASSERT_TRUE(phi.ok()) << phi.error().describe();
+            EXPECT_NEAR(phi.value().real(), 1.0, 1e-12) << "index " << index;
+            EXPECT_NEAR(phi.value().imag(), 0.0, 1e-12) << "index " << index;
+        }
+    }
+}
+
+TEST(HestonCharacteristicFunctionTest, HasConjugateSymmetry) {
+    // The log-price is real, so phi_j(-u) = conj(phi_j(u)) for real u.
+    for (const CfRegime& r : kCfRegimes) {
+        const auto mk = market(r.spot, r.rate, r.dividend);
+        const auto model = heston(r.v0, r.kappa, r.theta, r.xi, r.rho);
+        for (const int index : {1, 2}) {
+            for (const double u : {0.1, 0.7, 2.5, 12.0}) {
+                const auto plus = HestonAnalyticEngine::log_price_characteristic_function(
+                    mk, model, r.maturity, Complex{u, 0.0}, index);
+                const auto minus = HestonAnalyticEngine::log_price_characteristic_function(
+                    mk, model, r.maturity, Complex{-u, 0.0}, index);
+                ASSERT_TRUE(plus.ok() && minus.ok());
+                EXPECT_LT(std::abs(minus.value() - std::conj(plus.value())), 1e-10)
+                    << "index " << index << " u " << u;
+            }
+        }
+    }
+}
+
+TEST(HestonCharacteristicFunctionTest, SatisfiesTheMartingaleIdentity) {
+    // phi_2(-i) = E^Q[e^{ln S_T}] = E^Q[S_T] = S_0 e^{(r-q)T}, the forward. This pins
+    // the drift under the engine's exact convention: index 2 is the risk-neutral CF.
+    for (const CfRegime& r : kCfRegimes) {
+        const auto mk = market(r.spot, r.rate, r.dividend);
+        const auto model = heston(r.v0, r.kappa, r.theta, r.xi, r.rho);
+        const auto phi = HestonAnalyticEngine::log_price_characteristic_function(
+            mk, model, r.maturity, Complex{0.0, -1.0}, 2);
+        ASSERT_TRUE(phi.ok()) << phi.error().describe();
+        const double forward = r.spot * std::exp((r.rate - r.dividend) * r.maturity);
+        EXPECT_NEAR(phi.value().real(), forward, forward * 1e-10);
+        EXPECT_NEAR(phi.value().imag(), 0.0, forward * 1e-10);
+    }
+}
+
+TEST(HestonCharacteristicFunctionTest, IsFiniteAndContinuousAcrossADenseGrid) {
+    // Finite everywhere on a dense real-u grid, and continuous. The characteristic
+    // function is smooth, but it is not slowly varying: the e^{i u ln S_0} carrier
+    // rotates it at frequency ln(S_0) ~ 4-5, so a genuine step over a small du is
+    // O(ln(S_0) * du), not zero. A branch-cut crossing -- the "trap" the little-trap
+    // form exists to avoid -- would instead be an O(1) discontinuity. The grid is
+    // fine enough (du = 0.01) that the smooth rotation stays well under the bound
+    // while any real jump would blow through it.
+    const double du = 0.01;
+    for (const CfRegime& r : kCfRegimes) {
+        const auto mk = market(r.spot, r.rate, r.dividend);
+        const auto model = heston(r.v0, r.kappa, r.theta, r.xi, r.rho);
+        Complex previous{1.0, 0.0};
+        for (int k = 0; k <= 2000; ++k) {
+            const double u = k * du;
+            const auto phi = HestonAnalyticEngine::log_price_characteristic_function(
+                mk, model, r.maturity, Complex{u, 0.0}, 2);
+            ASSERT_TRUE(phi.ok());
+            ASSERT_TRUE(std::isfinite(phi.value().real()) && std::isfinite(phi.value().imag()))
+                << "u " << u;
+            // |phi| <= 1 for a characteristic function.
+            EXPECT_LE(std::abs(phi.value()), 1.0 + 1e-9) << "u " << u;
+            if (k > 0) {
+                // Smooth rotation is ~ln(S_0)*du ~ 0.05; a discontinuity is O(1).
+                EXPECT_LT(std::abs(phi.value() - previous), 0.2) << "jump at u " << u;
+            }
+            previous = phi.value();
+        }
+    }
+}
+
+TEST(HestonCharacteristicFunctionTest, RefusesDegenerateInputs) {
+    const auto mk = market(100.0, 0.05, 0.0);
+    // Zero vol-of-variance: the formula divides by xi^2.
+    const auto zero_xi = HestonAnalyticEngine::log_price_characteristic_function(
+        mk, heston(0.04, 2.0, 0.04, 0.0, -0.5), 1.0, Complex{1.0, 0.0}, 2);
+    ASSERT_FALSE(zero_xi.ok());
+    EXPECT_EQ(zero_xi.error().code, ErrorCode::UnsupportedCombination);
+    // Zero maturity.
+    const auto zero_t = HestonAnalyticEngine::log_price_characteristic_function(
+        mk, heston(0.04, 2.0, 0.04, 0.5, -0.5), 0.0, Complex{1.0, 0.0}, 2);
+    ASSERT_FALSE(zero_t.ok());
+    EXPECT_EQ(zero_t.error().code, ErrorCode::UnsupportedCombination);
+    // A bad probability index.
+    const auto bad_index = HestonAnalyticEngine::log_price_characteristic_function(
+        mk, heston(0.04, 2.0, 0.04, 0.5, -0.5), 1.0, Complex{1.0, 0.0}, 3);
+    ASSERT_FALSE(bad_index.ok());
+    EXPECT_EQ(bad_index.error().code, ErrorCode::InvalidArgument);
 }
 
 }  // namespace

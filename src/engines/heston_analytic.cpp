@@ -81,8 +81,11 @@ struct HestonCharacteristics {
 };
 
 /// The little-trap characteristic function of the log-price, evaluated for the two
-/// probabilities P1 (index 1) and P2 (index 2).
-[[nodiscard]] Complex characteristic_function(double u, int index, const HestonCharacteristics& p) {
+/// probabilities P1 (index 1) and P2 (index 2). The argument is complex: the
+/// pricing integrand supplies a real `u`, while validation evaluates identities off
+/// the real axis (e.g. the martingale point u = -i).
+[[nodiscard]] Complex
+characteristic_function(Complex u, int index, const HestonCharacteristics& p) {
     const Complex i{0.0, 1.0};
     const double u_j = index == 1 ? 0.5 : -0.5;
     const double b = index == 1 ? p.kappa - p.rho * p.xi : p.kappa;
@@ -113,8 +116,8 @@ probability_integrand(double x, int index, double log_strike, const HestonCharac
     const double one_minus = 1.0 - x;
     const double u = x / one_minus;
     const Complex i{0.0, 1.0};
-    const Complex value =
-        std::exp(-i * u * log_strike) * characteristic_function(u, index, p) / (i * u);
+    const Complex value = std::exp(-i * u * log_strike) *
+                          characteristic_function(Complex{u, 0.0}, index, p) / (i * u);
     return value.real() / (one_minus * one_minus);
 }
 
@@ -268,6 +271,43 @@ Result<PricingResult> HestonAnalyticEngine::price(const MarketState& market,
     }
 
     return Result<PricingResult>::success(std::move(result));
+}
+
+Result<std::complex<double>>
+HestonAnalyticEngine::log_price_characteristic_function(const MarketState& market,
+                                                        const HestonModel& model,
+                                                        double maturity,
+                                                        std::complex<double> u,
+                                                        int index) {
+    if (index != 1 && index != 2) {
+        return Result<std::complex<double>>::failure(
+            ErrorCode::InvalidArgument,
+            fmt::format("the characteristic-function index must be 1 or 2, got {}", index),
+            kContext);
+    }
+    if (!(maturity > 0.0)) {
+        return Result<std::complex<double>>::failure(
+            ErrorCode::UnsupportedCombination,
+            "the characteristic function is undefined at zero maturity",
+            kContext);
+    }
+    if (!(model.vol_of_variance() > 0.0)) {
+        return Result<std::complex<double>>::failure(
+            ErrorCode::UnsupportedCombination,
+            "the characteristic function needs a positive vol-of-variance: the formula divides by "
+            "xi^2, and at xi = 0 the variance is deterministic",
+            kContext);
+    }
+
+    const HestonCharacteristics params{.drift = market.rate() - market.dividend_yield(),
+                                       .maturity = maturity,
+                                       .log_spot = std::log(market.spot()),
+                                       .kappa = model.mean_reversion(),
+                                       .theta = model.long_run_variance(),
+                                       .xi = model.vol_of_variance(),
+                                       .rho = model.correlation(),
+                                       .v0 = model.initial_variance()};
+    return Result<std::complex<double>>::success(characteristic_function(u, index, params));
 }
 
 }  // namespace diffusionworks
