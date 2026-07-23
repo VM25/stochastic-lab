@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "command": "experiment",
+  "cross_method": {
+    "spot": 100.0,
+    "rate": 0.05,
+    "dividend_yield": 0.0,
+    "strike": 100.0,
+    "volatilities": [0.2, 0.4],
+    "maturities": [0.5, 2.0],
+    "monte_carlo_paths": 400000,
+    "monte_carlo_seed": 20260717,
+    "asian_monitoring_count": 12,
+    "control_variate_pilot_paths": 2000,
+    "fd_asset_nodes": 401,
+    "fd_time_steps": 400,
+    "heston_maturities": [0.5, 2.0],
+    "heston_initial_variance": 0.04,
+    "heston_mean_reversion": 2.0,
+    "heston_long_run_variance": 0.04,
+    "heston_vol_of_variances": [0.3, 1.0],
+    "heston_correlation": -0.7,
+    "heston_monte_carlo_paths": 200000,
+    "heston_monte_carlo_steps": 200,
+    "heston_monte_carlo_seed": 20260717,
+    "agreement_sigma": 5.0,
+    "fd_relative_tolerance": 5e-3
+  }
+}

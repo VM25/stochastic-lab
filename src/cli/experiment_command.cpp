@@ -3,6 +3,7 @@
 #include <diffusionworks/experiments/barrier_experiments.hpp>
 #include <diffusionworks/experiments/calibration_experiments.hpp>
 #include <diffusionworks/experiments/convergence_experiments.hpp>
+#include <diffusionworks/experiments/cross_method_experiments.hpp>
 #include <diffusionworks/experiments/greek_experiments.hpp>
 #include <diffusionworks/experiments/heston_cf_validation_experiments.hpp>
 #include <diffusionworks/experiments/heston_simulation_experiments.hpp>
@@ -771,6 +772,156 @@ Result<VarianceReductionExperimentConfig> parse_variance_reduction_config(const 
     return Result<VarianceReductionExperimentConfig>::success(std::move(config));
 }
 
+/// Parses the `cross_method` block for EXP-13.
+///
+/// Same contract as the other blocks: absent means the documented defaults that
+/// produced the published record, and an unknown key is rejected rather than
+/// silently ignored.
+Result<CrossMethodAgreementExperimentConfig> parse_cross_method_config(const ConfigNode& root) {
+    CrossMethodAgreementExperimentConfig config;
+
+    if (!root.contains("cross_method")) {
+        return Result<CrossMethodAgreementExperimentConfig>::success(config);
+    }
+
+    auto node = root.object("cross_method");
+    if (!node) {
+        return Result<CrossMethodAgreementExperimentConfig>::failure(std::move(node).error());
+    }
+
+    const Status unknown = node.value().reject_unknown_keys({"spot",
+                                                             "rate",
+                                                             "dividend_yield",
+                                                             "strike",
+                                                             "volatilities",
+                                                             "maturities",
+                                                             "monte_carlo_paths",
+                                                             "monte_carlo_seed",
+                                                             "asian_monitoring_count",
+                                                             "control_variate_pilot_paths",
+                                                             "fd_asset_nodes",
+                                                             "fd_time_steps",
+                                                             "heston_maturities",
+                                                             "heston_initial_variance",
+                                                             "heston_mean_reversion",
+                                                             "heston_long_run_variance",
+                                                             "heston_vol_of_variances",
+                                                             "heston_correlation",
+                                                             "heston_monte_carlo_paths",
+                                                             "heston_monte_carlo_steps",
+                                                             "heston_monte_carlo_seed",
+                                                             "agreement_sigma",
+                                                             "fd_relative_tolerance"});
+    if (!unknown) {
+        return Result<CrossMethodAgreementExperimentConfig>::failure(unknown.error());
+    }
+
+    std::optional<Error> first_error;
+    const auto read_number = [&](const char* key, double fallback) -> double {
+        auto v = node.value().number_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_integer = [&](const char* key, std::int64_t fallback) -> std::int64_t {
+        auto v = node.value().integer_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_doubles = [&](const char* key, std::vector<double> fallback) {
+        if (!node.value().contains(key)) {
+            return fallback;
+        }
+        auto array = node.value().array(key);
+        if (!array) {
+            if (!first_error.has_value()) {
+                first_error = array.error();
+            }
+            return fallback;
+        }
+        std::vector<double> out;
+        for (std::size_t i = 0; i < array.value().size(); ++i) {
+            auto v = array.value().number_at(i);
+            if (!v) {
+                if (!first_error.has_value()) {
+                    first_error = v.error();
+                }
+                return fallback;
+            }
+            out.push_back(v.value());
+        }
+        return out;
+    };
+
+    config.spot = read_number("spot", config.spot);
+    config.rate = read_number("rate", config.rate);
+    config.dividend_yield = read_number("dividend_yield", config.dividend_yield);
+    config.strike = read_number("strike", config.strike);
+    config.volatilities = read_doubles("volatilities", config.volatilities);
+    config.maturities = read_doubles("maturities", config.maturities);
+    config.monte_carlo_paths = read_integer("monte_carlo_paths", config.monte_carlo_paths);
+    config.monte_carlo_seed = static_cast<std::uint64_t>(
+        read_integer("monte_carlo_seed", static_cast<std::int64_t>(config.monte_carlo_seed)));
+    config.asian_monitoring_count =
+        read_integer("asian_monitoring_count", config.asian_monitoring_count);
+    config.control_variate_pilot_paths =
+        read_integer("control_variate_pilot_paths", config.control_variate_pilot_paths);
+    config.fd_asset_nodes = read_integer("fd_asset_nodes", config.fd_asset_nodes);
+    config.fd_time_steps = read_integer("fd_time_steps", config.fd_time_steps);
+    config.heston_maturities = read_doubles("heston_maturities", config.heston_maturities);
+    config.heston_initial_variance =
+        read_number("heston_initial_variance", config.heston_initial_variance);
+    config.heston_mean_reversion =
+        read_number("heston_mean_reversion", config.heston_mean_reversion);
+    config.heston_long_run_variance =
+        read_number("heston_long_run_variance", config.heston_long_run_variance);
+    config.heston_vol_of_variances =
+        read_doubles("heston_vol_of_variances", config.heston_vol_of_variances);
+    config.heston_correlation = read_number("heston_correlation", config.heston_correlation);
+    config.heston_monte_carlo_paths =
+        read_integer("heston_monte_carlo_paths", config.heston_monte_carlo_paths);
+    config.heston_monte_carlo_steps =
+        read_integer("heston_monte_carlo_steps", config.heston_monte_carlo_steps);
+    config.heston_monte_carlo_seed = static_cast<std::uint64_t>(read_integer(
+        "heston_monte_carlo_seed", static_cast<std::int64_t>(config.heston_monte_carlo_seed)));
+    config.agreement_sigma = read_number("agreement_sigma", config.agreement_sigma);
+    config.fd_relative_tolerance =
+        read_number("fd_relative_tolerance", config.fd_relative_tolerance);
+
+    if (first_error.has_value()) {
+        return Result<CrossMethodAgreementExperimentConfig>::failure(*first_error);
+    }
+
+    if (config.volatilities.empty() || config.maturities.empty() ||
+        config.heston_maturities.empty() || config.heston_vol_of_variances.empty()) {
+        return Result<CrossMethodAgreementExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "volatilities, maturities, heston_maturities, and heston_vol_of_variances must each be "
+            "non-empty: agreement is checked across regimes",
+            kContext);
+    }
+    if (config.monte_carlo_paths < 2 || config.heston_monte_carlo_paths < 2 ||
+        config.agreement_sigma <= 0.0 || config.fd_relative_tolerance <= 0.0 ||
+        config.fd_asset_nodes < 3 || config.fd_time_steps < 1) {
+        return Result<CrossMethodAgreementExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "path counts at least 2, agreement_sigma and fd_relative_tolerance positive, "
+            "fd_asset_nodes at least 3, and fd_time_steps at least 1",
+            kContext);
+    }
+
+    return Result<CrossMethodAgreementExperimentConfig>::success(std::move(config));
+}
+
 /// Parses the `heston_cf_validation` block for EXP-09.
 ///
 /// Same contract as the other blocks: absent means the documented defaults that
@@ -1472,6 +1623,12 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
             return Result<nlohmann::json>::failure(std::move(cf).error());
         }
         record = run_heston_cf_validation(cf.value());
+    } else if (id == "EXP-13") {
+        auto cross = parse_cross_method_config(config.root());
+        if (!cross) {
+            return Result<nlohmann::json>::failure(std::move(cross).error());
+        }
+        record = run_cross_method_agreement(cross.value());
     } else if (id == "EXP-10") {
         auto heston = parse_heston_simulation_config(config.root());
         if (!heston) {
