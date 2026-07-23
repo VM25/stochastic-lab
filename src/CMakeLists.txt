@@ -38,6 +38,7 @@ target_sources(
             experiments/experiment.cpp
             experiments/pde_experiments.cpp
             experiments/scheme_moments.cpp
+            experiments/variance_reduction_experiments.cpp
             instruments/asian_option.cpp
             instruments/barrier_option.cpp
             instruments/european_option.cpp

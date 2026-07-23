@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "command": "experiment",
+  "variance_reduction": {
+    "rate": 0.05,
+    "dividend_yield": 0.0,
+    "strike": 100.0,
+    "spots": [90.0, 100.0, 110.0],
+    "volatilities": [0.2, 0.4],
+    "maturity": 1.0,
+    "asian_monitoring_count": 12,
+    "paths": 100000,
+    "control_variate_pilot_paths": 2000,
+    "reference_paths": 1000000,
+    "seed_count": 12,
+    "master_seed": 20260717
+  }
+}

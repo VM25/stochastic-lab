@@ -6,6 +6,7 @@
 #include <diffusionworks/experiments/greek_experiments.hpp>
 #include <diffusionworks/experiments/heston_simulation_experiments.hpp>
 #include <diffusionworks/experiments/pde_experiments.hpp>
+#include <diffusionworks/experiments/variance_reduction_experiments.hpp>
 
 #include <fmt/format.h>
 
@@ -640,6 +641,135 @@ Result<GreekExperimentConfig> parse_greek_config(const ConfigNode& root) {
     return Result<GreekExperimentConfig>::success(std::move(config));
 }
 
+/// Parses the `variance_reduction` block for EXP-05.
+///
+/// Same contract as the other blocks: absent means the documented defaults that
+/// produced the published record, and an unknown key is rejected rather than
+/// silently ignored.
+Result<VarianceReductionExperimentConfig> parse_variance_reduction_config(const ConfigNode& root) {
+    VarianceReductionExperimentConfig config;
+
+    if (!root.contains("variance_reduction")) {
+        return Result<VarianceReductionExperimentConfig>::success(config);
+    }
+
+    auto node = root.object("variance_reduction");
+    if (!node) {
+        return Result<VarianceReductionExperimentConfig>::failure(std::move(node).error());
+    }
+
+    const Status unknown = node.value().reject_unknown_keys({"rate",
+                                                             "dividend_yield",
+                                                             "strike",
+                                                             "spots",
+                                                             "volatilities",
+                                                             "maturity",
+                                                             "asian_monitoring_count",
+                                                             "paths",
+                                                             "control_variate_pilot_paths",
+                                                             "reference_paths",
+                                                             "seed_count",
+                                                             "master_seed"});
+    if (!unknown) {
+        return Result<VarianceReductionExperimentConfig>::failure(unknown.error());
+    }
+
+    std::optional<Error> first_error;
+    const auto read_number = [&](const char* key, double fallback) -> double {
+        auto v = node.value().number_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_integer = [&](const char* key, std::int64_t fallback) -> std::int64_t {
+        auto v = node.value().integer_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_doubles = [&](const char* key, std::vector<double> fallback) {
+        if (!node.value().contains(key)) {
+            return fallback;
+        }
+        auto array = node.value().array(key);
+        if (!array) {
+            if (!first_error.has_value()) {
+                first_error = array.error();
+            }
+            return fallback;
+        }
+        std::vector<double> out;
+        for (std::size_t i = 0; i < array.value().size(); ++i) {
+            auto v = array.value().number_at(i);
+            if (!v) {
+                if (!first_error.has_value()) {
+                    first_error = v.error();
+                }
+                return fallback;
+            }
+            out.push_back(v.value());
+        }
+        return out;
+    };
+
+    config.rate = read_number("rate", config.rate);
+    config.dividend_yield = read_number("dividend_yield", config.dividend_yield);
+    config.strike = read_number("strike", config.strike);
+    config.maturity = read_number("maturity", config.maturity);
+    config.spots = read_doubles("spots", config.spots);
+    config.volatilities = read_doubles("volatilities", config.volatilities);
+
+    const std::int64_t monitoring =
+        read_integer("asian_monitoring_count", config.asian_monitoring_count);
+    const std::int64_t paths = read_integer("paths", config.paths);
+    const std::int64_t pilot =
+        read_integer("control_variate_pilot_paths", config.control_variate_pilot_paths);
+    const std::int64_t reference_paths = read_integer("reference_paths", config.reference_paths);
+    const std::int64_t seed_count =
+        read_integer("seed_count", static_cast<std::int64_t>(config.seed_count));
+    const std::int64_t master_seed =
+        read_integer("master_seed", static_cast<std::int64_t>(config.master_seed));
+
+    if (first_error.has_value()) {
+        return Result<VarianceReductionExperimentConfig>::failure(*first_error);
+    }
+
+    if (paths < 2 || seed_count < 2 || master_seed < 0 || monitoring < 1 || pilot < 1 ||
+        reference_paths < paths) {
+        return Result<VarianceReductionExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "paths at least 2; seed_count at least 2, since variance and RMSE are measured across "
+            "seeds; master_seed non-negative; asian_monitoring_count at least 1; "
+            "control_variate_pilot_paths at least 1; and reference_paths at least paths, so the "
+            "reference is no coarser than the estimators it judges",
+            kContext);
+    }
+    if (config.spots.empty() || config.volatilities.empty()) {
+        return Result<VarianceReductionExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "spots and volatilities must each be non-empty: the comparison exists to report gains "
+            "across regimes, and a single regime would license a universal claim",
+            kContext);
+    }
+
+    config.asian_monitoring_count = monitoring;
+    config.paths = paths;
+    config.control_variate_pilot_paths = pilot;
+    config.reference_paths = reference_paths;
+    config.seed_count = static_cast<std::uint64_t>(seed_count);
+    config.master_seed = static_cast<std::uint64_t>(master_seed);
+
+    return Result<VarianceReductionExperimentConfig>::success(std::move(config));
+}
+
 /// Parses the `heston_simulation` block for EXP-10.
 ///
 /// Same contract as the other blocks: absent means the documented defaults that
@@ -1163,6 +1293,16 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
         record = run_weak_convergence(experiment_config);
     } else if (id == "EXP-04") {
         record = run_bias_variance_tradeoff(experiment_config);
+    } else if (id == "EXP-05") {
+        auto variance = parse_variance_reduction_config(config.root());
+        if (!variance) {
+            return Result<nlohmann::json>::failure(std::move(variance).error());
+        }
+        VarianceReductionExperimentConfig variance_config = std::move(variance).value();
+        if (options.seed.has_value()) {
+            variance_config.master_seed = *options.seed;
+        }
+        record = run_variance_reduction_efficiency(variance_config);
     } else if (id == "EXP-06") {
         // EXP-06 is deterministic: it takes no seed and its configuration block is
         // its own, so it does not share the convergence block above.
