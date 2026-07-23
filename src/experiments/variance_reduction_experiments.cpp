@@ -36,11 +36,66 @@ std::vector<std::uint64_t> seeds_from(std::uint64_t master, std::uint64_t count)
 }
 
 /// One estimator measured across seeds: its across-seed dispersion (the standard
-/// deviation of an N-path estimate) and the mean wall-clock cost of one run.
+/// deviation of an N-observation estimate) and the mean wall-clock cost of one run.
+/// The runtime is a diagnostic only -- it never enters efficiency, ranking, or
+/// status, because a wall-clock number would make the comparison a benchmark of
+/// this machine rather than of the estimators.
 struct EstimatorResult {
     MultiSeedSummary summary;
     double mean_runtime_seconds{};
 };
+
+/// A deterministic, machine-independent count of the work an estimator does, from
+/// the configuration and the estimator alone. This is what efficiency is normalised
+/// by, so the comparison measures the estimators and not the clock.
+///
+/// The unit is one elementary operation. Simulating one path over its M monitoring
+/// steps costs M path-leg operations; forming that path's arithmetic average over M
+/// points costs M more; and, for the control variate, forming the geometric average
+/// costs M more still. Every component the design names is here: the production
+/// paths, the antithetic pair cost (an antithetic observation simulates two paths,
+/// original and reflected), the pilot paths that estimate the control-variate beta,
+/// and the arithmetic and geometric payoff evaluations.
+struct WorkModel {
+    std::int64_t production_paths{};      // observations requested (config.paths)
+    std::int64_t simulated_production{};  // paths actually simulated (2x under antithetic)
+    std::int64_t pilot_paths{};           // control-variate beta pilot (0 otherwise)
+    std::int64_t path_leg_ops{};          // GBM step evolutions
+    std::int64_t arithmetic_average_ops{};
+    std::int64_t geometric_average_ops{};
+    std::int64_t work_units{};
+};
+
+WorkModel work_model(std::int64_t production,
+                     std::int64_t steps,
+                     std::int64_t pilot,
+                     bool antithetic,
+                     bool control) {
+    WorkModel w;
+    w.production_paths = production;
+    w.simulated_production = antithetic ? 2 * production : production;
+    w.pilot_paths = control ? pilot : 0;
+    const std::int64_t total_sim = w.simulated_production + w.pilot_paths;
+    w.path_leg_ops = total_sim * steps;
+    // One arithmetic average (over `steps` monitoring points) per simulated path.
+    w.arithmetic_average_ops = total_sim * steps;
+    // The geometric control is formed on every simulated path only when the control
+    // variate is in use.
+    w.geometric_average_ops = control ? total_sim * steps : 0;
+    w.work_units = w.path_leg_ops + w.arithmetic_average_ops + w.geometric_average_ops;
+    return w;
+}
+
+/// Work-normalised statistical efficiency: the reciprocal of variance times
+/// deterministic work units, so a technique that halves the variance while doubling
+/// the work scores the same as crude. No wall-clock time enters, so the number is a
+/// property of the estimators, not of this machine.
+double work_efficiency(double variance, std::int64_t work_units) {
+    if (variance <= 0.0 || work_units <= 0) {
+        return 0.0;
+    }
+    return 1.0 / (variance * static_cast<double>(work_units));
+}
 
 /// Runs `price_for_seed` once per seed, at an identical path budget, and aggregates.
 /// The across-seed standard deviation is exactly the dispersion of a single N-path
@@ -70,29 +125,22 @@ Result<EstimatorResult> measure(PriceFn&& price_for_seed,
                         .mean_runtime_seconds = runtime / static_cast<double>(seeds.size())});
 }
 
-/// Efficiency in the variance-reduction sense: the reciprocal of variance times
-/// cost, so a technique that halves the variance while doubling the work scores the
-/// same as crude. Relative within one run on one machine; never an absolute rate.
-double efficiency(const EstimatorResult& e) {
-    const double variance = e.summary.standard_deviation * e.summary.standard_deviation;
-    const double cost = e.mean_runtime_seconds;
-    if (variance <= 0.0 || cost <= 0.0) {
-        return 0.0;
-    }
-    return 1.0 / (variance * cost);
-}
-
-/// One row of the comparison, for a single (instrument, regime, estimator).
+/// One row of the comparison, for a single (instrument, regime, estimator). The
+/// ranking columns -- variance_reduction_ratio and work_normalised_efficiency_gain
+/// -- are functions of variance and deterministic work only. The wall-clock runtime
+/// is reported beside them as a diagnostic and is never used to rank or to decide
+/// status.
 void push_row(ExperimentRecord& record,
               const std::string& instrument,
               double spot,
               double volatility,
               const std::string& estimator,
               const EstimatorResult& e,
+              const WorkModel& work,
               double crude_variance,
               double crude_efficiency) {
     const double variance = e.summary.standard_deviation * e.summary.standard_deviation;
-    const double eff = efficiency(e);
+    const double eff = work_efficiency(variance, work.work_units);
     const double vr_ratio = variance > 0.0 ? crude_variance / variance : 0.0;
     const double eff_gain = crude_efficiency > 0.0 ? eff / crude_efficiency : 0.0;
 
@@ -108,10 +156,17 @@ void push_row(ExperimentRecord& record,
         {"variance", variance},
         {"rmse", e.summary.rmse.value_or(0.0)},
         {"bias", e.summary.bias.value_or(0.0)},
-        {"mean_runtime_seconds", e.mean_runtime_seconds},
+        {"production_paths", work.production_paths},
+        {"simulated_production_paths", work.simulated_production},
+        {"pilot_paths", work.pilot_paths},
+        {"path_leg_ops", work.path_leg_ops},
+        {"arithmetic_average_ops", work.arithmetic_average_ops},
+        {"geometric_average_ops", work.geometric_average_ops},
+        {"work_units", work.work_units},
         {"variance_reduction_ratio", vr_ratio},
-        {"efficiency", eff},
-        {"efficiency_gain_over_crude", eff_gain},
+        {"work_normalised_efficiency", eff},
+        {"work_normalised_efficiency_gain_over_crude", eff_gain},
+        {"mean_runtime_seconds_diagnostic", e.mean_runtime_seconds},
         {"seed_count", e.summary.seed_count}};
     record.results["cells"].push_back(std::move(cell));
 
@@ -122,9 +177,10 @@ void push_row(ExperimentRecord& record,
                                  number(e.summary.mean),
                                  number(e.summary.standard_deviation),
                                  number(e.summary.rmse.value_or(0.0)),
-                                 number(e.mean_runtime_seconds),
+                                 std::to_string(work.work_units),
                                  number(vr_ratio),
-                                 number(eff_gain)});
+                                 number(eff_gain),
+                                 number(e.mean_runtime_seconds)});
 }
 
 }  // namespace
@@ -159,9 +215,10 @@ run_variance_reduction_efficiency(const VarianceReductionExperimentConfig& confi
                             "estimate",
                             "across_seed_sd",
                             "rmse",
-                            "runtime_s",
+                            "work_units",
                             "variance_reduction_ratio",
-                            "efficiency_gain"};
+                            "work_normalised_efficiency_gain",
+                            "runtime_s_diagnostic"};
     record.results = nlohmann::json::object();
     record.results["cells"] = nlohmann::json::array();
     record.results["control_validation"] = nlohmann::json::array();
@@ -230,15 +287,22 @@ run_variance_reduction_efficiency(const VarianceReductionExperimentConfig& confi
                 return Result<ExperimentRecord>::failure(euro_anti.error());
             }
 
+            // European is exact at one step, so M = 1.
+            const WorkModel euro_crude_work =
+                work_model(config.paths, 1, config.control_variate_pilot_paths, false, false);
+            const WorkModel euro_anti_work =
+                work_model(config.paths, 1, config.control_variate_pilot_paths, true, false);
             const double euro_crude_var = euro_crude.value().summary.standard_deviation *
                                           euro_crude.value().summary.standard_deviation;
-            const double euro_crude_eff = efficiency(euro_crude.value());
+            const double euro_crude_eff =
+                work_efficiency(euro_crude_var, euro_crude_work.work_units);
             push_row(record,
                      "european",
                      spot,
                      volatility,
                      "crude",
                      euro_crude.value(),
+                     euro_crude_work,
                      euro_crude_var,
                      euro_crude_eff);
             push_row(record,
@@ -247,6 +311,7 @@ run_variance_reduction_efficiency(const VarianceReductionExperimentConfig& confi
                      volatility,
                      "antithetic",
                      euro_anti.value(),
+                     euro_anti_work,
                      euro_crude_var,
                      euro_crude_eff);
 
@@ -386,15 +451,24 @@ run_variance_reduction_efficiency(const VarianceReductionExperimentConfig& confi
                 return Result<ExperimentRecord>::failure(asian_combined.error());
             }
 
+            const std::int64_t pilot = config.control_variate_pilot_paths;
+            const WorkModel asian_crude_work = work_model(config.paths, steps, pilot, false, false);
+            const WorkModel asian_anti_work = work_model(config.paths, steps, pilot, true, false);
+            const WorkModel asian_control_work =
+                work_model(config.paths, steps, pilot, false, true);
+            const WorkModel asian_combined_work =
+                work_model(config.paths, steps, pilot, true, true);
             const double asian_crude_var = asian_crude.value().summary.standard_deviation *
                                            asian_crude.value().summary.standard_deviation;
-            const double asian_crude_eff = efficiency(asian_crude.value());
+            const double asian_crude_eff =
+                work_efficiency(asian_crude_var, asian_crude_work.work_units);
             push_row(record,
                      "arithmetic_asian",
                      spot,
                      volatility,
                      "crude",
                      asian_crude.value(),
+                     asian_crude_work,
                      asian_crude_var,
                      asian_crude_eff);
             push_row(record,
@@ -403,6 +477,7 @@ run_variance_reduction_efficiency(const VarianceReductionExperimentConfig& confi
                      volatility,
                      "antithetic",
                      asian_anti.value(),
+                     asian_anti_work,
                      asian_crude_var,
                      asian_crude_eff);
             push_row(record,
@@ -411,6 +486,7 @@ run_variance_reduction_efficiency(const VarianceReductionExperimentConfig& confi
                      volatility,
                      "control_variate",
                      asian_control.value(),
+                     asian_control_work,
                      asian_crude_var,
                      asian_crude_eff);
             push_row(record,
@@ -419,6 +495,7 @@ run_variance_reduction_efficiency(const VarianceReductionExperimentConfig& confi
                      volatility,
                      "combined",
                      asian_combined.value(),
+                     asian_combined_work,
                      asian_crude_var,
                      asian_crude_eff);
         }
@@ -442,42 +519,54 @@ run_variance_reduction_efficiency(const VarianceReductionExperimentConfig& confi
     }
 
     record.interpretation =
-        "Efficiency -- error per unit of computation -- is the metric, not raw variance, because a "
-        "technique that halves the variance while doubling the work has bought nothing. Every "
-        "estimator here runs on the same path budget and the same seeds, so the "
-        "efficiency_gain_over_crude column is a fair comparison, and the variance_reduction_ratio "
-        "column shows the variance side alone. The two columns disagree, and that disagreement is "
-        "the point.\n\n"
-        "For the arithmetic Asian the geometric control variate dominates. The geometric Asian on "
-        "the same paths and dates has a closed-form price and tracks the arithmetic average "
-        "closely "
-        "-- they differ only by arithmetic versus geometric mean -- so subtracting it removes two "
-        "to three orders of magnitude of variance, and it is the most *efficient* estimator on "
-        "this "
-        "instrument in every regime tested. The control's known expectation is not taken on faith: "
-        "the control_validation block checks the analytic geometric price against a Monte Carlo "
-        "estimate of the same average and reports the agreement, which holds within a fraction of "
-        "a "
-        "standard error in every regime.\n\n"
+        "The metric is work-normalised statistical efficiency -- the reciprocal of variance times "
+        "deterministic work units -- not raw variance, because a technique that halves the "
+        "variance "
+        "while doubling the work has bought nothing. The work units are counted from the "
+        "configuration and the estimator alone (path-leg simulations, arithmetic and geometric "
+        "payoff evaluations, the antithetic pair cost, and the control-variate pilot), so the "
+        "comparison is a property of the estimators, not of this machine. Wall-clock time is "
+        "reported beside each row as a diagnostic only and never enters the ranking or the status. "
+        "The variance_reduction_ratio column shows the variance side alone, and the two columns "
+        "disagree -- which is the point.\n\n"
+        "For the arithmetic Asian the geometric control variate is the most efficient estimator, "
+        "in "
+        "every regime tested. The geometric Asian on the same paths and dates has a closed-form "
+        "price and tracks the arithmetic average closely -- they differ only by arithmetic versus "
+        "geometric mean -- so subtracting it removes two to three orders of magnitude of variance "
+        "for only the modest extra work of one geometric average per path plus a small beta pilot. "
+        "The control's known expectation is not taken on faith: the control_validation block "
+        "checks "
+        "the analytic geometric price against a Monte Carlo estimate of the same average and "
+        "reports the agreement, which holds within a fraction of a standard error in every "
+        "regime.\n\n"
         "The combined antithetic-plus-control estimator is the sharpest illustration of why "
-        "efficiency and variance are different questions. It has the *lowest variance* of any "
-        "estimator here -- its variance_reduction_ratio is the largest -- yet it is *less "
-        "efficient* than the control variate alone, because layering antithetic sampling on top "
-        "roughly doubles the payoff work for only a marginal further variance cut once the control "
-        "has already removed most of it. Ranked by variance the combined estimator wins; ranked by "
-        "error per unit of computation the control variate alone wins. Reporting only the variance "
-        "would have named the wrong estimator best.\n\n"
+        "efficiency and variance are different questions. It has the lowest variance of any "
+        "estimator here -- its variance_reduction_ratio is the largest, in every regime -- yet it "
+        "is less work-efficient than the control variate alone, in every regime, because the "
+        "antithetic layer doubles the simulated paths (each observation now averages an original "
+        "and a reflected path) for only a marginal further variance cut once the control has "
+        "removed most of it. Ranked by variance the combined estimator wins; ranked by error per "
+        "unit of work the control variate alone wins. Normalising by work keeps the doubled path "
+        "cost of the antithetic layer visible; reporting only the variance would have named the "
+        "wrong estimator best.\n\n"
         "Antithetic sampling on its own is the mild case. For the European call it helps where the "
-        "discounted payoff is close to monotone and smooth in the terminal shock, with an "
-        "efficiency gain that is real but modest and erodes as the option moves out of the money "
-        "and the payoff spends most paths pinned at zero -- the gain is regime-specific, and the "
-        "per-regime rows show its range rather than a single headline. On the arithmetic Asian "
-        "antithetic alone helps more than on the vanilla but is dwarfed by the control.\n\n"
+        "discounted payoff is close to monotone and smooth in the terminal shock, with a "
+        "work-normalised gain that is real but modest -- and, because an antithetic observation "
+        "costs two simulated paths, a variance cut of less than two would leave it no better than "
+        "crude once work is counted. The gain erodes as the option moves out of the money and the "
+        "payoff spends most paths pinned at zero, so the per-regime rows show its range rather "
+        "than "
+        "a single headline. On the arithmetic Asian antithetic alone helps more than on the "
+        "vanilla "
+        "but is dwarfed by the control.\n\n"
         "The reading is that the estimator should be matched to the payoff and judged by "
-        "efficiency, not variance: the geometric control for the arithmetic Asian, where a closely "
-        "correlated closed-form control exists; antithetic sampling for a smooth monotone vanilla, "
-        "with the caveat that its gain is regime-specific; and a combination only when its extra "
-        "cost actually earns its keep, which here it does not.";
+        "work-normalised efficiency, not variance: the geometric control for the arithmetic Asian, "
+        "where a closely correlated closed-form control exists; antithetic sampling for a smooth "
+        "monotone vanilla, with the caveat that its gain is regime-specific and its doubled path "
+        "cost must clear; and a combination only when its extra work actually earns its keep, "
+        "which "
+        "here it does not.";
 
     record.limitations.emplace_back(
         "The arithmetic Asian reference is a high-path-count Monte Carlo estimate, not a "
@@ -486,10 +575,15 @@ run_variance_reduction_efficiency(const VarianceReductionExperimentConfig& confi
         "RMSE at the smallest scales carries the reference's uncertainty as well as the "
         "estimator's.");
     record.limitations.emplace_back(
-        "Runtime is wall-clock on one machine, so the efficiency numbers are relative within a "
-        "single run, not portable rates. The comparison is fair because every estimator is timed "
-        "under the same build and machine in the same run; the absolute seconds are not a "
-        "performance claim.");
+        "The work-unit model is an elementary-operation count (path-leg simulations plus "
+        "arithmetic "
+        "and geometric averaging), not a cycle-accurate cost. It captures the structural "
+        "differences "
+        "that matter here -- the antithetic pair cost and the control-variate pilot and geometric "
+        "average -- but weights each elementary operation equally, so it is a deterministic proxy "
+        "for cost, not a measured one. The wall-clock runtime beside each row is a diagnostic "
+        "only; "
+        "it does not enter efficiency, ranking, or status, and is not a performance claim.");
     record.limitations.emplace_back(
         "The control variate applies only to the arithmetic Asian, whose geometric counterpart is "
         "the natural control. There is no comparably tight closed-form control for the European "
