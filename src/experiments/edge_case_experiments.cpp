@@ -207,12 +207,12 @@ Result<ExperimentRecord> run_edge_cases(const EdgeCaseExperimentConfig& config) 
     // An invalid input that must be rejected at construction.
     const auto expect_rejected_construction =
         [&](const std::string& name, bool was_rejected, const std::string& reason) {
-            nlohmann::json cell{{"case", name},
-                                {"category", "invalid_input_rejected"},
-                                {"expectation", "rejected_at_construction"},
-                                {"behavior", was_rejected ? "rejected" : "constructed"},
-                                {"reason", reason},
-                                {"passed", was_rejected}};
+            const nlohmann::json cell{{"case", name},
+                                      {"category", "invalid_input_rejected"},
+                                      {"expectation", "rejected_at_construction"},
+                                      {"behavior", was_rejected ? "rejected" : "constructed"},
+                                      {"reason", reason},
+                                      {"passed", was_rejected}};
             all_pass = all_pass && was_rejected;
             record.results["cases"].push_back(cell);
             add_row(name,

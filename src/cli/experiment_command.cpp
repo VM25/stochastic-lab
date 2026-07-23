@@ -836,7 +836,8 @@ Result<EdgeCaseExperimentConfig> parse_edge_case_config(const ConfigNode& root) 
             kContext);
     }
 
-    return Result<EdgeCaseExperimentConfig>::success(std::move(config));
+    // EdgeCaseExperimentConfig is trivially copyable (all doubles), so no std::move.
+    return Result<EdgeCaseExperimentConfig>::success(config);
 }
 
 /// Parses the `coverage` block for EXP-14.
