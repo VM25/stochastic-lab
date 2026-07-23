@@ -102,7 +102,7 @@ double work_efficiency(double variance, std::int64_t work_units) {
 /// estimate -- the quantity efficiency divides by -- measured rather than
 /// self-reported.
 template<typename PriceFn>
-Result<EstimatorResult> measure(PriceFn&& price_for_seed,
+Result<EstimatorResult> measure(const PriceFn& price_for_seed,
                                 const std::vector<std::uint64_t>& seeds,
                                 std::optional<double> reference) {
     std::vector<SeedResult> replications;
@@ -510,13 +510,10 @@ run_variance_reduction_efficiency(const VarianceReductionExperimentConfig& confi
     record.runtime_seconds =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 
-    if (bias_failure) {
-        record.status = ExperimentStatus::Fail;
-    } else if (control_unvalidated) {
-        record.status = ExperimentStatus::Fail;
-    } else {
-        record.status = ExperimentStatus::Pass;
-    }
+    // A resolved bias in an unbiased estimator, or a control whose known expectation
+    // does not check out, is a genuine defect; either fails the record.
+    record.status =
+        (bias_failure || control_unvalidated) ? ExperimentStatus::Fail : ExperimentStatus::Pass;
 
     record.interpretation =
         "The metric is work-normalised statistical efficiency -- the reciprocal of variance times "
