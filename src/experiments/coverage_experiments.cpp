@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -99,8 +100,7 @@ Result<ExperimentRecord> run_confidence_coverage(const CoverageExperimentConfig&
         return Result<ExperimentRecord>::failure(market.error());
     }
 
-    const std::int64_t largest_sample =
-        *std::max_element(config.sample_sizes.begin(), config.sample_sizes.end());
+    const std::int64_t largest_sample = *std::ranges::max_element(config.sample_sizes);
 
     // A coverage this many of its own standard errors from the nominal level is a
     // real deviation, not sampling noise in the coverage estimate itself. Three is
@@ -146,7 +146,7 @@ Result<ExperimentRecord> run_confidence_coverage(const CoverageExperimentConfig&
                 }
             }
 
-            const double trials = static_cast<double>(config.trial_count);
+            const auto trials = static_cast<double>(config.trial_count);
             const double coverage = static_cast<double>(covered) / trials;
             const double coverage_se = std::sqrt(coverage * (1.0 - coverage) / trials);
             const double deviation = coverage - config.confidence_level;
@@ -180,7 +180,7 @@ Result<ExperimentRecord> run_confidence_coverage(const CoverageExperimentConfig&
                                {"under_covers", under_covers}});
             record.table.rows.push_back({number(strike),
                                          number(skewness),
-                                         number(sample_size),
+                                         number(static_cast<double>(sample_size)),
                                          number(coverage),
                                          number(coverage_se),
                                          number(config.confidence_level),
