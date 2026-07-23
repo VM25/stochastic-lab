@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
-"""Plot the PDE, barrier, and Greek experiment records (EXP-06, EXP-07, EXP-08).
+"""Plot every experiment record outside the convergence quartet (EXP-05 through EXP-15).
+
+`plot_convergence.py` owns EXP-01 to EXP-04; this owns the rest. Each script
+renders the ids it recognises and skips the others, so both are run over the whole
+record set.
 
 Reporting only, not analysis (ADR-002). Every number drawn here was computed by
 the C++ engine and read out of the experiment's JSON record; this script fits
 nothing, decides nothing, and would not change a verdict if it had a bug. Fitted
-orders, their intervals, the continuity-corrected references, and the pass/fail
-verdicts are read from the record and rendered, never recomputed -- a plot that
-re-derived a slope could disagree with the one the experiment published, and then
-a reader would have no way to tell which was the result.
+orders, their intervals, the continuity-corrected references, the coverage
+deviations, and the pass/fail verdicts are read from the record and rendered, never
+recomputed -- a plot that re-derived a slope could disagree with the one the
+experiment published, and then a reader would have no way to tell which was the
+result.
 
 Usage:
     python3 python/plot_experiments.py results/EXP-06.json --outdir docs/figures
@@ -457,10 +462,468 @@ def plot_greeks(record: dict, outdir: pathlib.Path) -> list[pathlib.Path]:
     return written
 
 
+# --------------------------------------------------------------------------- #
+# EXP-05: variance-reduction efficiency
+# --------------------------------------------------------------------------- #
+ESTIMATOR_STYLE = {
+    "crude": {"color": "#57606a", "marker": "o"},
+    "antithetic": {"color": "#0969da", "marker": "s"},
+    "control_variate": {"color": "#1a7f37", "marker": "^"},
+    "combined": {"color": "#8250df", "marker": "D"},
+}
+
+
+def plot_variance_reduction(record: dict, outdir: pathlib.Path) -> list[pathlib.Path]:
+    cells = record["results"]["cells"]
+    instruments = sorted({c["instrument"] for c in cells})
+
+    fig, axes = plt.subplots(1, len(instruments), figsize=(6.6 * len(instruments), 4.6), squeeze=False)
+    for ax, instrument in zip(axes[0], instruments):
+        subset = [c for c in cells if c["instrument"] == instrument]
+        keys = sorted({(c["spot"], c["volatility"]) for c in subset})
+        for estimator in ["crude", "antithetic", "control_variate", "combined"]:
+            by_key = {
+                (c["spot"], c["volatility"]): c for c in subset if c["estimator"] == estimator
+            }
+            if not by_key:
+                continue
+            xs = [i for i, k in enumerate(keys) if k in by_key]
+            ys = [by_key[keys[i]]["work_normalised_efficiency_gain_over_crude"] for i in xs]
+            ax.plot(
+                xs,
+                ys,
+                linewidth=1.4,
+                markersize=5,
+                label=estimator,
+                **ESTIMATOR_STYLE.get(estimator, {"color": "#57606a", "marker": "x"}),
+            )
+        ax.axhline(1.0, linestyle="--", color="#57606a", linewidth=1.0, label="crude baseline")
+        ax.set_yscale("log")
+        ax.set_xticks(range(len(keys)))
+        ax.set_xticklabels([f"S={s:g}\nσ={v:g}" for (s, v) in keys], fontsize=7)
+        _finish(
+            ax,
+            f"EXP-05: {instrument.replace('_', ' ')}",
+            "cell",
+            "work-normalised efficiency gain over crude",
+        )
+    fig.suptitle(
+        "Efficiency is 1/(variance × deterministic work units), not 1/(variance × runtime):\n"
+        "the ranking is a property of the estimators, not of the machine the run happened on.",
+        fontsize=9,
+        y=1.03,
+    )
+    fig.tight_layout()
+    path = outdir / "exp05_work_normalised_efficiency.png"
+    fig.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return [path]
+
+
+# --------------------------------------------------------------------------- #
+# EXP-09: Heston characteristic-function validation
+# --------------------------------------------------------------------------- #
+def plot_heston_cf(record: dict, outdir: pathlib.Path) -> list[pathlib.Path]:
+    results = record["results"]
+    fig, axes = plt.subplots(1, 2, figsize=(13.0, 4.6), squeeze=False)
+
+    # (a) Quadrature convergence: an internal numerical check, not an oracle.
+    ax = axes[0][0]
+    levels = results["internal_numerical_checks"]["integration_convergence"]
+    xs = [lvl["quadrature_nodes"] for lvl in levels]
+    ys = [max(lvl["integration_error"], 1e-18) for lvl in levels]
+    ax.plot(xs, ys, color="#0969da", marker="o", linewidth=1.4, markersize=4.5, label="integration error")
+    ax.axhline(2.2e-16, linestyle="--", color="#57606a", linewidth=1.0, label="double precision ~2.2e-16")
+    ax.set_xscale("log", base=2)
+    ax.set_yscale("log")
+    _finish(ax, "EXP-09: quadrature convergence (internal check)", "quadrature nodes", "|price − converged price|")
+
+    # (b) External references: relative error against each case's own tolerance.
+    ax = axes[0][1]
+    refs = results["external_references"]
+    provenance_color = {"published": "#1a7f37", "independently_generated": "#0969da"}
+    xs = list(range(len(refs)))
+    for i, ref in enumerate(refs):
+        ax.scatter(
+            [i],
+            [max(ref["relative_error"], 1e-18)],
+            color=provenance_color.get(ref["provenance_category"], "#57606a"),
+            marker="o" if ref["passes"] else "X",
+            s=54,
+            zorder=3,
+            label=ref["provenance_category"] if i == 0 or ref["provenance_category"] not in
+            [r["provenance_category"] for r in refs[:i]] else None,
+        )
+        ax.plot([i - 0.3, i + 0.3], [ref["tolerance"]] * 2, color="#cf222e", linewidth=1.4,
+                label="tolerance" if i == 0 else None)
+    ax.set_yscale("log")
+    ax.set_xticks(xs)
+    ax.set_xticklabels([r["case"] for r in refs], fontsize=6.5, rotation=20, ha="right")
+    _finish(ax, "EXP-09: agreement with external references", "reference case", "relative error")
+
+    fig.suptitle(
+        "The evidence is kept in separate categories: quadrature convergence is an internal "
+        "numerical check,\nwhile the reference cases are published or independently generated "
+        "values. They are not all independent oracles.",
+        fontsize=9,
+        y=1.03,
+    )
+    fig.tight_layout()
+    path = outdir / "exp09_cf_validation.png"
+    fig.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return [path]
+
+
+# --------------------------------------------------------------------------- #
+# EXP-10: Heston variance discretization
+# --------------------------------------------------------------------------- #
+def plot_heston_discretization(record: dict, outdir: pathlib.Path) -> list[pathlib.Path]:
+    results = record["results"]
+    regimes = results["regimes"]
+    fits = {f["regime"]: f for f in results["bias_decay_order_fits"]}
+
+    fig, axes = plt.subplots(1, len(regimes), figsize=(6.6 * len(regimes), 4.6), squeeze=False)
+    for ax, regime in zip(axes[0], regimes):
+        cells = regime["cells"]
+        for scheme in sorted({c["scheme"] for c in cells}):
+            priced = [c for c in cells if c["scheme"] == scheme and c.get("priced")]
+            if not priced:
+                # A scheme that produced no price anywhere is the finding, not a
+                # gap: it is recorded in the caption rather than drawn as absent.
+                continue
+            priced.sort(key=lambda c: c["steps"])
+            xs = [c["steps"] for c in priced]
+            ys = [abs(c["bias"]) for c in priced]
+            errs = [c["across_seed_standard_error"] for c in priced]
+            ax.errorbar(
+                xs, ys, yerr=errs, linewidth=1.4, markersize=4.5, capsize=2,
+                label=scheme, **_style(scheme if scheme in SCHEME_STYLE else "implicit"),
+            )
+            # Unresolved levels are marked so a reader does not read noise as bias.
+            unresolved = [(c["steps"], abs(c["bias"])) for c in priced if not c["bias_is_resolved"]]
+            if unresolved:
+                ax.scatter(
+                    [u[0] for u in unresolved], [u[1] for u in unresolved],
+                    facecolors="white", edgecolors="#57606a", s=64, zorder=4,
+                    label="bias not resolved above noise",
+                )
+        ax.set_xscale("log", base=2)
+        ax.set_yscale("log")
+        fit = fits.get(regime["regime"], {})
+        order = fit.get("bias_decay_order")
+        order_text = f"decay order {order:.2f}" if order is not None else "decay order unresolved"
+        _finish(
+            ax,
+            f"EXP-10: {regime['regime'].replace('_', ' ')} (ξ={regime['xi']:g}) — {order_text}",
+            "time steps",
+            "|bias vs semi-analytic reference|",
+        )
+
+    failed = [
+        scheme
+        for regime in regimes
+        for scheme in sorted({c["scheme"] for c in regime["cells"]})
+        if not any(c["scheme"] == scheme and c.get("priced") for c in regime["cells"])
+    ]
+    note = (
+        f"The {sorted(set(failed))[0].replace('_', ' ')} scheme produced no price at any step "
+        "count tested, in either regime, and so has no curve to draw."
+        if failed
+        else "Every scheme tested produced a price at every step count."
+    )
+    fig.suptitle(
+        f"Full truncation prices every regime without a non-finite path. {note}",
+        fontsize=9,
+        y=1.03,
+    )
+    fig.tight_layout()
+    path = outdir / "exp10_variance_discretization.png"
+    fig.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return [path]
+
+
+# --------------------------------------------------------------------------- #
+# EXP-11: Heston calibration recovery
+# --------------------------------------------------------------------------- #
+def plot_calibration_recovery(record: dict, outdir: pathlib.Path) -> list[pathlib.Path]:
+    starts = record["results"]["starts"]
+    fig, ax = plt.subplots(figsize=(7.4, 4.6))
+    xs = list(range(len(starts)))
+    for i, start in enumerate(starts):
+        blind = start.get("blind", False)
+        ax.bar(
+            i,
+            max(start["distance_to_truth"], 1e-18),
+            color="#0969da" if blind else "#9a6700",
+            width=0.6,
+            label=("blind start" if blind else "start at the truth")
+            if i == 0 or (blind != starts[i - 1].get("blind", False))
+            else None,
+        )
+    ax.set_yscale("log")
+    ax.set_xticks(xs)
+    ax.set_xticklabels(
+        [f"start {s['index']}\n{'blind' if s.get('blind') else 'seeded'}" for s in starts],
+        fontsize=7,
+    )
+    _finish(
+        ax,
+        "EXP-11: parameter recovery from a synthetic surface",
+        "optimiser start",
+        "normalised distance to the generating parameters",
+    )
+    fig.suptitle(
+        "The headline recovery is read from a blind start -- one that did not begin at the "
+        "answer.\nA seeded start recovering the truth would prove nothing about calibration.",
+        fontsize=9,
+        y=1.02,
+    )
+    fig.tight_layout()
+    path = outdir / "exp11_recovery.png"
+    fig.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return [path]
+
+
+# --------------------------------------------------------------------------- #
+# EXP-12: market-surface calibration stability
+# --------------------------------------------------------------------------- #
+def plot_calibration_stability(record: dict, outdir: pathlib.Path) -> list[pathlib.Path]:
+    results = record["results"]
+    scenarios = results["scenarios"]
+    dispersion = results["parameter_dispersion"]
+    written: list[pathlib.Path] = []
+
+    # (1) The dispersion is the finding: every scenario fits, and the parameters
+    # still disagree by more than an order of magnitude on two of five axes.
+    names = list(dispersion.keys())
+    fig, axes = plt.subplots(1, len(names), figsize=(3.1 * len(names), 4.2), squeeze=False)
+    for ax, name in zip(axes[0], names):
+        values = [s["calibrated"][name] for s in scenarios]
+        ax.plot(range(len(values)), values, "o", color="#0969da", markersize=5)
+        stats = dispersion[name]
+        ax.axhline(stats["mean"], linestyle="--", color="#cf222e", linewidth=1.1, label="mean")
+        relative = stats["stddev"] / abs(stats["mean"]) if stats["mean"] else float("nan")
+        ax.set_title(f"{name.replace('_', ' ')}\nrel. sd {relative:.0%}", fontsize=9, pad=8)
+        ax.set_xlabel("scenario", fontsize=8)
+        ax.grid(True, alpha=0.25, linewidth=0.5)
+        ax.tick_params(labelsize=7)
+        ax.set_xticks(range(len(values)))
+    fig.suptitle(
+        "EXP-12: the same real surface, seven scenarios, all converged and all fitting well.\n"
+        "The short-end parameters are determined; mean reversion and long-run variance are not.",
+        fontsize=9,
+        y=1.04,
+    )
+    fig.tight_layout()
+    path = outdir / "exp12_parameter_dispersion.png"
+    fig.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    written.append(path)
+
+    # (2) Where the model tracks the smile and where it cannot. This surface is not
+    # generated by Heston, so the residual is genuine model error.
+    base = scenarios[0]
+    fig, ax = plt.subplots(figsize=(7.4, 4.6))
+    maturities = sorted({q["maturity"] for q in base["residual_surface"]})
+    palette = ["#0969da", "#1a7f37", "#cf222e", "#8250df", "#9a6700"]
+    for i, maturity in enumerate(maturities):
+        quotes = sorted(
+            (q for q in base["residual_surface"] if q["maturity"] == maturity),
+            key=lambda q: q["strike"],
+        )
+        ax.plot(
+            [q["strike"] for q in quotes],
+            [q["iv_residual"] for q in quotes],
+            marker="o",
+            linewidth=1.4,
+            markersize=4.5,
+            color=palette[i % len(palette)],
+            label=f"T = {maturity:.3g}y",
+        )
+    ax.axhline(0.0, color="#57606a", linewidth=0.9, alpha=0.7)
+    _finish(
+        ax,
+        "EXP-12: implied-volatility residual by strike (base scenario)",
+        "strike",
+        "model − market implied volatility",
+    )
+    fig.suptitle(
+        "A real surface is not a Heston surface: the residual is model error, and it is "
+        "reported\nby strike and maturity rather than summarised into a single RMSE.",
+        fontsize=9,
+        y=1.02,
+    )
+    fig.tight_layout()
+    path = outdir / "exp12_residual_surface.png"
+    fig.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    written.append(path)
+    return written
+
+
+# --------------------------------------------------------------------------- #
+# EXP-13: cross-method accuracy and agreement
+# --------------------------------------------------------------------------- #
+def plot_cross_method(record: dict, outdir: pathlib.Path) -> list[pathlib.Path]:
+    results = record["results"]
+    labels: list[str] = []
+    sigmas: list[float] = []
+    colors: list[str] = []
+
+    for cell in results["black_scholes_european"]:
+        for method in cell["methods"]:
+            if method.get("is_reference") or "sigmas" not in method:
+                continue
+            labels.append(f"BS {method['method']}\nT={cell['maturity']:g} σ={cell['volatility']:g}")
+            sigmas.append(abs(method["sigmas"]))
+            colors.append("#0969da" if method.get("agrees") else "#cf222e")
+
+    for cell in results["heston_european"]:
+        labels.append(f"Heston MC vs CF\nT={cell['maturity']:g} ξ={cell['vol_of_variance']:g}")
+        sigmas.append(abs(cell["sigmas"]))
+        colors.append("#1a7f37" if cell.get("agrees") else "#cf222e")
+
+    fig, ax = plt.subplots(figsize=(max(8.0, 0.55 * len(labels)), 4.8))
+    ax.bar(range(len(sigmas)), sigmas, color=colors, width=0.65)
+    ax.axhline(5.0, linestyle="--", color="#cf222e", linewidth=1.2, label="agreement gate (5σ)")
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels, fontsize=6, rotation=45, ha="right")
+    _finish(
+        ax,
+        "EXP-13: cross-method agreement",
+        "comparison",
+        "|difference| in combined standard errors (σ)",
+    )
+    asian_agree = sum(1 for c in results["arithmetic_asian"] if c.get("all_agree"))
+    fig.suptitle(
+        "Methods are compared against each other in units of their own combined standard error, "
+        "so a\ndisagreement is judged against sampling noise rather than an absolute tolerance. "
+        f"All {asian_agree} of {len(results['arithmetic_asian'])} Asian cells agree pairwise.",
+        fontsize=9,
+        y=1.02,
+    )
+    fig.tight_layout()
+    path = outdir / "exp13_agreement.png"
+    fig.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return [path]
+
+
+# --------------------------------------------------------------------------- #
+# EXP-14: statistical confidence coverage
+# --------------------------------------------------------------------------- #
+def plot_coverage(record: dict, outdir: pathlib.Path) -> list[pathlib.Path]:
+    results = record["results"]
+    cells = sorted(results["cells"], key=lambda c: (c["moneyness"], c["sample_size"]))
+
+    fig, ax = plt.subplots(figsize=(8.6, 4.8))
+    xs = list(range(len(cells)))
+    ys = [c["observed_coverage"] for c in cells]
+    errs = [c["coverage_standard_error"] for c in cells]
+    colors = ["#cf222e" if c["under_covers"] else "#1a7f37" for c in cells]
+    for x, y, e, color in zip(xs, ys, errs, colors):
+        ax.errorbar([x], [y], yerr=[e], fmt="o", color=color, markersize=6, capsize=3, linewidth=1.3)
+    nominal = cells[0]["nominal_coverage"]
+    ax.axhline(nominal, linestyle="--", color="#57606a", linewidth=1.2, label=f"nominal {nominal:.0%}")
+    ax.set_xticks(xs)
+    ax.set_xticklabels(
+        [f"N={c['sample_size']:,}\nK/S={c['moneyness']:g}\nskew {c['payoff_skewness']:.1f}" for c in cells],
+        fontsize=6.5,
+    )
+    _finish(
+        ax,
+        "EXP-14: observed coverage of the nominal 95% interval",
+        "cell",
+        "observed coverage",
+    )
+    worst = max(cells, key=lambda c: c["deviation_sigmas"])
+    fig.suptitle(
+        "Red is a resolved under-coverage. The interval is not automatically valid: at "
+        f"K/S={worst['moneyness']:g} with payoff skewness {worst['payoff_skewness']:.1f}, "
+        f"N={worst['sample_size']:,} covers only\n{worst['observed_coverage']:.2%} "
+        f"({worst['deviation_sigmas']:.1f}σ below nominal). More paths fix it — the central "
+        "limit theorem needs enough of them.",
+        fontsize=9,
+        y=1.03,
+    )
+    fig.tight_layout()
+    path = outdir / "exp14_coverage.png"
+    fig.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return [path]
+
+
+# --------------------------------------------------------------------------- #
+# EXP-15: numerical edge cases
+# --------------------------------------------------------------------------- #
+def plot_edge_cases(record: dict, outdir: pathlib.Path) -> list[pathlib.Path]:
+    cases = record["results"]["cases"]
+    order = sorted({c["category"] for c in cases})
+    grouped = [c for category in order for c in cases if c["category"] == category]
+
+    category_color = {
+        "limiting_behavior": "#0969da",
+        "already_breached": "#1a7f37",
+        "degenerate_refusal": "#8250df",
+        "invalid_input_rejected": "#9a6700",
+    }
+
+    fig, ax = plt.subplots(figsize=(8.4, 0.30 * len(grouped) + 2.0))
+    ys = list(range(len(grouped)))
+    ax.barh(
+        ys,
+        [1.0 if c["passed"] else 0.0 for c in grouped],
+        color=[category_color.get(c["category"], "#57606a") for c in grouped],
+        height=0.68,
+    )
+    ax.set_yticks(ys)
+    ax.set_yticklabels([f"{c['case']}" for c in grouped], fontsize=6.5)
+    ax.invert_yaxis()
+    ax.set_xlim(0, 1.35)
+    ax.set_xticks([0, 1])
+    ax.set_xticklabels(["not resolved", "behaved as required"], fontsize=8)
+    for y, case in zip(ys, grouped):
+        ax.text(1.02, y, case["behavior"], va="center", fontsize=6, color="#57606a")
+    handles = [
+        plt.Line2D([0], [0], color=color, linewidth=6, label=category.replace("_", " "))
+        for category, color in category_color.items()
+        if any(c["category"] == category for c in grouped)
+    ]
+    ax.legend(handles=handles, fontsize=7, framealpha=0.95, loc="lower right")
+    ax.set_title("EXP-15: every edge case either produces the correct limit or refuses", fontsize=11, pad=10)
+    ax.grid(True, axis="x", alpha=0.25, linewidth=0.5)
+    ax.tick_params(labelsize=7)
+    summary = record["results"]["summary"]
+    fig.suptitle(
+        f"{summary['passed']} of {summary['total_cases']} cases behaved as required; "
+        f"non-finite value escaped: {str(summary['any_non_finite_escaped']).lower()}.\n"
+        "Refusing is a correct outcome here -- a plausible number from a degenerate input "
+        "would be the failure.",
+        fontsize=9,
+        y=1.005,
+    )
+    fig.tight_layout()
+    path = outdir / "exp15_edge_cases.png"
+    fig.savefig(path, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return [path]
+
+
 PLOTTERS = {
+    "EXP-05": plot_variance_reduction,
     "EXP-06": plot_pde,
     "EXP-07": plot_barrier,
     "EXP-08": plot_greeks,
+    "EXP-09": plot_heston_cf,
+    "EXP-10": plot_heston_discretization,
+    "EXP-11": plot_calibration_recovery,
+    "EXP-12": plot_calibration_stability,
+    "EXP-13": plot_cross_method,
+    "EXP-14": plot_coverage,
+    "EXP-15": plot_edge_cases,
 }
 
 
