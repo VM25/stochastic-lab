@@ -5,6 +5,7 @@
 #include <fmt/format.h>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <complex>
@@ -53,91 +54,101 @@ struct ReferenceCase {
     const char* name;
     const char* provenance_category;  // "published" or "independently_generated"
     const char* provenance;
-    double spot, rate, dividend, strike, maturity, v0, kappa, theta, xi, rho;
+    double spot;
+    double rate;
+    double dividend;
+    double strike;
+    double maturity;
+    double v0;
+    double kappa;
+    double theta;
+    double xi;
+    double rho;
     double reference;
     double tolerance;
 };
 
-const ReferenceCase kReferences[] = {
+const std::array<ReferenceCase, 5> kReferences = {{
     // The one genuinely published benchmark.
-    {"fang_oosterlee_2008",
-     "published",
-     "Fang & Oosterlee (2008) COS-method benchmark",
-     100.0,
-     0.0,
-     0.0,
-     100.0,
-     1.0,
-     0.0175,
-     1.5768,
-     0.0398,
-     0.5751,
-     -0.5711,
-     5.78515543437619,
-     kPublishedRefTol},
+    {.name = "fang_oosterlee_2008",
+     .provenance_category = "published",
+     .provenance = "Fang & Oosterlee (2008) COS-method benchmark",
+     .spot = 100.0,
+     .rate = 0.0,
+     .dividend = 0.0,
+     .strike = 100.0,
+     .maturity = 1.0,
+     .v0 = 0.0175,
+     .kappa = 1.5768,
+     .theta = 0.0398,
+     .xi = 0.5751,
+     .rho = -0.5711,
+     .reference = 5.78515543437619,
+     .tolerance = kPublishedRefTol},
     // Independently generated to 40 digits with mpmath and cross-checked against
     // QuantLib's AnalyticHestonEngine. NOT a published literature value.
-    {"feller_violating",
-     "independently_generated",
-     "40-digit mpmath integration, cross-checked with QuantLib (Feller ratio 0.36 < 1)",
-     100.0,
-     0.05,
-     0.0,
-     100.0,
-     1.0,
-     0.09,
-     2.0,
-     0.09,
-     1.0,
-     -0.3,
-     13.1365327960895,
-     kHighPrecisionRefTol},
-    {"long_maturity_trap_t5",
-     "independently_generated",
-     "40-digit mpmath integration; the regime where the naive branch fails",
-     100.0,
-     0.03,
-     0.0,
-     100.0,
-     5.0,
-     0.04,
-     1.5,
-     0.04,
-     0.6,
-     -0.7,
-     23.50614713998921,
-     kHighPrecisionRefTol},
-    {"long_maturity_trap_t10",
-     "independently_generated",
-     "40-digit mpmath integration; the regime where the naive branch fails",
-     100.0,
-     0.03,
-     0.0,
-     100.0,
-     10.0,
-     0.04,
-     1.5,
-     0.04,
-     0.6,
-     -0.7,
-     36.44207657516968,
-     kHighPrecisionRefTol},
-    {"long_maturity_trap_t15",
-     "independently_generated",
-     "40-digit mpmath integration; the regime where the naive branch fails",
-     100.0,
-     0.03,
-     0.0,
-     100.0,
-     15.0,
-     0.04,
-     1.5,
-     0.04,
-     0.6,
-     -0.7,
-     46.43818472722808,
-     kHighPrecisionRefTol},
-};
+    {.name = "feller_violating",
+     .provenance_category = "independently_generated",
+     .provenance =
+         "40-digit mpmath integration, cross-checked with QuantLib (Feller ratio 0.36 < 1)",
+     .spot = 100.0,
+     .rate = 0.05,
+     .dividend = 0.0,
+     .strike = 100.0,
+     .maturity = 1.0,
+     .v0 = 0.09,
+     .kappa = 2.0,
+     .theta = 0.09,
+     .xi = 1.0,
+     .rho = -0.3,
+     .reference = 13.1365327960895,
+     .tolerance = kHighPrecisionRefTol},
+    {.name = "long_maturity_trap_t5",
+     .provenance_category = "independently_generated",
+     .provenance = "40-digit mpmath integration; the regime where the naive branch fails",
+     .spot = 100.0,
+     .rate = 0.03,
+     .dividend = 0.0,
+     .strike = 100.0,
+     .maturity = 5.0,
+     .v0 = 0.04,
+     .kappa = 1.5,
+     .theta = 0.04,
+     .xi = 0.6,
+     .rho = -0.7,
+     .reference = 23.50614713998921,
+     .tolerance = kHighPrecisionRefTol},
+    {.name = "long_maturity_trap_t10",
+     .provenance_category = "independently_generated",
+     .provenance = "40-digit mpmath integration; the regime where the naive branch fails",
+     .spot = 100.0,
+     .rate = 0.03,
+     .dividend = 0.0,
+     .strike = 100.0,
+     .maturity = 10.0,
+     .v0 = 0.04,
+     .kappa = 1.5,
+     .theta = 0.04,
+     .xi = 0.6,
+     .rho = -0.7,
+     .reference = 36.44207657516968,
+     .tolerance = kHighPrecisionRefTol},
+    {.name = "long_maturity_trap_t15",
+     .provenance_category = "independently_generated",
+     .provenance = "40-digit mpmath integration; the regime where the naive branch fails",
+     .spot = 100.0,
+     .rate = 0.03,
+     .dividend = 0.0,
+     .strike = 100.0,
+     .maturity = 15.0,
+     .v0 = 0.04,
+     .kappa = 1.5,
+     .theta = 0.04,
+     .xi = 0.6,
+     .rho = -0.7,
+     .reference = 46.43818472722808,
+     .tolerance = kHighPrecisionRefTol},
+}};
 
 }  // namespace
 
