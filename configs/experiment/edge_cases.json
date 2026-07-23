@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "command": "experiment",
+  "edge_cases": {
+    "spot": 100.0,
+    "rate": 0.05,
+    "dividend_yield": 0.0,
+    "volatility": 0.2,
+    "limit_tolerance": 1e-6,
+    "zero_tolerance": 1e-8,
+    "tiny_maturity": 1e-8,
+    "tiny_volatility": 1e-8
+  }
+}

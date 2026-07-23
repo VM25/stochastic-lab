@@ -35,6 +35,7 @@ target_sources(
             experiments/convergence_experiments.cpp
             experiments/coverage_experiments.cpp
             experiments/cross_method_experiments.cpp
+            experiments/edge_case_experiments.cpp
             experiments/greek_experiments.cpp
             experiments/heston_cf_validation_experiments.cpp
             experiments/heston_simulation_experiments.cpp

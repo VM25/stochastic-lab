@@ -5,6 +5,7 @@
 #include <diffusionworks/experiments/convergence_experiments.hpp>
 #include <diffusionworks/experiments/coverage_experiments.hpp>
 #include <diffusionworks/experiments/cross_method_experiments.hpp>
+#include <diffusionworks/experiments/edge_case_experiments.hpp>
 #include <diffusionworks/experiments/greek_experiments.hpp>
 #include <diffusionworks/experiments/heston_cf_validation_experiments.hpp>
 #include <diffusionworks/experiments/heston_simulation_experiments.hpp>
@@ -771,6 +772,71 @@ Result<VarianceReductionExperimentConfig> parse_variance_reduction_config(const 
     config.master_seed = static_cast<std::uint64_t>(master_seed);
 
     return Result<VarianceReductionExperimentConfig>::success(std::move(config));
+}
+
+/// Parses the `edge_cases` block for EXP-15.
+///
+/// Same contract as the other blocks: absent means the documented defaults that
+/// produced the published record, and an unknown key is rejected rather than
+/// silently ignored.
+Result<EdgeCaseExperimentConfig> parse_edge_case_config(const ConfigNode& root) {
+    EdgeCaseExperimentConfig config;
+
+    if (!root.contains("edge_cases")) {
+        return Result<EdgeCaseExperimentConfig>::success(config);
+    }
+
+    auto node = root.object("edge_cases");
+    if (!node) {
+        return Result<EdgeCaseExperimentConfig>::failure(std::move(node).error());
+    }
+
+    const Status unknown = node.value().reject_unknown_keys({"spot",
+                                                             "rate",
+                                                             "dividend_yield",
+                                                             "volatility",
+                                                             "limit_tolerance",
+                                                             "zero_tolerance",
+                                                             "tiny_maturity",
+                                                             "tiny_volatility"});
+    if (!unknown) {
+        return Result<EdgeCaseExperimentConfig>::failure(unknown.error());
+    }
+
+    std::optional<Error> first_error;
+    const auto read_number = [&](const char* key, double fallback) -> double {
+        auto v = node.value().number_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+
+    config.spot = read_number("spot", config.spot);
+    config.rate = read_number("rate", config.rate);
+    config.dividend_yield = read_number("dividend_yield", config.dividend_yield);
+    config.volatility = read_number("volatility", config.volatility);
+    config.limit_tolerance = read_number("limit_tolerance", config.limit_tolerance);
+    config.zero_tolerance = read_number("zero_tolerance", config.zero_tolerance);
+    config.tiny_maturity = read_number("tiny_maturity", config.tiny_maturity);
+    config.tiny_volatility = read_number("tiny_volatility", config.tiny_volatility);
+
+    if (first_error.has_value()) {
+        return Result<EdgeCaseExperimentConfig>::failure(*first_error);
+    }
+    if (config.limit_tolerance <= 0.0 || config.zero_tolerance <= 0.0 ||
+        config.tiny_maturity <= 0.0 || config.tiny_volatility <= 0.0) {
+        return Result<EdgeCaseExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "limit_tolerance, zero_tolerance, tiny_maturity, and tiny_volatility must all be "
+            "positive",
+            kContext);
+    }
+
+    return Result<EdgeCaseExperimentConfig>::success(std::move(config));
 }
 
 /// Parses the `coverage` block for EXP-14.
@@ -1765,6 +1831,12 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
             return Result<nlohmann::json>::failure(std::move(coverage).error());
         }
         record = run_confidence_coverage(coverage.value());
+    } else if (id == "EXP-15") {
+        auto edge = parse_edge_case_config(config.root());
+        if (!edge) {
+            return Result<nlohmann::json>::failure(std::move(edge).error());
+        }
+        record = run_edge_cases(edge.value());
     } else if (id == "EXP-10") {
         auto heston = parse_heston_simulation_config(config.root());
         if (!heston) {
