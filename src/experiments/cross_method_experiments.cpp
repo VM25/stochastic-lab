@@ -36,9 +36,13 @@ agree_within_sigma(double value, double reference, double se, double reference_s
     Agreement a;
     a.difference = value - reference;
     a.combined_standard_error = std::sqrt(se * se + reference_se * reference_se);
-    a.sigmas = a.combined_standard_error > 0.0
-                   ? std::abs(a.difference) / a.combined_standard_error
-                   : (a.difference == 0.0 ? 0.0 : std::numeric_limits<double>::infinity());
+    if (a.combined_standard_error > 0.0) {
+        a.sigmas = std::abs(a.difference) / a.combined_standard_error;
+    } else if (a.difference == 0.0) {
+        a.sigmas = 0.0;
+    } else {
+        a.sigmas = std::numeric_limits<double>::infinity();
+    }
     a.agrees = a.sigmas <= sigma;
     return a;
 }
