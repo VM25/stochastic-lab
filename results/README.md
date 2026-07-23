@@ -17,7 +17,14 @@ and the figures in `docs/figures/`:
 
 ```
 python3 python/plot_convergence.py results/*.json --outdir docs/figures
+python3 python/plot_experiments.py results/*.json --outdir docs/figures
 ```
+
+`plot_convergence.py` owns the convergence records (EXP-01–04);
+`plot_experiments.py` owns the PDE, barrier, and Greek records (EXP-06–08). Each
+renders the records it recognises and skips the rest, so both are run over the whole
+set. Both are reporting only (ADR-002): every number is read from the record, never
+recomputed.
 
 ## Status
 
@@ -30,6 +37,9 @@ python3 python/plot_convergence.py results/*.json --outdir docs/figures
 | EXP-06 | pass | Crank–Nicolson reaches order 2.0034 in space; Rannacher restores order 1.98 in time where plain CN oscillates. The explicit stability bound is sufficient, not necessary — stable to ratio 1.60, divergent at 1.70. |
 | EXP-07 | pass | Daily monitoring is not continuous monitoring: the bias reaches **67% of price** for an up-and-out call near the spot, and is biased high in all 42 resolved cells. The Brownian bridge removes it at every frequency, in both directions. A separate PDE arm prices the continuous contract directly and converges to the analytic reference at order ~2.0. |
 | EXP-08 | pass | No Greek estimator wins everywhere. Under common random numbers the finite-difference **delta** variance is bump-independent (fitted exponent ~0, not 1/h); **gamma** grows only as ~bump^(−0.5), not 1/h². Pathwise beats likelihood-ratio delta by 1.8–2.4× in standard error but has no gamma; likelihood-ratio is the one that survives a discontinuous payoff. |
+| EXP-10 | pass | Full truncation prices every regime with **zero** non-finite paths, where the unguarded naive Euler fails at every step count tested. The remaining bias decays at ~first order in the Feller-violating regime; in the satisfying regime it never clears the sampling noise, so no order is fitted. |
+| EXP-11 | pass | Calibration recovers the generating parameters from a **blind** start (not one handed the answer): normalised distance 2.0e−10, implied-vol RMSE 1.8e−11, 4 of 4 starts converged, and no competing fit at a materially different parameter set. |
+| EXP-12 | pass | **A good fit is not an identified parameter set.** On a real SPY surface all 7 scenarios converge and fit well (implied-vol RMSE 0.0015–0.0106), yet mean reversion spans 0.26–11.21 (relative sd **145%**) and long-run variance 0.038–0.496 (**95%**) across them, while correlation and initial variance hold to ~10%. No scenario leaned on penalties. |
 
 The EXP-02 warning is not a defect. It records that the full-range slopes (0.4974,
 0.9838) exclude their theoretical values while the asymptotic-window slopes
@@ -78,12 +88,30 @@ what happens.** The experiment fits the dispersion-versus-bump exponent per cell
 finds a median near **0.0** for delta (its variance is essentially bump-independent,
 because the shared-draw estimator converges to the pathwise one) and near **0.5** for
 gamma — not 2.0, and not a universal law (it ranges 0.4–2.0 with moneyness). The
-rankings are equally regime-specific: pathwise delta beats likelihood-ratio delta by
-1.8–2.4× in standard error, but has no gamma, and likelihood-ratio is the only method
-that survives a discontinuous payoff. The experiment reports these per cell rather than
+rankings are equally regime-specific: pathwise delta has the smaller standard error in
+every cell — about **2.4× smaller at the median**, but widening to roughly **250×** in
+the deep out-of-the-money, short-maturity corner, so a single ratio would misdescribe
+it — while having no gamma at all, and likelihood-ratio is the only method that
+survives a discontinuous payoff. The experiment reports these per cell rather than
 declaring a winner, and marks its worst region (deep out-of-the-money, short maturity)
 explicitly. It fails the record only if a *theoretically unbiased* estimator (pathwise,
 likelihood-ratio) shows a resolved bias, which none does.
+
+EXP-12 is the result that most deserves not to be rounded off. On a **real** SPY
+surface — 18 quotes, three maturities, none excluded — all seven scenarios converge and
+every one of them fits: implied-vol RMSE ranges 0.0015 to 0.0106, and no scenario had
+to lean on a penalty. A reader who stopped at the fit quality would conclude the model
+was pinned down. It is not. Across those same seven scenarios the **mean reversion
+spans 0.26 to 11.21** (relative standard deviation 145%) and the **long-run variance
+0.038 to 0.496** (95%), while the correlation (−0.72 to −0.55) and initial variance
+hold to about 10%. The parameters that govern the short end are determined by this
+surface; the pair that governs the long-run variance level is not — κ and θ trade off
+against each other along a valley the data does not resolve. This is why the record
+reports objective value, surface fit, parameter dispersion, and penalty reliance as
+four separate things: collapsing them into "the calibration converged" would state the
+one that is true and hide the one that matters. Contrast EXP-11, where a *synthetic*
+surface generated by known Heston parameters is recovered to 2.0e−10 with no competing
+fit — the difference between the two records is model error, not solver quality.
 
 ## Reading a record
 

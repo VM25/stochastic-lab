@@ -1,0 +1,5 @@
+start,blind,status,objective,iv_rmse,price_rmse,distance_to_truth,evaluations,v0,kappa,theta,xi,rho
+0,yes,converged,6.12819e-21,1.75046e-11,6.00191e-10,1.96729e-10,437,0.04,1.5,0.05,0.4,-0.6
+1,yes,converged,1.58712e-20,2.81702e-11,8.1498e-10,2.54777e-10,664,0.04,1.5,0.05,0.4,-0.6
+2,yes,converged,2.31533e-20,3.40245e-11,4.79006e-10,4.57211e-10,492,0.04,1.5,0.05,0.4,-0.6
+3,yes,converged,2.5802e-20,3.5918e-11,1.16729e-09,5.19442e-10,665,0.04,1.5,0.05,0.4,-0.6

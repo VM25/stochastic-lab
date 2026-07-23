@@ -415,17 +415,27 @@ jobs:
       - name: Build
         run: cmake --build --preset release
 
-      - name: Every experiment runs from its stored configuration
+      - name: Fast experiments regenerate from their stored configuration
         run: |
           set -euo pipefail
           mkdir -p /tmp/records
+          # A config->record smoke test on the experiments quick enough to run in
+          # CI. EXP-07 (barrier, ~19 min) and the calibration studies are too slow
+          # to regenerate on every push; their committed records are the source of
+          # truth and are checked for artifacts and figure reproducibility below.
           for id in EXP-01 EXP-02 EXP-03 EXP-04; do
             ./build/release/src/diffusionworks experiment \
               --config configs/experiment/convergence.json \
               --id "$id" --output "/tmp/records/$id.json"
           done
+          ./build/release/src/diffusionworks experiment \
+            --config configs/experiment/pde.json --id EXP-06 \
+            --output "/tmp/records/EXP-06.json"
+          ./build/release/src/diffusionworks experiment \
+            --config configs/experiment/greeks.json --id EXP-08 \
+            --output "/tmp/records/EXP-08.json"
 
-      - name: Records carry every required artifact
+      - name: Every committed record carries every required artifact
         run: |
           set -euo pipefail
           python3 - <<'EOF'
@@ -433,15 +443,21 @@ jobs:
 
           # EXPERIMENT-CATALOG "Required Artifacts". A record missing any of these
           # is not publishable, so a missing field fails the build rather than
-          # being noticed later by a reader.
+          # being noticed later by a reader. This runs over the committed records,
+          # which are the ones a reader actually gets.
           required = [
               "id", "name", "question", "status", "interpretation", "limitations",
               "reproduction_command", "configuration", "results", "table",
               "runtime_seconds", "build_metadata",
           ]
 
+          records = sorted(pathlib.Path("results").glob("EXP-*.json"))
+          if not records:
+              print("FAIL: no committed records found under results/")
+              sys.exit(1)
+
           failed = False
-          for path in sorted(pathlib.Path("/tmp/records").glob("*.json")):
+          for path in records:
               record = json.loads(path.read_text())
 
               for field in required:
@@ -467,13 +483,16 @@ jobs:
           sys.exit(1 if failed else 0)
           EOF
 
-      - name: Every published figure regenerates from its record
+      - name: Every published figure regenerates from its committed record
         run: |
           set -euo pipefail
-          python3 python/plot_convergence.py /tmp/records/*.json --outdir /tmp/figures
           # EXPERIMENT-CATALOG's final gate requires that all published charts can
           # be regenerated automatically. Every figure committed under
-          # docs/figures/ must therefore be reproducible from a record.
+          # docs/figures/ must therefore be reproducible from a committed record.
+          # Each plotter renders the ids it owns and skips the rest, so both are
+          # run over the whole record set.
+          python3 python/plot_convergence.py results/EXP-*.json --outdir /tmp/figures
+          python3 python/plot_experiments.py results/EXP-*.json --outdir /tmp/figures
           for figure in docs/figures/*.png; do
             name=$(basename "$figure")
             if [ ! -f "/tmp/figures/$name" ]; then
