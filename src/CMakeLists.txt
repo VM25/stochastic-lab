@@ -34,6 +34,7 @@ target_sources(
             experiments/convergence.cpp
             experiments/convergence_experiments.cpp
             experiments/greek_experiments.cpp
+            experiments/heston_cf_validation_experiments.cpp
             experiments/heston_simulation_experiments.cpp
             experiments/experiment.cpp
             experiments/pde_experiments.cpp

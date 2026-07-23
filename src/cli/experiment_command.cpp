@@ -4,6 +4,7 @@
 #include <diffusionworks/experiments/calibration_experiments.hpp>
 #include <diffusionworks/experiments/convergence_experiments.hpp>
 #include <diffusionworks/experiments/greek_experiments.hpp>
+#include <diffusionworks/experiments/heston_cf_validation_experiments.hpp>
 #include <diffusionworks/experiments/heston_simulation_experiments.hpp>
 #include <diffusionworks/experiments/pde_experiments.hpp>
 #include <diffusionworks/experiments/variance_reduction_experiments.hpp>
@@ -770,6 +771,140 @@ Result<VarianceReductionExperimentConfig> parse_variance_reduction_config(const 
     return Result<VarianceReductionExperimentConfig>::success(std::move(config));
 }
 
+/// Parses the `heston_cf_validation` block for EXP-09.
+///
+/// Same contract as the other blocks: absent means the documented defaults that
+/// produced the published record, and an unknown key is rejected rather than
+/// silently ignored.
+Result<HestonCfValidationExperimentConfig>
+parse_heston_cf_validation_config(const ConfigNode& root) {
+    HestonCfValidationExperimentConfig config;
+
+    if (!root.contains("heston_cf_validation")) {
+        return Result<HestonCfValidationExperimentConfig>::success(config);
+    }
+
+    auto node = root.object("heston_cf_validation");
+    if (!node) {
+        return Result<HestonCfValidationExperimentConfig>::failure(std::move(node).error());
+    }
+
+    const Status unknown = node.value().reject_unknown_keys({"spot",
+                                                             "rate",
+                                                             "dividend_yield",
+                                                             "initial_variance",
+                                                             "long_run_variance",
+                                                             "strikes",
+                                                             "maturities",
+                                                             "correlations",
+                                                             "vol_of_variances",
+                                                             "mean_reversions",
+                                                             "cf_grid_max_u",
+                                                             "cf_grid_points",
+                                                             "quadrature_node_counts",
+                                                             "reference_quadrature_nodes"});
+    if (!unknown) {
+        return Result<HestonCfValidationExperimentConfig>::failure(unknown.error());
+    }
+
+    std::optional<Error> first_error;
+    const auto read_number = [&](const char* key, double fallback) -> double {
+        auto v = node.value().number_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_integer = [&](const char* key, std::int64_t fallback) -> std::int64_t {
+        auto v = node.value().integer_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_doubles = [&](const char* key, std::vector<double> fallback) {
+        if (!node.value().contains(key)) {
+            return fallback;
+        }
+        auto array = node.value().array(key);
+        if (!array) {
+            if (!first_error.has_value()) {
+                first_error = array.error();
+            }
+            return fallback;
+        }
+        std::vector<double> out;
+        for (std::size_t i = 0; i < array.value().size(); ++i) {
+            auto v = array.value().number_at(i);
+            if (!v) {
+                if (!first_error.has_value()) {
+                    first_error = v.error();
+                }
+                return fallback;
+            }
+            out.push_back(v.value());
+        }
+        return out;
+    };
+
+    config.spot = read_number("spot", config.spot);
+    config.rate = read_number("rate", config.rate);
+    config.dividend_yield = read_number("dividend_yield", config.dividend_yield);
+    config.initial_variance = read_number("initial_variance", config.initial_variance);
+    config.long_run_variance = read_number("long_run_variance", config.long_run_variance);
+    config.strikes = read_doubles("strikes", config.strikes);
+    config.maturities = read_doubles("maturities", config.maturities);
+    config.correlations = read_doubles("correlations", config.correlations);
+    config.vol_of_variances = read_doubles("vol_of_variances", config.vol_of_variances);
+    config.mean_reversions = read_doubles("mean_reversions", config.mean_reversions);
+    config.cf_grid_max_u = read_number("cf_grid_max_u", config.cf_grid_max_u);
+    config.cf_grid_points = read_integer("cf_grid_points", config.cf_grid_points);
+    config.reference_quadrature_nodes =
+        read_integer("reference_quadrature_nodes", config.reference_quadrature_nodes);
+
+    // The node-count list is integers; read as numbers and narrow.
+    if (node.value().contains("quadrature_node_counts")) {
+        const std::vector<double> nodes = read_doubles("quadrature_node_counts", {});
+        std::vector<std::int64_t> counts;
+        counts.reserve(nodes.size());
+        for (const double n : nodes) {
+            counts.push_back(static_cast<std::int64_t>(n));
+        }
+        if (!counts.empty()) {
+            config.quadrature_node_counts = counts;
+        }
+    }
+
+    if (first_error.has_value()) {
+        return Result<HestonCfValidationExperimentConfig>::failure(*first_error);
+    }
+
+    if (config.strikes.empty() || config.maturities.empty() || config.correlations.empty() ||
+        config.vol_of_variances.empty() || config.mean_reversions.empty()) {
+        return Result<HestonCfValidationExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "strikes, maturities, correlations, vol_of_variances, and mean_reversions must each be "
+            "non-empty: the characteristic-function properties are validated across a regime sweep",
+            kContext);
+    }
+    if (config.cf_grid_points < 2 || config.cf_grid_max_u <= 0.0 ||
+        config.reference_quadrature_nodes < 8) {
+        return Result<HestonCfValidationExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "cf_grid_points at least 2, cf_grid_max_u positive, and reference_quadrature_nodes at "
+            "least 8 (the engine's minimum)",
+            kContext);
+    }
+
+    return Result<HestonCfValidationExperimentConfig>::success(std::move(config));
+}
+
 /// Parses the `heston_simulation` block for EXP-10.
 ///
 /// Same contract as the other blocks: absent means the documented defaults that
@@ -1331,6 +1466,12 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
             greek_config.master_seed = *options.seed;
         }
         record = run_greek_estimator_comparison(greek_config);
+    } else if (id == "EXP-09") {
+        auto cf = parse_heston_cf_validation_config(config.root());
+        if (!cf) {
+            return Result<nlohmann::json>::failure(std::move(cf).error());
+        }
+        record = run_heston_cf_validation(cf.value());
     } else if (id == "EXP-10") {
         auto heston = parse_heston_simulation_config(config.root());
         if (!heston) {

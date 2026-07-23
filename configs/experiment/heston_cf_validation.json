@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "command": "experiment",
+  "heston_cf_validation": {
+    "spot": 100.0,
+    "rate": 0.05,
+    "dividend_yield": 0.0,
+    "initial_variance": 0.04,
+    "long_run_variance": 0.04,
+    "strikes": [80.0, 100.0, 120.0],
+    "maturities": [0.25, 1.0, 5.0],
+    "correlations": [-0.7, 0.0, 0.7],
+    "vol_of_variances": [0.3, 0.6, 1.0],
+    "mean_reversions": [1.0, 2.0],
+    "cf_grid_max_u": 50.0,
+    "cf_grid_points": 1000,
+    "quadrature_node_counts": [16, 32, 64, 128, 256, 512],
+    "reference_quadrature_nodes": 1024
+  }
+}

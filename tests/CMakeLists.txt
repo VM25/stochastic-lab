@@ -140,7 +140,8 @@ add_dw_test(
     LABEL statistical
     SOURCES experiments/scheme_moments_test.cpp
             experiments/convergence_test.cpp
-            experiments/variance_reduction_experiment_test.cpp)
+            experiments/variance_reduction_experiment_test.cpp
+            experiments/heston_cf_validation_experiment_test.cpp)
 
 # --- PDE --------------------------------------------------------------------
 
