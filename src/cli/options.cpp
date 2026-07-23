@@ -250,7 +250,7 @@ Result<Options> parse_arguments(const std::vector<std::string_view>& args) {
 
 std::string usage_text() {
     return R"(DiffusionWorks: Stochastic Derivatives Numerics
-A C++ Stochastic Derivatives Modeling, Validation and Performance Engine
+A C++ Stochastic Derivatives Modeling and Validation Engine
 
 Usage:
   diffusionworks <command> [options]
