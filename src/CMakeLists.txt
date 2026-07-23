@@ -33,6 +33,7 @@ target_sources(
             experiments/calibration_experiments.cpp
             experiments/convergence.cpp
             experiments/convergence_experiments.cpp
+            experiments/coverage_experiments.cpp
             experiments/cross_method_experiments.cpp
             experiments/greek_experiments.cpp
             experiments/heston_cf_validation_experiments.cpp

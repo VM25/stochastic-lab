@@ -3,6 +3,7 @@
 #include <diffusionworks/experiments/barrier_experiments.hpp>
 #include <diffusionworks/experiments/calibration_experiments.hpp>
 #include <diffusionworks/experiments/convergence_experiments.hpp>
+#include <diffusionworks/experiments/coverage_experiments.hpp>
 #include <diffusionworks/experiments/cross_method_experiments.hpp>
 #include <diffusionworks/experiments/greek_experiments.hpp>
 #include <diffusionworks/experiments/heston_cf_validation_experiments.hpp>
@@ -770,6 +771,135 @@ Result<VarianceReductionExperimentConfig> parse_variance_reduction_config(const 
     config.master_seed = static_cast<std::uint64_t>(master_seed);
 
     return Result<VarianceReductionExperimentConfig>::success(std::move(config));
+}
+
+/// Parses the `coverage` block for EXP-14.
+///
+/// Same contract as the other blocks: absent means the documented defaults that
+/// produced the published record, and an unknown key is rejected rather than
+/// silently ignored.
+Result<CoverageExperimentConfig> parse_coverage_config(const ConfigNode& root) {
+    CoverageExperimentConfig config;
+
+    if (!root.contains("coverage")) {
+        return Result<CoverageExperimentConfig>::success(config);
+    }
+
+    auto node = root.object("coverage");
+    if (!node) {
+        return Result<CoverageExperimentConfig>::failure(std::move(node).error());
+    }
+
+    const Status unknown = node.value().reject_unknown_keys({"spot",
+                                                             "rate",
+                                                             "dividend_yield",
+                                                             "volatility",
+                                                             "maturity",
+                                                             "strikes",
+                                                             "sample_sizes",
+                                                             "trial_count",
+                                                             "master_seed",
+                                                             "confidence_level"});
+    if (!unknown) {
+        return Result<CoverageExperimentConfig>::failure(unknown.error());
+    }
+
+    std::optional<Error> first_error;
+    const auto read_number = [&](const char* key, double fallback) -> double {
+        auto v = node.value().number_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_integer = [&](const char* key, std::int64_t fallback) -> std::int64_t {
+        auto v = node.value().integer_or(key, fallback);
+        if (!v) {
+            if (!first_error.has_value()) {
+                first_error = v.error();
+            }
+            return fallback;
+        }
+        return v.value();
+    };
+    const auto read_doubles = [&](const char* key, std::vector<double> fallback) {
+        if (!node.value().contains(key)) {
+            return fallback;
+        }
+        auto array = node.value().array(key);
+        if (!array) {
+            if (!first_error.has_value()) {
+                first_error = array.error();
+            }
+            return fallback;
+        }
+        std::vector<double> out;
+        for (std::size_t i = 0; i < array.value().size(); ++i) {
+            auto v = array.value().number_at(i);
+            if (!v) {
+                if (!first_error.has_value()) {
+                    first_error = v.error();
+                }
+                return fallback;
+            }
+            out.push_back(v.value());
+        }
+        return out;
+    };
+
+    config.spot = read_number("spot", config.spot);
+    config.rate = read_number("rate", config.rate);
+    config.dividend_yield = read_number("dividend_yield", config.dividend_yield);
+    config.volatility = read_number("volatility", config.volatility);
+    config.maturity = read_number("maturity", config.maturity);
+    config.strikes = read_doubles("strikes", config.strikes);
+    config.trial_count = read_integer("trial_count", config.trial_count);
+    config.master_seed = static_cast<std::uint64_t>(
+        read_integer("master_seed", static_cast<std::int64_t>(config.master_seed)));
+    config.confidence_level = read_number("confidence_level", config.confidence_level);
+
+    if (node.value().contains("sample_sizes")) {
+        const std::vector<double> sizes = read_doubles("sample_sizes", {});
+        std::vector<std::int64_t> out;
+        out.reserve(sizes.size());
+        for (const double s : sizes) {
+            out.push_back(static_cast<std::int64_t>(s));
+        }
+        if (!out.empty()) {
+            config.sample_sizes = out;
+        }
+    }
+
+    if (first_error.has_value()) {
+        return Result<CoverageExperimentConfig>::failure(*first_error);
+    }
+
+    if (config.strikes.empty() || config.sample_sizes.empty()) {
+        return Result<CoverageExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "strikes and sample_sizes must each be non-empty: coverage is swept over moneyness and "
+            "sample size",
+            kContext);
+    }
+    if (config.trial_count < 2 || config.confidence_level <= 0.0 ||
+        config.confidence_level >= 1.0) {
+        return Result<CoverageExperimentConfig>::failure(
+            ErrorCode::InvalidArgument,
+            "trial_count at least 2 (coverage is a fraction over trials) and confidence_level "
+            "strictly between 0 and 1",
+            kContext);
+    }
+    for (const std::int64_t size : config.sample_sizes) {
+        if (size < 2) {
+            return Result<CoverageExperimentConfig>::failure(
+                ErrorCode::InvalidArgument, "each sample_size must be at least 2", kContext);
+        }
+    }
+
+    return Result<CoverageExperimentConfig>::success(std::move(config));
 }
 
 /// Parses the `cross_method` block for EXP-13.
@@ -1629,6 +1759,12 @@ Result<nlohmann::json> run_experiment(const ConfigDocument& config, const Option
             return Result<nlohmann::json>::failure(std::move(cross).error());
         }
         record = run_cross_method_agreement(cross.value());
+    } else if (id == "EXP-14") {
+        auto coverage = parse_coverage_config(config.root());
+        if (!coverage) {
+            return Result<nlohmann::json>::failure(std::move(coverage).error());
+        }
+        record = run_confidence_coverage(coverage.value());
     } else if (id == "EXP-10") {
         auto heston = parse_heston_simulation_config(config.root());
         if (!heston) {

@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "command": "experiment",
+  "coverage": {
+    "spot": 100.0,
+    "rate": 0.05,
+    "dividend_yield": 0.0,
+    "volatility": 0.2,
+    "maturity": 1.0,
+    "strikes": [100.0, 130.0, 160.0],
+    "sample_sizes": [2000, 50000],
+    "trial_count": 400,
+    "master_seed": 20260717,
+    "confidence_level": 0.95
+  }
+}
