@@ -21,6 +21,12 @@ verify by hand:
    *published reference value* -- the Fang-Oosterlee COS price -- is legitimate and is
    not flagged, so the check looks for the performance senses specifically.
 
+4. **The API is documented.** Every public header under `include/` carries `///`
+   documentation. The annotated headers *are* this project's API reference -- Doxygen is
+   a permitted dependency rather than a required one, and a renderer nobody runs would
+   not make the API better documented than the declarations do. Enforcing coverage keeps
+   that an actual property instead of a claim, and catches a new header added without it.
+
 Usage:
     python3 python/check_docs.py
 """
@@ -105,17 +111,26 @@ def main() -> int:
     for phantom in sorted(referenced - committed):
         failures.append(f"figure {phantom} is referenced but not committed")
 
+    headers = sorted(pathlib.Path("include").rglob("*.hpp"))
+    undocumented = [h for h in headers if not re.search(r"^///", h.read_text(), re.M)]
+    for header in undocumented:
+        failures.append(f"{header}: public header carries no /// documentation")
+
     for line in failures:
         print(f"FAIL: {line}")
 
     print(
         f"\n{len(docs)} documents, {len(committed)} figures "
-        f"({len(referenced & committed)} referenced)"
+        f"({len(referenced & committed)} referenced), "
+        f"{len(headers) - len(undocumented)} of {len(headers)} public headers documented"
     )
     if failures:
         print(f"DOCUMENTATION CHECK FAILED with {len(failures)} problem(s)")
         return 1
-    print("DOCUMENTATION CHECK PASSED: links resolve, figures are referenced, scope is clean")
+    print(
+        "DOCUMENTATION CHECK PASSED: links resolve, figures are referenced, "
+        "the API is documented, scope is clean"
+    )
     return 0
 
 

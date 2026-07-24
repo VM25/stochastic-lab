@@ -192,10 +192,16 @@ Statistics + Validation + Diagnostics
 JSON record / CSV summary / console
 ```
 
-The numerical core has no dependency on the CLI, on plotting, on the website, or on
-QuantLib. Errors are values: every fallible operation returns `Result<T>`, and no engine
-throws across an API boundary. An engine that cannot produce a trustworthy number
-**refuses** and says why, rather than returning a plausible one.
+The numerical core has no dependency on the CLI, on plotting, on QuantLib, or on the
+results site specified for a later phase and not built at the time of writing. Errors are
+values: every fallible operation returns `Result<T>`, and no engine throws across an API
+boundary. An engine that cannot produce a trustworthy number **refuses** and says why,
+rather than returning a plausible one.
+
+The API reference is the annotated headers themselves: all **58 public headers** under
+`include/` carry `///` documentation, and [`python/check_docs.py`](../python/check_docs.py)
+enforces that rather than asserting it. Doxygen is a permitted dependency and is not used;
+a renderer nobody runs would not document the declarations better than the declarations do.
 
 ### 4.2 Experiment records
 
