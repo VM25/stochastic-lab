@@ -177,10 +177,10 @@ run_heston_variance_discretization(const HestonSimulationExperimentConfig& confi
 
     // Status is assembled from measured facts, not asserted. These accumulate the
     // ones the exit criteria turn on.
-    bool full_truncation_ever_failed = false;   // a non-finite path under full truncation
-    bool naive_demonstrated_a_failure = false;  // the naive scheme failing somewhere
-    bool a_regime_resolved_its_bias = false;    // at least one regime measured a real bias
-    bool prices_approached_reference = true;    // in every resolved regime, bias fell with steps
+    bool full_truncation_ever_failed = false;    // a non-finite path under full truncation
+    bool naive_demonstrated_a_failure = false;   // the naive scheme failing somewhere
+    bool every_regime_resolved_its_bias = true;  // every regime measured a decay order
+    bool prices_approached_reference = true;     // in every resolved regime, bias fell with steps
 
     for (const double xi : config.vol_of_variance) {
         const auto model = HestonModel::create(config.initial_variance,
@@ -303,8 +303,10 @@ run_heston_variance_discretization(const HestonSimulationExperimentConfig& confi
                                   {"xi", xi},
                                   {"feller_ratio", feller_ratio},
                                   {"resolved_levels", resolved_dt.size()}};
+        if (resolved_dt.size() < 3) {
+            every_regime_resolved_its_bias = false;
+        }
         if (resolved_dt.size() >= 3) {
-            a_regime_resolved_its_bias = true;
             const auto fit = fit_power_law(resolved_dt, resolved_abs_bias);
             if (fit) {
                 order_json["bias_decay_order"] = fit.value().slope;
@@ -345,6 +347,7 @@ run_heston_variance_discretization(const HestonSimulationExperimentConfig& confi
     record.results["bias_decay_order_fits"] = std::move(order_fits);
     record.results["full_truncation_produced_non_finite_paths"] = full_truncation_ever_failed;
     record.results["naive_euler_produced_non_finite_paths"] = naive_demonstrated_a_failure;
+    record.results["every_regime_resolved_bias_decay_order"] = every_regime_resolved_its_bias;
     record.results["bias_resolution_threshold"] = config.bias_resolution;
 
     // Status. The two hard requirements are that full truncation never produces a
@@ -354,10 +357,13 @@ run_heston_variance_discretization(const HestonSimulationExperimentConfig& confi
     // which is the exit criterion that says so.
     if (full_truncation_ever_failed || !prices_approached_reference) {
         record.status = ExperimentStatus::Fail;
-    } else if (!a_regime_resolved_its_bias || !naive_demonstrated_a_failure) {
-        // The physics held, but the run could not exhibit one of the things it exists
-        // to show -- a resolvable bias, or the naive scheme failing -- so it is worth
-        // reading before quoting.
+    } else if (!every_regime_resolved_its_bias || !naive_demonstrated_a_failure) {
+        // The status reports the strength of the evidence, not that the run finished.
+        // A regime whose bias never cleared the sampling noise yields no decay order,
+        // so "full truncation converges at first order" is established for the regimes
+        // that resolved and not for the others -- a caveat a reader must have before
+        // quoting a single order for the scheme. Requiring only *some* regime to
+        // resolve would let one measured order stand in for all of them.
         record.status = ExperimentStatus::Warning;
     } else {
         record.status = ExperimentStatus::Pass;

@@ -8,7 +8,7 @@ Record the decisions that define DiffusionWorks and prevent inconsistent impleme
 
 ## ADR-001: C++ Owns the Numerical Core
 
-**Decision:** Implement models, pricing, simulation, Greeks, calibration, validation, and benchmarks in C++.
+**Decision:** Implement models, pricing, simulation, Greeks, calibration, validation, and the numerical experiments in C++.
 
 **Why:** The project must visibly prove C++ engineering and quantitative implementation ability.
 

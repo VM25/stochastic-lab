@@ -551,6 +551,38 @@ Result<ExperimentRecord> run_market_surface_stability(const MarketSurfaceStabili
         {"vol_of_variance", spread([](const HestonParameters& p) { return p.vol_of_variance; })},
         {"correlation", spread([](const HestonParameters& p) { return p.correlation; })}};
 
+    // Identifiability. A parameter whose spread across the scenarios is comparable to
+    // its own magnitude is not determined by this surface: the scenarios all fit, and
+    // still disagree about what the parameter is. That is a property of the data and
+    // the model, not of the optimiser, so it is measured here rather than inferred
+    // from a converged flag.
+    constexpr double kDispersionWarning = 0.50;
+    double max_relative_dispersion = 0.0;
+    std::string least_identified_parameter;
+    for (const auto& [name, stats] : dispersion.items()) {
+        const double mean = stats.at("mean").get<double>();
+        if (mean == 0.0) {
+            continue;
+        }
+        const double relative = stats.at("stddev").get<double>() / std::abs(mean);
+        if (relative > max_relative_dispersion) {
+            max_relative_dispersion = relative;
+            least_identified_parameter = name;
+        }
+    }
+    const bool parameters_not_identified = max_relative_dispersion > kDispersionWarning;
+    if (parameters_not_identified) {
+        record.limitations.push_back(fmt::format(
+            "The scenarios all converged and all fit the surface, and still disagree about the "
+            "parameters: {} varies by {:.0f}% of its own mean across them, above the {:.0f}% "
+            "threshold at which a parameter is treated as not identified by this surface. The "
+            "fitted values are therefore usable for repricing the quotes they were fitted to, "
+            "and are not a measurement of the parameter itself.",
+            least_identified_parameter,
+            max_relative_dispersion * 100.0,
+            kDispersionWarning * 100.0));
+    }
+
     // The exclusion report from validation.
     nlohmann::json excluded = nlohmann::json::array();
     for (const ExcludedQuote& e : validated.value().excluded) {
@@ -628,12 +660,19 @@ Result<ExperimentRecord> run_market_surface_stability(const MarketSurfaceStabili
         {"strike_count", validated.value().strikes.size()},
         {"scenarios", std::move(scenario_json)},
         {"parameter_dispersion", std::move(dispersion)},
+        {"max_relative_parameter_dispersion", max_relative_dispersion},
+        {"least_identified_parameter", least_identified_parameter},
+        {"parameter_dispersion_warning_threshold", kDispersionWarning},
+        {"parameters_not_identified", parameters_not_identified},
         {"any_scenario_relied_on_penalties", any_relied_on_penalties}};
 
-    // Status. A fit that leaned on penalties, or a scenario that did not converge, is
-    // not a clean pass: those are the conditions the penalty-sensitivity requirement
-    // and the convergence separation demand be visible.
-    if (any_relied_on_penalties || !all_converged) {
+    // Status. It describes the empirical result, not whether the solver ran. A fit
+    // that leaned on penalties or failed to converge is not a clean pass; neither is
+    // a set of scenarios that all fit well and still cannot agree on the parameters,
+    // which is the finding this experiment exists to expose. Reporting that as a pass
+    // because every scenario converged would report the solver's health in place of
+    // the answer.
+    if (any_relied_on_penalties || !all_converged || parameters_not_identified) {
         record.status = ExperimentStatus::Warning;
     } else {
         record.status = ExperimentStatus::Pass;
@@ -649,10 +688,13 @@ Result<ExperimentRecord> run_market_surface_stability(const MarketSurfaceStabili
         "the per-scenario implied-volatility RMSE is a real residual, and the residual_surface of "
         "each scenario shows where Heston tracks the smile and where it cannot.\n\n"
         "Convergence, fit RMSE, residual structure, the penalized-quote count, and parameter "
-        "dispersion are reported separately, and a fit that leaned on penalties is flagged and "
-        "kept "
-        "out of clean-pass status. The dataset's excluded quotes are reported by reason, so the "
-        "surface the calibration ran on is exactly the surface a reader can audit.";
+        "dispersion are reported separately, and the status is driven by all of them rather than "
+        "by convergence alone. A fit that leaned on penalties is kept out of clean-pass status, "
+        "and so is a set of scenarios that all converge and all fit while disagreeing about the "
+        "parameters by more than half their own magnitude: that disagreement is the answer to the "
+        "question this experiment asks, so reporting it as a pass because the solver succeeded "
+        "would report the wrong thing. The dataset's excluded quotes are reported by reason, so "
+        "the surface the calibration ran on is exactly the surface a reader can audit.";
 
     record.limitations = {
         "The dataset is a small end-of-day snapshot of last-trade closing prices, not a "

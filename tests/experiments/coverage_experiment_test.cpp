@@ -38,11 +38,14 @@ protected:
 
 ExperimentRecord* CoverageExperimentTest::record_ = nullptr;
 
-// The methodology is sound where the central limit theorem holds (the large sample),
-// and the sweep reaches the small-sample skewed regime where coverage degrades, so
-// the record passes rather than being inconclusive.
-TEST_F(CoverageExperimentTest, Passes) {
-    EXPECT_EQ(record_->status, ExperimentStatus::Pass);
+// The status reports what was measured. The methodology is sound where the central
+// limit theorem holds (the large sample), so this is not a failure -- but the sweep
+// resolves a real under-coverage in the small-sample skewed regime, which means the
+// reported 95% interval is not worth 95% everywhere this experiment looked. That is a
+// warning, not a pass: finding the degradation is the result, not the success
+// condition.
+TEST_F(CoverageExperimentTest, WarnsBecauseTheIntervalUnderCoversSomewhere) {
+    EXPECT_EQ(record_->status, ExperimentStatus::Warning);
     const auto& summary = record_->results.at("summary");
     EXPECT_TRUE(summary.at("methodology_sound_at_largest_sample").get<bool>());
     EXPECT_TRUE(summary.at("observed_under_coverage_somewhere").get<bool>());

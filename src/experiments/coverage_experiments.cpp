@@ -107,6 +107,10 @@ Result<ExperimentRecord> run_confidence_coverage(const CoverageExperimentConfig&
     // conservative, so a well-calibrated interval effectively never trips it by
     // chance across the swept cells.
     constexpr double kCoverageSigma = 3.0;
+    // A payoff this skewed is the regime where a Student-t interval built on a small
+    // sample is genuinely at risk. If the sweep never reaches it, a clean coverage
+    // result says nothing about the hard case and must not be read as one.
+    constexpr double kStressSkewness = 5.0;
 
     bool methodology_sound = true;  // every large-sample cell must be defensible
 
@@ -194,26 +198,38 @@ Result<ExperimentRecord> run_confidence_coverage(const CoverageExperimentConfig&
     // sweep did not reach the hard regime and the finding is inconclusive rather
     // than a clean pass.
     bool observed_under_coverage = false;
+    double max_skewness_tested = 0.0;
     for (const auto& cell : record.results["cells"]) {
         if (cell.at("under_covers").get<bool>()) {
             observed_under_coverage = true;
         }
+        max_skewness_tested =
+            std::max(max_skewness_tested, cell.at("payoff_skewness").get<double>());
     }
     record.results["summary"] =
         nlohmann::json{{"methodology_sound_at_largest_sample", methodology_sound},
                        {"observed_under_coverage_somewhere", observed_under_coverage},
+                       {"maximum_payoff_skewness_tested", max_skewness_tested},
+                       {"stress_skewness_threshold", kStressSkewness},
                        {"coverage_deviation_threshold_sigmas", kCoverageSigma}};
 
     record.runtime_seconds =
         std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
 
-    // Pass when the intervals are defensible where the central limit theorem holds
-    // (the large sample) across every moneyness, and the sweep reached a regime where
-    // the known small-sample degradation is visible and thus explained. A large-sample
-    // under-coverage would be a real methodology failure.
+    // The status describes what was measured, not whether the sweep ran. A resolved
+    // under-coverage is the empirical finding that the reported 95% interval is not
+    // worth 95% everywhere, so it is a warning even though it is expected, explained,
+    // and confined to the small-sample skewed corner: a reader quoting the interval
+    // without that caveat would be quoting something this experiment disproved.
+    // Finding the degradation is not the success condition -- it is the result.
     if (!methodology_sound) {
+        // Under-coverage where the central limit theorem should hold is a real defect.
         record.status = ExperimentStatus::Fail;
-    } else if (!observed_under_coverage) {
+    } else if (observed_under_coverage) {
+        record.status = ExperimentStatus::Warning;
+    } else if (max_skewness_tested < kStressSkewness) {
+        // Nothing under-covered, but nothing stressed the interval either: a sweep of
+        // mild payoffs cannot license "the intervals are calibrated".
         record.status = ExperimentStatus::Inconclusive;
     } else {
         record.status = ExperimentStatus::Pass;

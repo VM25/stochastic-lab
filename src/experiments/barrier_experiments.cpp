@@ -13,6 +13,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstddef>
+#include <map>
 #include <optional>
 #include <ranges>
 #include <span>
@@ -714,6 +715,56 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
         record.results["pde_arm_converged"] = pde_arm_converged;
     }
 
+    // Where the experiment's own reference stops working, tallied from the record.
+    // The Broadie-Glasserman-Kou continuity correction is an o(1/sqrt(m)) approximation,
+    // so an isolated resolved residual is expected; a majority of the resolved cells in
+    // one barrier geometry disagreeing with it is the correction failing there, and a
+    // reader must not carry it into that geometry as an oracle.
+    bool any_arm_refused_its_fit = false;
+    std::map<std::string, std::pair<int, int>>
+        correction_tally;  // geometry -> {disagree, resolved}
+    for (const auto& arm : record.results["arms"]) {
+        if (arm.contains("fit_refused")) {
+            any_arm_refused_its_fit = true;
+        }
+        if (arm.at("convention").get<std::string>() != "discrete") {
+            continue;
+        }
+        auto& tally = correction_tally[arm.at("barrier_type").get<std::string>()];
+        for (const auto& level : arm.at("levels")) {
+            if (!level.value("bias_is_resolved", false)) {
+                continue;
+            }
+            ++tally.second;
+            if (level.value("continuity_corrected_residual_is_resolved", false)) {
+                ++tally.first;
+            }
+        }
+    }
+
+    bool correction_failed_in_a_geometry = false;
+    nlohmann::json correction_json = nlohmann::json::object();
+    for (const auto& [geometry, tally] : correction_tally) {
+        const bool failed = tally.second > 0 && tally.first * 2 > tally.second;
+        correction_json[geometry] =
+            nlohmann::json{{"resolved_cells", tally.second},
+                           {"cells_disagreeing_with_correction", tally.first},
+                           {"correction_is_usable_here", !failed}};
+        if (failed) {
+            correction_failed_in_a_geometry = true;
+            record.limitations.push_back(fmt::format(
+                "The continuity correction is resolved as wrong at {} of {} resolved {} cells, so "
+                "it is not an oracle in that geometry. It is kept in the record as a measured "
+                "reference that fails here, not removed, because where an approximation breaks "
+                "down is itself a result.",
+                tally.first,
+                tally.second,
+                geometry));
+        }
+    }
+
+    record.results["continuity_correction_by_geometry"] = std::move(correction_json);
+    record.results["any_arm_refused_its_fit"] = any_arm_refused_its_fit;
     record.results["resolution_threshold"] = kResolutionThreshold;
     record.results["bridge_defect_threshold"] = kBridgeDefectThreshold;
     record.results["continuity_correction_beta"] = kContinuityCorrectionBeta;
@@ -735,6 +786,14 @@ Result<ExperimentRecord> run_barrier_monitoring_bias(const BarrierExperimentConf
             "The discrete-monitoring bias did not clear its own across-seed noise at the coarsest "
             "monitoring frequency, so this run quantified nothing. More paths or more seeds are "
             "needed before any statement about the bias is supported.");
+    } else if (any_arm_refused_its_fit || correction_failed_in_a_geometry) {
+        // Both arms worked, and the result still carries caveats that change what may
+        // be claimed from it: an arm whose bias never resolved has no decay order, and
+        // a geometry where the closed-form correction is measurably wrong has no
+        // independent reference. Neither is a defect in the engine -- they are what was
+        // found -- but a bare "pass" would invite the reader to quote a fitted order and
+        // a correction that this record shows do not hold everywhere it looked.
+        record.status = ExperimentStatus::Warning;
     } else {
         record.status = ExperimentStatus::Pass;
     }
