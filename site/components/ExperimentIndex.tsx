@@ -2,17 +2,27 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import type { StudyRecord, StudyStatus } from "@/lib/records.generated";
+import type { StudyStatus } from "@/lib/records.generated";
 import { StatusBadge } from "./StatusBadge";
 import styles from "./ExperimentIndex.module.css";
 
 type Filter = "all" | StudyStatus;
 
+// The minimal shape this client component needs. Passing only these fields keeps the
+// raw record data — results, tables, interpretations, internal identifiers — out of
+// the page's hydration payload; nothing beyond what is displayed is shipped.
+export interface StudyCard {
+  slug: string;
+  name: string;
+  question: string;
+  status: StudyStatus;
+}
+
 // A filterable index of all fifteen studies. The filter is a set of real toggle
 // buttons (keyboard-operable, aria-pressed), and the count updates so a reader always
 // knows how many are shown. Never hides information behind hover.
 
-export function ExperimentIndex({ records }: { records: StudyRecord[] }) {
+export function ExperimentIndex({ records }: { records: StudyCard[] }) {
   const [filter, setFilter] = useState<Filter>("all");
   const shown = filter === "all" ? records : records.filter((r) => r.status === filter);
 
@@ -46,7 +56,7 @@ export function ExperimentIndex({ records }: { records: StudyRecord[] }) {
         {shown.map((r) => {
           const position = records.indexOf(r) + 1;
           return (
-            <li key={r.id}>
+            <li key={r.slug}>
               <Link href={`/studies/${r.slug}/`} className={styles.row} data-status={r.status}>
                 <span className={styles.rowId}>{String(position).padStart(2, "0")}</span>
                 <span className={styles.rowMain}>

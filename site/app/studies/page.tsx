@@ -36,7 +36,14 @@ export default function StudiesPage() {
           {pass} clean, {warning} flagged. Filter by outcome, then open a study for its full
           account.
         </p>
-        <ExperimentIndex records={ORDERED_RECORDS} />
+        <ExperimentIndex
+          records={ORDERED_RECORDS.map((r) => ({
+            slug: r.slug,
+            name: r.name,
+            question: r.question,
+            status: r.status,
+          }))}
+        />
       </Section>
     </div>
   );

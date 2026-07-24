@@ -67,15 +67,31 @@ const FORBIDDEN = [
 
 for (const file of htmlFiles()) {
   const html = fs.readFileSync(file, "utf8");
-  // Strip scripts/styles and tags to get visible text.
+  // Strip scripts/styles/rendered math and tags to get visible prose. KaTeX embeds the
+  // raw TeX source (e.g. "dv_t") in a MathML annotation; that is mathematical notation,
+  // not a code identifier, so the whole math block is removed before scanning prose.
   const text = html
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<math[\s\S]*?<\/math>/gi, " ")
     .replace(/<[^>]+>/g, " ")
     .replace(/&[a-z]+;/gi, " ");
   for (const re of FORBIDDEN) {
     const m = text.match(re);
     if (m) failures.push(`${routeOf(file)}: developer-facing term in visible text: "${m[0]}"`);
+  }
+
+  // A snake_case token in visible prose is an engine field name that escaped into the
+  // reader-facing text — code, not English.
+  const snake = text.match(/\b[a-z]{2,}_[a-z][a-z_]*\b/);
+  if (snake) failures.push(`${routeOf(file)}: code identifier in visible text: "${snake[0]}"`);
+
+  // Internal study identifiers must not ship anywhere — not even in the hydration
+  // payload a visitor could read from the page source. This scans the whole file,
+  // scripts included.
+  const idLeak = html.match(/\bEXP-\d{2}\b/);
+  if (idLeak) {
+    failures.push(`${routeOf(file)}: internal identifier "${idLeak[0]}" present in page source`);
   }
 }
 

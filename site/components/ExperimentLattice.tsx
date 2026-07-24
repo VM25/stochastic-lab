@@ -13,7 +13,7 @@ export function ExperimentLattice() {
       {ORDERED_RECORDS.map((r, i) => {
         const num = String(i + 1).padStart(2, "0");
         return (
-          <li key={r.id}>
+          <li key={r.slug}>
             <Link href={`/studies/${r.slug}/`} className={styles.node} data-status={r.status}>
               <span className={styles.top}>
                 <span className={styles.num}>{num}</span>

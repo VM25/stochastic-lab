@@ -66,7 +66,7 @@ export default function LimitationsPage() {
           {warnings.map((r) => {
             const position = (STUDY_IDS as readonly string[]).indexOf(r.id) + 1;
             return (
-              <li key={r.id} className={styles.warning}>
+              <li key={r.slug} className={styles.warning}>
                 <div className={styles.warningHead}>
                   <Link href={`/studies/${r.slug}/`} className={styles.warningTitle}>
                     <span className={styles.warningId}>Study {String(position).padStart(2, "0")}</span>

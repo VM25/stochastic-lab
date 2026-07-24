@@ -17,7 +17,7 @@ export function RelatedExperiments({ ids }: { ids: string[] }) {
           if (!r) return null;
           const position = (STUDY_IDS as readonly string[]).indexOf(id) + 1;
           return (
-            <li key={id}>
+            <li key={r.slug}>
               <Link href={`/studies/${r.slug}/`} className={styles.item}>
                 <span className={styles.id}>{String(position).padStart(2, "0")}</span>
                 <span className={styles.name}>{r.name}</span>

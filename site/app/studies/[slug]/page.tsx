@@ -6,7 +6,6 @@ import { FIGURE_COPY } from "@/lib/figure-copy";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Figure } from "@/components/Figure";
 import { Section } from "@/components/Section";
-import { SummaryTable } from "@/components/SummaryTable";
 import styles from "./study.module.css";
 
 export const dynamicParams = false;
@@ -69,10 +68,6 @@ export default function StudyPage({ params }: { params: { slug: string } }) {
             />
           );
         })}
-      </Section>
-
-      <Section idx="▦" title="Results" id="results">
-        <SummaryTable table={record.table} caption={`Measured results for ${record.name.toLowerCase()}`} />
       </Section>
 
       <Section idx="!" title="What this does not establish" id="limitations">
