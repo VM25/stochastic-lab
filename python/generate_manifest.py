@@ -83,10 +83,15 @@ REQUIRED_FIELDS = [
     "build_metadata",
 ]
 
-# A stored configuration must pin the randomness for a Monte-Carlo experiment. The
-# deterministic ones (PDE, characteristic function, edge cases) legitimately have no
-# seed, so they are not required to carry one.
-SEEDLESS = {"EXP-06", "EXP-09", "EXP-15"}
+# A stored configuration must pin the randomness of anything that samples. Rather
+# than trusting a hand-maintained list of which experiments those are -- which can be
+# wrong in the direction that matters, excusing a sampling experiment that forgot its
+# seed -- stochasticity is inferred from the configuration itself. Anything that
+# counts paths, trials, replications, or seeds is sampling and must pin a seed; the
+# rest (PDE grids, characteristic-function quadrature, deterministic calibration,
+# analytic edge cases) are deterministic, and "deterministic" is itself the seed
+# policy worth recording.
+STOCHASTIC_MARKERS = ("path", "trial", "replication", "seed")
 
 
 def sha256(path: pathlib.Path) -> str:
@@ -97,13 +102,22 @@ def sha256(path: pathlib.Path) -> str:
     return digest.hexdigest()
 
 
-def seed_policy(record: dict) -> dict | None:
-    """The seed fields the record's own stored configuration carries."""
+def seed_policy(record: dict) -> tuple[dict, bool]:
+    """The record's seed policy, and whether the experiment samples at all.
+
+    Returns the seed fields its own stored configuration carries, together with a flag
+    saying whether the configuration describes a sampling experiment. A sampling
+    experiment with no seed is a reproducibility hole; a deterministic one legitimately
+    has no seed, and says so.
+    """
     configuration = record.get("configuration", {})
     if not isinstance(configuration, dict):
-        return None
-    keys = [k for k in configuration if "seed" in k.lower()]
-    return {k: configuration[k] for k in keys} or None
+        return {}, False
+    seeds = {k: v for k, v in configuration.items() if "seed" in k.lower()}
+    samples = any(
+        marker in key.lower() for key in configuration for marker in STOCHASTIC_MARKERS
+    )
+    return seeds, samples
 
 
 def main() -> int:
@@ -148,9 +162,15 @@ def main() -> int:
         if not record.get("configuration"):
             failures.append(f"{experiment_id}: record carries no stored configuration")
 
-        seeds = seed_policy(record)
-        if seeds is None and experiment_id not in SEEDLESS:
-            failures.append(f"{experiment_id}: stored configuration pins no seed")
+        seeds, samples = seed_policy(record)
+        if samples and not seeds:
+            failures.append(
+                f"{experiment_id}: the stored configuration describes a sampling experiment "
+                "but pins no seed, so the record is not reproducible"
+            )
+        recorded_seed_policy = (
+            seeds if seeds else {"deterministic": "no sampling; the record is exactly reproducible"}
+        )
 
         build = record.get("build_metadata", {})
         commit = build.get("git_commit")
@@ -177,7 +197,7 @@ def main() -> int:
                 "record_csv": str(csv_path),
                 "figures": [f"{args.figures}/{f}" for f in figures],
                 "methodology": methodology,
-                "seed_policy": seeds,
+                "seed_policy": recorded_seed_policy,
                 "generator_commit": commit,
                 "generator_tree_clean": not build.get("git_dirty", False),
                 "checksums_sha256": {
@@ -227,10 +247,18 @@ def main() -> int:
         "generator_commit": generator,
         "generator_commit_short": generator[:7] if generator else None,
         "generator_tree_clean": not dirty_records,
+        # Deliberately null. The artifact commit is the commit that adds this manifest,
+        # so writing it here would require knowing a hash that does not exist yet, and
+        # filling it in afterwards would change the file the hash was taken over --
+        # regenerating and recommitting forever. The field is kept so the schema names
+        # the thing rather than pretending it does not exist; `git log --follow
+        # results/MANIFEST.json` resolves it after the fact.
+        "artifact_commit": None,
         "artifact_commit_note": (
-            "The artifact commit is the commit that adds this manifest, and so cannot be "
-            "named inside it; `git log --follow results/MANIFEST.json` reports it. The "
-            "generator_commit above is the source revision the records were produced from."
+            "Null by construction: this manifest is committed by the artifact commit and "
+            "cannot name it. Resolve it with `git log --follow results/MANIFEST.json`. The "
+            "generator_commit above is the source revision the records were produced from, "
+            "and is the one that matters for reproducing them."
         ),
         "experiment_count": len(entries),
         "status_counts": statuses,
