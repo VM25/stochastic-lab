@@ -52,3 +52,6 @@ tmp/
 
 # Generated results are committed selectively; local unpublished runs are not.
 results/local/
+
+# Local Netlify folder
+.netlify

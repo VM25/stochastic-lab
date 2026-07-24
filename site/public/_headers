@@ -1,0 +1,13 @@
+# Applied by Netlify to the deployed static files. Mirrors netlify.toml so the headers
+# hold whether the site is built by Netlify from Git or deployed as a pre-built export.
+# The site is fully self-contained: fonts, styles, scripts, and figures are all
+# same-origin, so nothing external is permitted.
+/*
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'
+
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
