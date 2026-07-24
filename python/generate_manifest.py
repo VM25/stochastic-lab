@@ -91,7 +91,12 @@ REQUIRED_FIELDS = [
 # rest (PDE grids, characteristic-function quadrature, deterministic calibration,
 # analytic edge cases) are deterministic, and "deterministic" is itself the seed
 # policy worth recording.
-STOCHASTIC_MARKERS = ("path", "trial", "replication", "seed")
+#
+# "paths" is deliberately plural: the singular matches `dataset_path`, a filesystem
+# location, and flagged the deterministic market-surface calibration as a sampling
+# experiment that had lost its seed. A checker that cries wolf on a correct record
+# gets muted, so the marker is the one the sampling configs actually use.
+STOCHASTIC_MARKERS = ("paths", "trial", "replication", "seed")
 
 
 def sha256(path: pathlib.Path) -> str:
