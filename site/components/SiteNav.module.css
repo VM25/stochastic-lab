@@ -1,0 +1,194 @@
+.rail {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  width: var(--rail);
+  flex-shrink: 0;
+  border-right: 1px solid var(--line);
+  background: var(--bg-2);
+  display: flex;
+  flex-direction: column;
+  padding: var(--sp-5) 0;
+}
+
+.brand {
+  padding: 0 var(--sp-5) var(--sp-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+
+.wordmark {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  border-bottom: none;
+  color: var(--ink);
+}
+
+/* The mark: a small filled node on a grid crossing — the checkpoint motif. */
+.mark {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  background: var(--accent);
+  box-shadow:
+    0 0 0 1px var(--bg),
+    0 0 0 4px var(--accent-wash);
+}
+
+.wordmarkText {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+.works {
+  color: var(--accent);
+}
+
+.toggle {
+  display: none;
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.72rem;
+  font-weight: 600;
+  background: transparent;
+  color: var(--ink-dim);
+  border: 1px solid var(--line-strong);
+  padding: var(--sp-2) var(--sp-3);
+  cursor: pointer;
+}
+
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-5) 0;
+}
+
+.spineLabel {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: 0.68rem;
+  color: var(--ink-faint);
+  padding: 0 var(--sp-5);
+  margin: 0 0 var(--sp-3);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.link {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-3);
+  align-items: start;
+  padding: var(--sp-3) var(--sp-5);
+  border-bottom: none;
+  border-left: 2px solid transparent;
+  color: var(--ink-dim);
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+.link:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+.link[data-active="true"] {
+  border-left-color: var(--accent);
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.stage {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  padding-top: 2px;
+}
+.link[data-active="true"] .stage {
+  color: var(--accent);
+}
+
+.linkBody {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.linkLabel {
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.25;
+}
+.linkBlurb {
+  font-size: 0.74rem;
+  color: var(--ink-faint);
+  line-height: 1.35;
+}
+
+.foot {
+  padding: var(--sp-5) var(--sp-5) 0;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.footLink {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.72rem;
+  color: var(--ink-dim);
+  border-bottom: none;
+}
+.footLink:hover {
+  color: var(--accent);
+}
+.footNote {
+  font-size: 0.7rem;
+  color: var(--ink-faint);
+  line-height: 1.4;
+}
+
+/* ---- Mobile: the rail becomes a top bar with a disclosure menu ---- */
+@media (max-width: 900px) {
+  .rail {
+    position: sticky;
+    height: auto;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
+    padding: var(--sp-4) 0 0;
+    z-index: 50;
+  }
+  .brand {
+    padding: 0 var(--sp-4) var(--sp-4);
+  }
+  .toggle {
+    display: inline-block;
+  }
+  .nav {
+    padding: 0;
+    overflow: visible;
+  }
+  .spineLabel {
+    display: none;
+  }
+  .list {
+    display: none;
+    border-top: 1px solid var(--line);
+  }
+  .list[data-open="true"] {
+    display: block;
+    padding: var(--sp-3) 0;
+  }
+  .foot {
+    display: none;
+  }
+}

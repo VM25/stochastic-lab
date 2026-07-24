@@ -1,0 +1,105 @@
+.lattice {
+  list-style: none;
+  margin: var(--sp-5) 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  /* Hairline lattice: a single-pixel gap fills with the surface beneath, drawing the
+     grid lines between nodes rather than around them. */
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+
+.node {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  min-height: 108px;
+  padding: var(--sp-3) var(--sp-4) var(--sp-4);
+  background: var(--surface);
+  border-bottom: none;
+  border-left: 2px solid transparent;
+  color: var(--ink);
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+.node:hover {
+  background: var(--surface-2);
+}
+.node[data-status="pass"] {
+  border-left-color: var(--status-pass);
+}
+.node[data-status="warning"] {
+  border-left-color: var(--status-warning);
+}
+.node[data-status="fail"] {
+  border-left-color: var(--status-fail);
+}
+.node[data-status="inconclusive"] {
+  border-left-color: var(--status-inconclusive);
+}
+
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.num {
+  font-family: var(--font-mono);
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: var(--ink);
+}
+.glyph {
+  font-size: 0.8rem;
+}
+.glyph[data-status="pass"] {
+  color: var(--status-pass);
+}
+.glyph[data-status="warning"] {
+  color: var(--status-warning);
+}
+.glyph[data-status="fail"] {
+  color: var(--status-fail);
+}
+.glyph[data-status="inconclusive"] {
+  color: var(--status-inconclusive);
+}
+
+.name {
+  flex: 1;
+  font-size: 0.82rem;
+  line-height: 1.3;
+  color: var(--ink-dim);
+}
+
+.status {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.64rem;
+  font-weight: 600;
+}
+.status[data-status="pass"] {
+  color: var(--status-pass);
+}
+.status[data-status="warning"] {
+  color: var(--status-warning);
+}
+.status[data-status="fail"] {
+  color: var(--status-fail);
+}
+.status[data-status="inconclusive"] {
+  color: var(--status-inconclusive);
+}
+
+@media (max-width: 900px) {
+  .lattice {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 520px) {
+  .lattice {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

@@ -1,0 +1,284 @@
+@import "./tokens.css";
+@import "katex/dist/katex.min.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-body);
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  /* A faint computational lattice — a real project motif (the finite-difference
+     grid), rendered as a barely-there background rather than decoration. */
+  background-image:
+    linear-gradient(var(--bg-2) 1px, transparent 1px),
+    linear-gradient(90deg, var(--bg-2) 1px, transparent 1px);
+  background-size: 48px 48px;
+  background-position: -1px -1px;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--sp-4);
+  color: var(--ink);
+}
+
+h1 {
+  font-size: var(--step-4);
+  font-weight: 700;
+}
+h2 {
+  font-size: var(--step-3);
+}
+h3 {
+  font-size: var(--step-2);
+}
+h4 {
+  font-size: var(--step-1);
+}
+
+p {
+  margin: 0 0 var(--sp-4);
+  max-width: var(--measure);
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid var(--accent-dim);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+a:hover {
+  border-bottom-color: var(--accent);
+}
+
+/* Accessibility floor: a visible focus ring on every interactive element. */
+a:focus-visible,
+button:focus-visible,
+[tabindex]:focus-visible,
+summary:focus-visible {
+  outline: var(--focus);
+  outline-offset: 3px;
+  border-radius: 1px;
+}
+
+code,
+kbd,
+samp {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+/* All-caps labels and eyebrows — the one place Source Code Pro is used. */
+.eyebrow {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--accent);
+  margin: 0 0 var(--sp-3);
+  display: block;
+}
+
+.numeric {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* A skip link for keyboard users, hidden until focused. */
+.skip-link {
+  position: absolute;
+  left: var(--sp-4);
+  top: -60px;
+  background: var(--accent);
+  color: var(--bg);
+  padding: var(--sp-2) var(--sp-4);
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: var(--step--1);
+  border: none;
+  z-index: 100;
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: var(--sp-4);
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--line);
+  margin: var(--sp-6) 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ---- Shell layout: navigation rail + content ---- */
+.shell {
+  display: flex;
+  align-items: flex-start;
+  min-height: 100vh;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: var(--sp-8) var(--sp-8) var(--sp-6);
+  outline: none;
+}
+
+@media (max-width: 900px) {
+  .shell {
+    flex-direction: column;
+  }
+  .main {
+    padding: var(--sp-6) var(--sp-5) var(--sp-5);
+    width: 100%;
+  }
+}
+
+.site-footer {
+  margin-top: var(--sp-9);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--line);
+  max-width: var(--content-max);
+}
+.site-footer p {
+  font-size: var(--step--1);
+  color: var(--ink-faint);
+  max-width: var(--measure);
+}
+.site-footer code {
+  color: var(--ink-dim);
+}
+
+/* ---- Page container and section rhythm ---- */
+.page {
+  max-width: var(--content-max);
+}
+.page-lede {
+  font-size: var(--step-1);
+  color: var(--ink-dim);
+  max-width: var(--measure);
+  line-height: 1.55;
+}
+
+.section {
+  margin: var(--sp-8) 0;
+  scroll-margin-top: var(--sp-6);
+}
+.section > p,
+.section > ul,
+.section > ol {
+  color: var(--ink);
+}
+.section ul,
+.section ol {
+  max-width: var(--measure);
+  padding-left: var(--sp-5);
+}
+.section li {
+  margin-bottom: var(--sp-2);
+}
+
+/* Section divider label — the numerical checkpoint. */
+.section-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-4);
+  border-top: 1px solid var(--line-strong);
+  padding-top: var(--sp-4);
+  margin-bottom: var(--sp-5);
+}
+.section-head .idx {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--accent);
+  padding-top: var(--sp-2);
+}
+.section-head h2 {
+  margin: 0;
+}
+
+/* ---- Equations ---- */
+.equation-block {
+  margin: var(--sp-5) 0;
+  padding: var(--sp-4) var(--sp-5);
+  border-left: 2px solid var(--line-strong);
+  background: var(--bg-2);
+  overflow-x: auto;
+}
+.equation-block .katex {
+  color: var(--ink);
+  font-size: 1.15em;
+}
+
+/* KaTeX renders on the petrol surface; keep it readable. */
+.katex { color: var(--ink); }
+
+/* ---- Definition lists for parameters/conventions ---- */
+.defs {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) 1fr;
+  gap: var(--sp-2) var(--sp-5);
+  max-width: var(--measure);
+  margin: var(--sp-5) 0;
+}
+.defs dt {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+.defs dd {
+  margin: 0;
+  color: var(--ink-dim);
+}

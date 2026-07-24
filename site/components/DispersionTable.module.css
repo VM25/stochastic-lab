@@ -1,0 +1,70 @@
+.scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  margin: var(--sp-5) 0;
+}
+.table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.86rem;
+}
+.caption {
+  text-align: left;
+  padding: var(--sp-3) var(--sp-4);
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.68rem;
+  color: var(--ink-dim);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+.table th[scope="col"] {
+  text-align: left;
+  padding: var(--sp-2) var(--sp-4);
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+.table th[scope="row"] {
+  text-align: left;
+  padding: var(--sp-3) var(--sp-4);
+  font-weight: 500;
+  color: var(--ink);
+}
+.table td {
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-dim);
+}
+.table tbody tr {
+  border-bottom: 1px solid var(--line);
+}
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ink);
+}
+.verdict {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+.verdict[data-identified="true"] {
+  color: var(--status-pass);
+}
+.verdict[data-identified="false"] {
+  color: var(--status-warning);
+}
+.table tr[data-identified="false"] th[scope="row"] {
+  border-left: 2px solid var(--status-warning);
+}

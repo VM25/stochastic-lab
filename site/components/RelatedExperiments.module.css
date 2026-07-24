@@ -1,0 +1,58 @@
+.wrap {
+  margin: var(--sp-5) 0;
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--accent-dim);
+  background: var(--bg-2);
+  padding: var(--sp-4) var(--sp-5);
+}
+.label {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.68rem;
+  color: var(--accent);
+  margin: 0 0 var(--sp-3);
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.item {
+  display: grid;
+  grid-template-columns: 68px 1fr auto;
+  gap: var(--sp-3);
+  align-items: center;
+  border-bottom: none;
+  color: var(--ink);
+  padding: var(--sp-1) 0;
+}
+.item:hover .name {
+  color: var(--accent);
+}
+.id {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--ink-dim);
+}
+.name {
+  font-size: 0.88rem;
+  transition: color 0.14s ease;
+}
+
+@media (max-width: 560px) {
+  .item {
+    grid-template-columns: 60px 1fr;
+    grid-template-areas: "id name" "badge badge";
+    row-gap: var(--sp-1);
+  }
+  .item .id {
+    grid-area: id;
+  }
+  .item .name {
+    grid-area: name;
+  }
+}

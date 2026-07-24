@@ -526,3 +526,34 @@ jobs:
 
       - name: The artifact set is complete
         run: python3 python/generate_manifest.py --check
+
+  # ---------------------------------------------------------------------------
+  # The public results site (site/). A static export that presents the committed
+  # artifacts read-only. This job runs the production build — which regenerates the
+  # site's data module from results/EXP-*.json — and then every site check: static
+  # export integrity, broken internal links, artifact presentation and stale
+  # numerical claims, and accessibility regressions.
+  # ---------------------------------------------------------------------------
+  site:
+    name: results site
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - name: Install
+        working-directory: site
+        run: npm ci
+
+      - name: Production build (static export)
+        working-directory: site
+        run: npm run build
+
+      - name: Site checks
+        working-directory: site
+        run: npm run check

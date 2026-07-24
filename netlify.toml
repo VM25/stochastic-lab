@@ -1,0 +1,37 @@
+# Netlify build for the public results site.
+#
+# The site lives in site/ and is a static export: Netlify runs the build there and
+# serves the emitted files. prepare-artifacts (run by the build's prebuild step) reads
+# ../results and ../docs/figures relative to the base, which resolve to the committed
+# engine artifacts at the repository root.
+
+[build]
+  base = "site"
+  command = "npm run build"
+  publish = "out"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # The site is a static export; no Next.js runtime is deployed.
+  NEXT_TELEMETRY_DISABLED = "1"
+
+# Conservative security headers for a fully self-contained static site. Everything the
+# pages load — fonts, styles, scripts, figures — is same-origin, so nothing external is
+# permitted. 'unsafe-inline' is required for the framework's hydration bootstrap and
+# KaTeX's inline styles; there is no user input and no external data, so the surface is
+# static markup.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'"
+
+# Long-cache the fingerprinted framework assets; the artifacts and figures are content
+# a reader may want fresh, so they are left to the default.
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

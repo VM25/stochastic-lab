@@ -1,0 +1,40 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: var(--step--1);
+  font-weight: 600;
+  padding: 3px var(--sp-3) 3px var(--sp-2);
+  border: 1px solid var(--line-strong);
+  border-left-width: 3px;
+  white-space: nowrap;
+}
+
+.glyph {
+  font-size: 0.85em;
+  line-height: 1;
+}
+
+.badge[data-status="pass"] {
+  color: var(--status-pass);
+  border-left-color: var(--status-pass);
+  background: var(--status-pass-wash);
+}
+.badge[data-status="warning"] {
+  color: var(--status-warning);
+  border-left-color: var(--status-warning);
+  background: var(--status-warning-wash);
+}
+.badge[data-status="fail"] {
+  color: var(--status-fail);
+  border-left-color: var(--status-fail);
+  background: var(--status-fail-wash);
+}
+.badge[data-status="inconclusive"] {
+  color: var(--status-inconclusive);
+  border-left-color: var(--status-inconclusive);
+  background: var(--status-inconclusive-wash);
+}

@@ -1,0 +1,49 @@
+.field {
+  margin: var(--sp-4) 0;
+}
+
+.label {
+  display: block;
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.68rem;
+  color: var(--ink-dim);
+  margin-bottom: var(--sp-2);
+}
+
+.row {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--line-strong);
+  background: var(--bg-2);
+}
+
+.value {
+  flex: 1;
+  min-width: 0;
+  padding: var(--sp-3) var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--ink);
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.button {
+  flex-shrink: 0;
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--bg);
+  background: var(--accent);
+  border: none;
+  padding: 0 var(--sp-4);
+  cursor: pointer;
+  transition: background 0.14s ease;
+}
+.button:hover {
+  background: var(--accent-dim);
+}

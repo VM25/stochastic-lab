@@ -1,0 +1,79 @@
+/*
+ * Design tokens for DiffusionWorks.
+ *
+ * One deeply-considered dark theme in petrol ink — chromatic, not near-black, not
+ * slate or graphite. Colour carries semantic meaning only: the base and structural
+ * accent are a single teal family (the "instrument"), and status hues appear solely
+ * on status, always alongside a glyph and a word so meaning never rests on colour.
+ */
+
+:root {
+  /* Petrol-ink surfaces, deepest to raised. */
+  --bg: #0b191d;
+  --bg-2: #0d1f24;
+  --surface: #0f2429;
+  --surface-2: #123037;
+  --line: #1c3d45;
+  --line-strong: #2a545e;
+
+  /* Ink, soft near-white with a green-blue cast rather than pure white. */
+  --ink: #dce8e6;
+  --ink-dim: #92aead;
+  --ink-faint: #607d7c;
+
+  /* Structural accent: a luminous mint-teal, distinct from cyan. Structure, active
+     states, the pipeline spine, links. */
+  --accent: #5fd0b6;
+  --accent-dim: #3f9c88;
+  --accent-wash: rgba(95, 208, 182, 0.1);
+
+  /* Status hues. Semantic only; every use is paired with a glyph and a label. */
+  --status-pass: #57c98a;
+  --status-warning: #e6b25a;
+  --status-fail: #e0665f;
+  --status-inconclusive: #7f9cc4;
+
+  --status-pass-wash: rgba(87, 201, 138, 0.12);
+  --status-warning-wash: rgba(230, 178, 90, 0.14);
+  --status-fail-wash: rgba(224, 102, 95, 0.12);
+  --status-inconclusive-wash: rgba(127, 156, 196, 0.12);
+
+  /* A restrained categorical scale for interactive method comparison, distinguishable
+     without relying on hue alone (paired with markers in charts). */
+  --series-1: #5fd0b6;
+  --series-2: #e6b25a;
+  --series-3: #7f9cc4;
+  --series-4: #d98f6b;
+
+  /* Type roles (font families injected by next/font on the <html> element). */
+  --font-display: Georgia, "Times New Roman", serif;
+  --font-body: system-ui, sans-serif;
+  --font-mono: ui-monospace, monospace;
+  --font-label: ui-monospace, monospace;
+
+  /* Type scale — compact and technical. */
+  --step--1: 0.82rem;
+  --step-0: 0.95rem;
+  --step-1: 1.15rem;
+  --step-2: 1.5rem;
+  --step-3: 2.1rem;
+  --step-4: 3rem;
+  --step-5: 4.2rem;
+
+  /* Spacing, on a 4px grid. */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+  --sp-8: 64px;
+  --sp-9: 96px;
+
+  --measure: 68ch;
+  --rail: 232px;
+  --content-max: 1180px;
+
+  --focus: 2px solid var(--accent);
+}

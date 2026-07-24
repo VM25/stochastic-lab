@@ -1,0 +1,54 @@
+.figure {
+  margin: var(--sp-6) 0;
+}
+
+.frame {
+  border: 1px solid var(--line);
+  background: #ffffff;
+  padding: var(--sp-4);
+  /* The matplotlib figures are drawn on white; framing them keeps them legible on
+     the petrol surface without recolouring the committed artifact. */
+}
+
+.frame img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.caption {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--sp-2) var(--sp-4);
+  align-items: baseline;
+  margin-top: var(--sp-3);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
+  font-size: var(--step--1);
+  color: var(--ink-dim);
+}
+
+.figLabel {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.72rem;
+  color: var(--accent);
+}
+
+.figText {
+  line-height: 1.5;
+  max-width: var(--measure);
+}
+.figText :global(strong) {
+  color: var(--ink);
+}
+
+.figSource {
+  grid-column: 2;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  border-bottom-color: var(--line-strong);
+  justify-self: start;
+}

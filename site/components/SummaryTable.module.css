@@ -1,0 +1,58 @@
+.scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  margin: var(--sp-5) 0;
+}
+
+.table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.82rem;
+}
+
+.caption {
+  text-align: left;
+  padding: var(--sp-3) var(--sp-4);
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.68rem;
+  color: var(--ink-dim);
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.table th {
+  text-align: left;
+  padding: var(--sp-2) var(--sp-4);
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--accent);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-strong);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+
+.table td {
+  padding: var(--sp-2) var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+
+.table tbody tr:hover td {
+  background: var(--bg-2);
+  color: var(--ink);
+}
+
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ink);
+}

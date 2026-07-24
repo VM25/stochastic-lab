@@ -1,0 +1,177 @@
+.hero {
+  padding: var(--sp-5) 0 var(--sp-6);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.title {
+  font-size: clamp(2.6rem, 6vw, var(--step-5));
+  line-height: 1.02;
+  margin: 0 0 var(--sp-5);
+}
+.titleSub {
+  display: block;
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: clamp(1.1rem, 2.4vw, 1.7rem);
+  letter-spacing: 0;
+  color: var(--ink-dim);
+  margin-top: var(--sp-2);
+}
+
+.thesis {
+  font-size: var(--step-1);
+  line-height: 1.55;
+  color: var(--ink);
+  max-width: 60ch;
+  margin-bottom: var(--sp-6);
+}
+
+.ledger {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  max-width: 620px;
+  margin: 0 0 var(--sp-4);
+}
+.ledgerItem {
+  background: var(--surface);
+  padding: var(--sp-4);
+  border-top: 3px solid var(--line-strong);
+}
+.ledgerItem dt {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.68rem;
+  color: var(--ink-dim);
+  margin-bottom: var(--sp-2);
+}
+.ledgerItem dd {
+  margin: 0;
+  font-size: 2.4rem;
+  font-weight: 500;
+  line-height: 1;
+  color: var(--ink);
+}
+.ledgerItem[data-status="pass"] {
+  border-top-color: var(--status-pass);
+}
+.ledgerItem[data-status="pass"] dd {
+  color: var(--status-pass);
+}
+.ledgerItem[data-status="warning"] {
+  border-top-color: var(--status-warning);
+}
+.ledgerItem[data-status="warning"] dd {
+  color: var(--status-warning);
+}
+.ledgerItem[data-status="fail"] {
+  border-top-color: var(--line-strong);
+}
+.ledgerItem[data-status="fail"] dd {
+  color: var(--ink-faint);
+}
+
+.ledgerNote {
+  font-size: var(--step-0);
+  color: var(--ink-dim);
+  max-width: var(--measure);
+}
+
+.latticeFoot {
+  margin-top: var(--sp-4);
+}
+.latticeFoot a {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  border-bottom: none;
+}
+
+/* The pipeline spine as an aligned sequence of checkpoints. */
+.spine {
+  list-style: none;
+  margin: var(--sp-5) 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+}
+.spineNode {
+  flex: 1 1 150px;
+  background: var(--surface);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.spineIdx {
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  color: var(--accent);
+}
+.spineLabel {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--ink);
+}
+
+.linkGrid {
+  list-style: none;
+  margin: var(--sp-5) 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  max-width: 100%;
+}
+.linkGrid li {
+  background: var(--surface);
+  padding: var(--sp-4) var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  margin: 0;
+}
+.linkGrid a {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.05rem;
+  border-bottom: none;
+  color: var(--ink);
+}
+.linkGrid a:hover {
+  color: var(--accent);
+}
+.linkGrid span {
+  font-size: 0.84rem;
+  color: var(--ink-faint);
+  line-height: 1.4;
+}
+
+.provenance {
+  margin-top: var(--sp-6);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--ink-faint);
+}
+.provenance code {
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .ledger {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .linkGrid {
+    grid-template-columns: 1fr;
+  }
+}
