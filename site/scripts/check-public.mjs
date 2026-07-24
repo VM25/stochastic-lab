@@ -62,6 +62,9 @@ const FORBIDDEN = [
   /\bcommand[- ]line\b/i,
   /\bgenerator commit\b/i,
   /\bnpm\b/i,
+  /\bthe record\b/i,
+  /\bprovenance\b/i,
+  /\bexperiments?\b/i, // the project's framing is "studies", not "experiments"
   /\bEXP-\d{2}\b/,
 ];
 

@@ -30,9 +30,9 @@ export default function CalibrationPage() {
           are determined by the data, it finds them.
         </p>
         <Figure
-          file="exp11_recovery.png"
-          alt={FIGURE_COPY["exp11_recovery.png"].alt}
-          caption={FIGURE_COPY["exp11_recovery.png"].caption}
+          file="recovery.png"
+          alt={FIGURE_COPY["recovery.png"].alt}
+          caption={FIGURE_COPY["recovery.png"].caption}
         />
         <RelatedExperiments ids={["EXP-11"]} />
       </Section>
@@ -56,9 +56,9 @@ export default function CalibrationPage() {
           <strong>A good fit is not the same as a determined model.</strong>
         </p>
         <Figure
-          file="exp12_parameter_dispersion.png"
-          alt={FIGURE_COPY["exp12_parameter_dispersion.png"].alt}
-          caption={FIGURE_COPY["exp12_parameter_dispersion.png"].caption}
+          file="parameter-dispersion.png"
+          alt={FIGURE_COPY["parameter-dispersion.png"].alt}
+          caption={FIGURE_COPY["parameter-dispersion.png"].caption}
         />
       </Section>
 
@@ -70,9 +70,9 @@ export default function CalibrationPage() {
           where it cannot.
         </p>
         <Figure
-          file="exp12_residual_surface.png"
-          alt={FIGURE_COPY["exp12_residual_surface.png"].alt}
-          caption={FIGURE_COPY["exp12_residual_surface.png"].caption}
+          file="residual-surface.png"
+          alt={FIGURE_COPY["residual-surface.png"].alt}
+          caption={FIGURE_COPY["residual-surface.png"].caption}
         />
         <p>
           This is why the study reports the quality of the fit and the determinacy of the parameters

@@ -54,9 +54,9 @@ export default function ValidationPage() {
           independently computed high-precision values.
         </p>
         <Figure
-          file="exp13_agreement.png"
-          alt={FIGURE_COPY["exp13_agreement.png"].alt}
-          caption={FIGURE_COPY["exp13_agreement.png"].caption}
+          file="agreement.png"
+          alt={FIGURE_COPY["agreement.png"].alt}
+          caption={FIGURE_COPY["agreement.png"].caption}
         />
         <RelatedExperiments ids={["EXP-13", "EXP-09"]} />
       </Section>
@@ -74,16 +74,16 @@ export default function ValidationPage() {
 
       <Section idx="D" title="Confidence intervals that mean what they say" id="coverage">
         <p>
-          When simulation reports a 95% confidence interval, that claim can itself be tested: run
-          the experiment many times and count how often the interval really contains the true value.
+          When simulation reports a 95% confidence interval, that claim can itself be tested: repeat
+          the estimate many times and count how often the interval really contains the true value.
           The project finds that the interval is trustworthy in normal conditions and{" "}
           <em>not</em> trustworthy for a rare, extreme payoff with too few paths — a caveat worth
           knowing before quoting the number.
         </p>
         <Figure
-          file="exp14_coverage.png"
-          alt={FIGURE_COPY["exp14_coverage.png"].alt}
-          caption={FIGURE_COPY["exp14_coverage.png"].caption}
+          file="coverage.png"
+          alt={FIGURE_COPY["coverage.png"].alt}
+          caption={FIGURE_COPY["coverage.png"].caption}
         />
         <RelatedExperiments ids={["EXP-14"]} />
       </Section>

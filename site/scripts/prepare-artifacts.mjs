@@ -43,20 +43,30 @@ resetDir(PUBLIC_FIGURES);
 fs.rmSync(path.join(site, "public", "artifacts"), { recursive: true, force: true });
 fs.mkdirSync(path.dirname(GENERATED), { recursive: true });
 
-// 1. Copy every rendered figure, and map each to its study.
+// 1. Copy every rendered figure under a clean, descriptive name so the served image
+//    URL carries no internal numbering — "parameter-dispersion.png", not
+//    "exp12_parameter_dispersion.png". The study each belongs to is recorded here, not
+//    in the public filename.
 const figureFiles = fs
   .readdirSync(FIGURES)
   .filter((f) => f.endsWith(".png"))
   .sort();
 if (figureFiles.length !== 21) fail(`expected 21 figures, found ${figureFiles.length}`);
-for (const file of figureFiles) {
-  fs.copyFileSync(path.join(FIGURES, file), path.join(PUBLIC_FIGURES, file));
-}
+
+const cleanFigureName = (file) => file.replace(/^exp\d{2}_/, "").replace(/_/g, "-");
+
 const figuresByStudy = {};
+const publicByCommitted = {};
+const seenClean = new Set();
 for (const file of figureFiles) {
   const m = file.match(/^exp(\d{2})_/);
   if (!m) fail(`figure ${file} does not name a study`);
-  (figuresByStudy[`EXP-${m[1]}`] ||= []).push(file);
+  const clean = cleanFigureName(file);
+  if (seenClean.has(clean)) fail(`clean figure name collision: ${clean}`);
+  seenClean.add(clean);
+  publicByCommitted[file] = clean;
+  fs.copyFileSync(path.join(FIGURES, file), path.join(PUBLIC_FIGURES, clean));
+  (figuresByStudy[`EXP-${m[1]}`] ||= []).push(clean);
 }
 
 // The records cross-reference one another by internal identifier (EXP-NN). Those
@@ -71,15 +81,21 @@ for (const id of STUDY_IDS) {
   idToName[id] = rawBydId[id].name;
 }
 const namesById = new RegExp(`\\b(${STUDY_IDS.join("|")})\\b`, "g");
-// The engine's interpretation prose cites its own internal field names (snake_case,
-// e.g. "parameter_dispersion"). Those read as code on a reader-facing site, so they are
-// turned into ordinary words — "parameter dispersion" — which is what they describe.
+// The engine's interpretation prose is written for a technical record: it cites its own
+// field names (snake_case, sometimes in `backticks`), calls itself "the record", and
+// uses "provenance" for a data source. On a reader-facing site those read as internal
+// jargon, so each is turned into the ordinary words it means.
 const snakeCase = /\b[a-z]+(?:_[a-z]+)+\b/g;
 const sanitize = (text) =>
   typeof text === "string"
     ? text
         .replace(namesById, (m) => `the ${idToName[m]} study`)
+        .replace(/`/g, "")
         .replace(snakeCase, (m) => m.replace(/_/g, " "))
+        .replace(/\bthe record\b/gi, (m) => (m[0] === "T" ? "The study" : "the study"))
+        .replace(/\bprovenance\b/gi, "source")
+        .replace(/\bexperiments\b/gi, (m) => (m[0] === "E" ? "Studies" : "studies"))
+        .replace(/\bexperiment\b/gi, (m) => (m[0] === "E" ? "Study" : "study"))
     : text;
 
 // 2. Collect only the fields the reader-facing pages need: the question, the finding,
@@ -100,7 +116,7 @@ for (const id of STUDY_IDS) {
     id: record.id,
     slug,
     name: record.name,
-    question: record.question,
+    question: sanitize(record.question),
     status: record.status,
     interpretation: sanitize(record.interpretation),
     limitations: record.limitations.map(sanitize),

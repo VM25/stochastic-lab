@@ -20,22 +20,31 @@ ensureExport();
 const failures = [];
 
 // ---- 1. Every rendered figure is presented and shipped -----------------------------
-const committedFigures = fs
+// The committed figures are copied under clean, descriptive names; there must be one
+// per committed figure, and every one must be shown on some page.
+const committedCount = fs
   .readdirSync(path.join(REPO, "docs", "figures"))
-  .filter((f) => f.endsWith(".png"))
-  .sort();
+  .filter((f) => f.endsWith(".png")).length;
+const exportedFigures = fs.existsSync(path.join(OUT, "figures"))
+  ? fs.readdirSync(path.join(OUT, "figures")).filter((f) => f.endsWith(".png")).sort()
+  : [];
+if (exportedFigures.length !== committedCount) {
+  failures.push(`${exportedFigures.length} figures in the export, ${committedCount} committed`);
+}
+if (exportedFigures.some((f) => /^exp\d{2}_/.test(f) || f.includes("_"))) {
+  failures.push("a figure is served under its internal name (should be a clean, hyphenated name)");
+}
 
 const referencedFigures = new Set();
 for (const file of htmlFiles()) {
   const html = fs.readFileSync(file, "utf8");
   for (const src of attrValues(html, "src")) {
-    const m = src.match(/\/figures\/(exp\d{2}_[a-z0-9_]+\.png)/);
+    const m = src.match(/\/figures\/([a-z0-9-]+\.png)/);
     if (m) referencedFigures.add(m[1]);
   }
 }
-for (const fig of committedFigures) {
+for (const fig of exportedFigures) {
   if (!referencedFigures.has(fig)) failures.push(`figure ${fig} is rendered nowhere on the site`);
-  if (!fs.existsSync(path.join(OUT, "figures", fig))) failures.push(`figure ${fig} missing from export`);
 }
 
 // ---- 2. No hand-authored result numbers --------------------------------------------
@@ -82,7 +91,7 @@ for (const file of HANDWRITTEN) {
 
 for (const f of failures) console.error(`FAIL: ${f}`);
 console.log(
-  `\n${committedFigures.length} figures, ${referencedFigures.size} rendered; ` +
+  `\n${exportedFigures.length} figures, ${referencedFigures.size} rendered; ` +
     `${HANDWRITTEN.length} source files scanned for hand-authored numbers`
 );
 if (failures.length) {
