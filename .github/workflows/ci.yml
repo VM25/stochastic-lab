@@ -501,3 +501,28 @@ jobs:
             fi
           done
           echo "OK: every committed figure regenerates from its record"
+
+  # ---------------------------------------------------------------------------
+  # The documentation is an artifact too. A paper whose numbers have drifted from
+  # the records, a methodology note linking to a renamed file, or a figure nobody
+  # references is a defect a reader cannot be expected to catch. These checks read
+  # only committed files, so they need no build.
+  # ---------------------------------------------------------------------------
+  documentation:
+    name: documentation and claims
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Links resolve, figures are referenced, removed scope stays removed
+        run: python3 python/check_docs.py
+
+      - name: Every headline claim re-derives from a committed record
+        run: python3 python/verify_claims.py
+
+      - name: The artifact set is complete
+        run: python3 python/generate_manifest.py --check

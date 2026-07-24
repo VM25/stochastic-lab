@@ -1,11 +1,22 @@
 #!/usr/bin/env python3
-"""Re-derive every headline claim in results/README.md from the committed records.
+"""Re-derive every headline claim in the prose from the committed records.
 
 Reporting and checking only (ADR-002). Each claim below is recomputed from the JSON
 records and then required to appear *verbatim* in the prose. A number that drifts
 when the experiments are regenerated stops being a description of the artifact and
 becomes a leftover, and prose is where that happens silently -- so this makes it a
 build failure instead.
+
+Two documents are checked, with two claim sets:
+
+* `results/README.md` -- the reconciliation. It must carry every **shared** claim: the
+  headline number for each experiment.
+* `docs/TECHNICAL-PAPER.md` -- the paper. It must carry the shared claims *and* the
+  finer-grained ones it alone states (per-scheme weak orders, regime counts, the
+  calibration dispersion table, cross-method agreement in sigmas).
+
+The README is deliberately not required to carry the paper's detail; it is a summary,
+and forcing the two to state the same things would make one of them redundant.
 
 The check is deliberately literal: it does not parse the prose or try to understand
 it, it asserts that the exact string the record implies is present. That catches the
@@ -18,7 +29,7 @@ while the prose still said six.
 
 Usage:
     python3 python/verify_claims.py
-    python3 python/verify_claims.py --readme results/README.md --results results
+    python3 python/verify_claims.py --results results
 """
 
 from __future__ import annotations
@@ -43,6 +54,83 @@ WORDS = {
     11: "eleven",
     12: "twelve",
 }
+
+
+def paper_claims(records: dict[str, dict]) -> list[tuple[str, str, str]]:
+    """Claims the technical paper states and the reconciliation summary does not."""
+    out: list[tuple[str, str, str]] = []
+
+    def add(exp: str, what: str, text: str) -> None:
+        out.append((exp, what, text))
+
+    # EXP-03 -- weak order per test function, including the non-smooth payoff.
+    for study in records["EXP-03"]["results"]["studies"]:
+        add(
+            "EXP-03",
+            f"{study['test_function']} / {study['scheme']} weak order",
+            f"{study['asymptotic_fit']['slope']:.4f}",
+        )
+
+    # EXP-04 -- the regime census that locates the bias floor.
+    regimes: dict[str, int] = {}
+    for cell in records["EXP-04"]["results"]["cells"]:
+        regimes[cell["regime"]] = regimes.get(cell["regime"], 0) + 1
+    add("EXP-04", "total cells", f"{sum(regimes.values())} cells")
+    add("EXP-04", "bias-dominated cells", f"{regimes['bias_dominated']} are bias-dominated")
+    add("EXP-04", "sampling-dominated cells", f"{regimes['sampling_dominated']} sampling-dominated")
+    add("EXP-04", "mixed cells", f"{regimes['mixed']} mixed")
+
+    # EXP-06 -- the temporal arms, including the inflated full-range fit.
+    for arm in records["EXP-06"]["results"]["time_sweep"]:
+        if arm["arm"] == "implicit":
+            add("EXP-06", "implicit temporal order", f"{arm['fit_full_range']['order']:.4f}")
+        if arm["arm"] == "crank_nicolson":
+            add("EXP-06", "plain CN full-range order", f"{arm['fit_full_range']['order']:.4f}")
+            add("EXP-06", "plain CN asymptotic order", f"{arm['fit_asymptotic_window']['order']:.4f}")
+
+    # EXP-09 -- the characteristic function's own invariants.
+    cf = records["EXP-09"]["results"]["characteristic_function_properties"]
+    add("EXP-09", "martingale identity residual", f"{cf['max_martingale_identity_relative_error']:.1e}".replace("e-16", "e−16"))
+    add("EXP-09", "regimes swept", f"{cf['regimes']} parameter")
+
+    # EXP-12 -- the dispersion table, parameter by parameter. The *ranges* are asserted
+    # rather than only the relative-dispersion percentages: a bare "95%" is satisfied by
+    # the phrase "nominal 95% interval" elsewhere in the same document, so it would keep
+    # passing after the number it describes had moved. The min-to-max span is specific to
+    # this table and cannot be satisfied by accident.
+    dispersion = records["EXP-12"]["results"]["parameter_dispersion"]
+    spans = {
+        "correlation": "{:.2f} to {:.2f}",
+        "initial_variance": "{:.3f} to {:.3f}",
+        "vol_of_variance": "{:.2f} to {:.2f}",
+        "long_run_variance": "{:.3f} to {:.3f}",
+        "mean_reversion": "{:.2f} to {:.2f}",
+    }
+    for name, form in spans.items():
+        stats = dispersion[name]
+        span = form.format(stats["min"], stats["max"]).replace("-", "−")
+        add("EXP-12", f"{name} span across scenarios", span)
+    for name in ("correlation", "initial_variance", "vol_of_variance"):
+        stats = dispersion[name]
+        add(
+            "EXP-12",
+            f"{name} relative dispersion",
+            f"{stats['stddev'] / abs(stats['mean']) * 100:.0f}%",
+        )
+    surface = records["EXP-12"]["results"]
+    add("EXP-12", "included quotes", f"{surface['included_quotes']} quotes")
+
+    # EXP-13 -- agreement measured in combined standard errors.
+    european = records["EXP-13"]["results"]["black_scholes_european"]
+    worst = max(
+        abs(m["sigmas"])
+        for cell in european
+        for m in cell["methods"]
+        if not m.get("is_reference") and "sigmas" in m
+    )
+    add("EXP-13", "worst European disagreement", f"{worst:.2f}")
+
+    return out
 
 
 def claims(records: dict[str, dict]) -> list[tuple[str, str, str]]:
@@ -185,6 +273,7 @@ def claims(records: dict[str, dict]) -> list[tuple[str, str, str]]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--readme", type=pathlib.Path, default=pathlib.Path("results/README.md"))
+    parser.add_argument("--paper", type=pathlib.Path, default=pathlib.Path("docs/TECHNICAL-PAPER.md"))
     parser.add_argument("--results", type=pathlib.Path, default=pathlib.Path("results"))
     args = parser.parse_args()
 
@@ -192,22 +281,38 @@ def main() -> int:
     for path in sorted(args.results.glob("EXP-*.json")):
         records[path.stem] = json.loads(path.read_text())
 
-    prose = args.readme.read_text()
+    shared = claims(records)
+    extra = paper_claims(records)
 
-    missing = []
-    checked = claims(records)
-    for experiment, what, text in checked:
-        if text not in prose:
-            missing.append((experiment, what, text))
+    # (document, claims it must carry). The reconciliation carries the headlines; the
+    # paper carries those plus its own finer detail.
+    targets: list[tuple[pathlib.Path, list[tuple[str, str, str]]]] = [
+        (args.readme, shared),
+        (args.paper, shared + extra),
+    ]
 
-    for experiment, what, text in missing:
-        print(f"FAIL: {experiment} {what}: the records imply '{text}', which the prose does not say")
+    total = 0
+    missing_total = 0
+    for document, required in targets:
+        if not document.exists():
+            print(f"FAIL: {document} does not exist")
+            return 1
+        prose = document.read_text()
+        missing = [(e, w, t) for e, w, t in required if t not in prose]
+        for experiment, what, text in missing:
+            print(
+                f"FAIL: {document}: {experiment} {what}: the records imply '{text}', "
+                "which the prose does not say"
+            )
+        print(f"{document}: {len(required) - len(missing)} of {len(required)} claims re-derived")
+        total += len(required)
+        missing_total += len(missing)
 
-    print(f"\n{len(checked) - len(missing)} of {len(checked)} headline claims re-derived from the records")
-    if missing:
+    print(f"\n{total - missing_total} of {total} claims re-derived from the committed records")
+    if missing_total:
         print("The prose disagrees with the artifacts it describes.")
         return 1
-    print("Every checked claim in results/README.md is supported by a committed record.")
+    print("Every checked claim is supported by a committed record.")
     return 0
 
 
