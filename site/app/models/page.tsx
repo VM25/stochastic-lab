@@ -5,159 +5,117 @@ import { EquationBlock, InlineMath } from "@/components/Equation";
 import { RelatedExperiments } from "@/components/RelatedExperiments";
 
 export const metadata: Metadata = {
-  title: "Models & instruments",
+  title: "Stochastic models",
   description:
-    "Black–Scholes–Merton and Heston, their parameters and assumptions, the contracts priced, and the regions where each model fails.",
+    "Black–Scholes and Heston: the equations that turn assumptions about randomness into a price, and the regions where each stops being reliable.",
 };
 
 export default function ModelsPage() {
   return (
     <div className="page">
       <PageHeader
-        stage="Stage 01 — model"
-        title="Models & instruments"
-        lede={
-          <>
-            Two models under the risk-neutral measure, a handful of contracts, and — stated
-            plainly — the regions where each model stops being trustworthy. The full
-            specification is the engine&apos;s <code>MATHEMATICAL-SPEC</code>.
-          </>
-        }
+        stage="Stochastic models"
+        title="Two ways to model a random price"
+        lede="A pricing model is a story about how a price moves at random through time, written as an equation. Two such stories dominate practice — one simple, one richer — and the difference between them is where the interesting behaviour lives."
       />
 
-      <Section idx="01.1" title="Market and conventions" id="market">
+      <Section idx="A" title="The setting" id="setting">
         <p>
-          A single-asset market carries spot <InlineMath tex="S_0 > 0" />, a continuously
-          compounded risk-free rate <InlineMath tex="r" />, and a continuous dividend yield{" "}
-          <InlineMath tex="q" />. Time is in years and all pricing is under the risk-neutral
-          measure <InlineMath tex="\mathbb{Q}" />; the discount factor is{" "}
-          <InlineMath tex="e^{-rT}" /> and the forward is{" "}
-          <InlineMath tex="F = S_0 e^{(r-q)T}" />.
+          Every price starts from the same footing: a current price <InlineMath tex="S_0" />, an
+          interest rate <InlineMath tex="r" />, and a dividend yield <InlineMath tex="q" />. Pricing
+          then asks what a contract is worth today given how the price might evolve, discounting
+          future payoffs back to the present. The models differ in one thing only: how they
+          describe that evolution.
         </p>
       </Section>
 
-      <Section idx="01.2" title="Black–Scholes–Merton" id="black-scholes">
-        <p>Under the risk-neutral measure the spot follows a geometric Brownian motion:</p>
+      <Section idx="B" title="Black–Scholes: constant volatility" id="black-scholes">
+        <p>
+          The classical model assumes the price drifts upward at the interest rate while jiggling
+          with a constant volatility <InlineMath tex="\sigma" />:
+        </p>
         <EquationBlock
           tex="dS_t = (r - q)\,S_t\,dt + \sigma\,S_t\,dW_t"
-          describe="The change in the spot price equals the risk-neutral drift r minus q times the spot, plus sigma times the spot times the increment of a Brownian motion."
+          describe="The change in the price equals the drift, the interest rate minus the dividend yield, times the price times the time step, plus a constant volatility sigma times the price times the increment of a random Brownian motion."
         />
-        <p>The European call has the closed form</p>
-        <EquationBlock
-          tex="C = S_0 e^{-qT} N(d_1) - K e^{-rT} N(d_2), \quad d_{1,2} = \frac{\ln(S_0/K) + (r - q \pm \tfrac{1}{2}\sigma^2)T}{\sigma\sqrt{T}}"
-          describe="The call price equals the discounted spot times the normal CDF of d1 minus the discounted strike times the normal CDF of d2, where d1 and d2 depend on log-moneyness, drift, and volatility."
-        />
-        <p>with the put following by put–call parity. The parameters are:</p>
-        <dl className="defs">
-          <dt>
-            <InlineMath tex="\sigma" />
-          </dt>
-          <dd>annualised volatility, the single free parameter of the model</dd>
-          <dt>
-            <InlineMath tex="K" />
-          </dt>
-          <dd>strike</dd>
-          <dt>
-            <InlineMath tex="T" />
-          </dt>
-          <dd>maturity, in years</dd>
-          <dt>
-            <InlineMath tex="N(\cdot)" />
-          </dt>
-          <dd>the standard normal cumulative distribution function</dd>
-        </dl>
         <p>
-          <strong>Assumptions.</strong> Constant volatility, frictionless continuous trading,
-          a single deterministic rate, and log-normal terminal prices. The closed form is the
-          reference the simulated and PDE engines are scored against.
+          Its great virtue is a closed-form answer: the price of a European option is a simple
+          formula, no simulation required. That makes it the yardstick — the exact value every
+          numerical method on this site is checked against. Its great flaw is the assumption of
+          constant volatility, which real markets contradict: options at different strikes imply
+          different volatilities, the well-known &ldquo;smile&rdquo; the model cannot reproduce.
         </p>
       </Section>
 
-      <Section idx="01.3" title="Heston" id="heston">
+      <Section idx="C" title="Heston: volatility that moves" id="heston">
         <p>
-          The Heston model replaces the constant volatility with a stochastic variance that
-          mean-reverts and is correlated with the spot:
+          The Heston model fixes that by letting the volatility itself be random. The variance{" "}
+          <InlineMath tex="v_t" /> follows its own equation, pulled back toward a long-run level and
+          correlated with the price:
         </p>
         <EquationBlock
-          tex="\begin{aligned} dS_t &= (r - q)\,S_t\,dt + \sqrt{v_t}\,S_t\,dW_t^S \\ dv_t &= \kappa(\theta - v_t)\,dt + \xi\sqrt{v_t}\,dW_t^v \\ d\langle W^S, W^v\rangle_t &= \rho\,dt \end{aligned}"
-          describe="The spot follows a diffusion with instantaneous variance v. The variance follows a Cox-Ingersoll-Ross process reverting to theta at rate kappa with vol-of-variance xi, and the two Brownian motions are correlated with coefficient rho."
+          tex="\begin{aligned} dS_t &= (r - q)\,S_t\,dt + \sqrt{v_t}\,S_t\,dW_t^S \\ dv_t &= \kappa(\theta - v_t)\,dt + \xi\sqrt{v_t}\,dW_t^v \end{aligned}"
+          describe="The price follows a diffusion whose volatility is the square root of a variance v. The variance mean-reverts toward a long-run level theta at speed kappa, with its own randomness scaled by the volatility-of-variance xi."
         />
+        <p>Its five parameters each control a recognisable feature of the market:</p>
         <dl className="defs">
           <dt>
             <InlineMath tex="v_0" />
           </dt>
-          <dd>initial variance</dd>
+          <dd>where volatility starts today</dd>
           <dt>
             <InlineMath tex="\kappa" />
           </dt>
-          <dd>mean-reversion rate of the variance</dd>
+          <dd>how quickly volatility is pulled back to its average</dd>
           <dt>
             <InlineMath tex="\theta" />
           </dt>
-          <dd>long-run variance level</dd>
+          <dd>the long-run average level of variance</dd>
           <dt>
             <InlineMath tex="\xi" />
           </dt>
-          <dd>volatility of variance</dd>
+          <dd>how much the volatility itself fluctuates</dd>
           <dt>
             <InlineMath tex="\rho" />
           </dt>
-          <dd>spot–variance correlation</dd>
+          <dd>how price moves and volatility moves are correlated — usually negative</dd>
         </dl>
         <p>
-          Pricing uses the characteristic function in its numerically stable
-          &ldquo;little-trap&rdquo; form, integrated by Gauss–Legendre quadrature. The engine
-          validates the function directly, not only through the prices it produces.
+          With these, Heston can reproduce the volatility smile. The price is a shade harder to
+          compute — there is no elementary formula — but a well-understood integral gives it
+          accurately, and the project checks that integral against its own defining properties
+          before trusting it.
         </p>
         <RelatedExperiments ids={["EXP-09", "EXP-10"]} />
       </Section>
 
-      <Section idx="01.4" title="Failure regions" id="failure-regions">
+      <Section idx="D" title="Where each model breaks" id="failure">
         <p>
-          A model is only as trustworthy as its worst regime, so the engine names them rather
-          than avoiding them.
+          A model is only as good as its worst regime, and the project names those rather than
+          avoiding them.
         </p>
         <p>
-          <strong>The Feller condition.</strong> The variance process can reach zero unless
+          <strong>Volatility hitting zero.</strong> In the Heston model the variance can fall all
+          the way to zero unless its parameters satisfy a balance condition,
         </p>
         <EquationBlock
           tex="2\kappa\theta \geq \xi^2"
-          describe="Twice kappa times theta is greater than or equal to xi squared."
+          describe="Twice kappa times theta is at least xi squared."
         />
         <p>
-          A violation is treated as a <em>regime to be priced and measured</em>, not an invalid
-          input: violating parameter sets are priced, their discretisation bias measured, and
-          their uncertainty attached. EXP-10 quantifies exactly this.
+          When that balance is broken, the variance repeatedly touches zero, and a careless
+          simulation produces nonsense. The project treats such a regime as something to price
+          carefully and measure — not as a forbidden input — and one study is devoted to getting it
+          right.
         </p>
         <p>
-          <strong>Weak identification.</strong> A short-dated option surface carries little
-          information about the long-run variance level, so <InlineMath tex="\kappa" /> and{" "}
-          <InlineMath tex="\theta" /> can trade off against each other while the fit stays
-          good. EXP-12 measures this on a real surface, and it is the sharpest limitation in
-          the whole programme.
+          <strong>Too little information.</strong> Even when the model is well behaved, a set of
+          option prices may not be enough to pin its parameters down. A market with only a few
+          maturities tells you little about the long-run behaviour of volatility, so very different
+          parameter sets can fit equally well. The calibration study measures this directly on a
+          real market, and it is the sharpest limitation the project uncovers.
         </p>
         <RelatedExperiments ids={["EXP-10", "EXP-12"]} />
-      </Section>
-
-      <Section idx="01.5" title="Instruments" id="instruments">
-        <p>The contracts priced across the programme:</p>
-        <dl className="defs">
-          <dt>European</dt>
-          <dd>call and put — the closed-form baseline</dd>
-          <dt>Arithmetic Asian</dt>
-          <dd>call and put, with the geometric Asian (which has a closed form) as control variate</dd>
-          <dt>Barrier</dt>
-          <dd>
-            down-and-out and up-and-out calls, under continuous, discrete, and Brownian-bridge
-            monitoring
-          </dd>
-        </dl>
-        <p>
-          The monitoring convention is part of the contract, not a solver setting. A discretely
-          monitored barrier is a different instrument from a continuously monitored one, and
-          EXP-07 measures how different.
-        </p>
-        <RelatedExperiments ids={["EXP-05", "EXP-07"]} />
       </Section>
     </div>
   );

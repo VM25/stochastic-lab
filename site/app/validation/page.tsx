@@ -8,50 +8,50 @@ import { FIGURE_COPY } from "@/lib/figure-copy";
 export const metadata: Metadata = {
   title: "Validation",
   description:
-    "How the engine is checked: separated evidence, no unresolved fits, both convergence fits published, and failures preserved.",
+    "How every result is checked — against exact formulas, against independent methods, and against the model's own defining properties.",
 };
 
 export default function ValidationPage() {
   return (
     <div className="page">
       <PageHeader
-        stage="Stage 04 — validation"
-        title="Validation"
-        lede="A pricing engine that only checks itself proves nothing. This one is scored against published values, independent methods, analytic invariants, and its own statistical claims — and it refuses to fit what it cannot resolve."
+        stage="Validation"
+        title="How the results are checked"
+        lede="A method that only checks itself proves nothing. Every number here is confirmed against something independent — an exact formula, a rival method, or a mathematical identity the answer must satisfy — and the project refuses to report anything it cannot resolve above the noise."
       />
 
-      <Section idx="04.1" title="Four principles" id="principles">
+      <Section idx="A" title="The discipline" id="principles">
         <ol>
           <li>
-            <strong>Evidence is separated by kind.</strong> External references, analytic
-            invariants, and internal numerical checks are reported in distinct categories. They
-            are not all independent oracles, and no single oracle is load-bearing.
+            <strong>Independent checks, kept separate.</strong> A published reference value, a rival
+            method, and a mathematical identity are different kinds of evidence, and the project
+            keeps them apart rather than pretending they all confirm each other.
           </li>
           <li>
-            <strong>Nothing unresolved is fitted.</strong> A quantity is fitted only once it
-            clears a stated multiple of its own standard error. A power-law fit will return a
-            confident interval for pure noise, so the refusal is mechanical, not discretionary.
+            <strong>Nothing unresolved is reported as fact.</strong> If an effect cannot be
+            distinguished from simulation noise, it is reported as unresolved — never fitted to a
+            confident-looking number, because a fitting procedure will happily draw a trend through
+            pure randomness.
           </li>
           <li>
-            <strong>Both fits are published where they disagree.</strong> A theoretical order
-            is asymptotic, so a full-range fit over coarse levels is a faithful description of a
-            curve that is not a straight line — reported alongside the asymptotic-window fit.
+            <strong>Honest about early behaviour.</strong> A convergence rate is a statement about
+            the fine-grid limit, so where a coarse-grid estimate disagrees with the limit, both are
+            shown and the difference is explained.
           </li>
           <li>
-            <strong>Failures are preserved.</strong> A disappointing outcome is a result. It is
-            kept with its evidence, not re-run until it improves or smoothed into a pass.
+            <strong>Failures are kept.</strong> A disappointing result is a result. It stays,
+            explained, rather than being re-run until it looks better.
           </li>
         </ol>
       </Section>
 
-      <Section idx="04.2" title="References and cross-method agreement" id="references">
+      <Section idx="B" title="Independent methods agree" id="agreement">
         <p>
-          European prices are checked across analytic, crude and antithetic Monte Carlo, and
-          Crank–Nicolson finite differences; Heston Monte Carlo against the characteristic
-          function. Methods are compared in units of their own combined standard error, so a
-          disagreement is judged against sampling noise rather than an absolute tolerance. The
-          characteristic function is validated directly against a published value and four
-          independently generated high-precision references.
+          The strongest check is redundancy: price the same contract by an exact formula, by
+          simulation, and by solving the pricing equation, and confirm they agree — not to an
+          arbitrary tolerance, but to within the simulation&apos;s own margin of error. The Heston
+          model&apos;s price is checked the same way, against a published reference and several
+          independently computed high-precision values.
         </p>
         <Figure
           file="exp13_agreement.png"
@@ -61,24 +61,24 @@ export default function ValidationPage() {
         <RelatedExperiments ids={["EXP-13", "EXP-09"]} />
       </Section>
 
-      <Section idx="04.3" title="Financial invariants" id="invariants">
+      <Section idx="C" title="Prices must obey the rules" id="invariants">
         <p>
-          Put–call parity, the no-arbitrage price bounds, monotonicity in the inputs, and the
-          barrier in–out relationship are checked as identities the prices must satisfy
-          regardless of method. The martingale identity{" "}
-          <span className="numeric">φ₂(−i) = S₀e^(r−q)T</span> is enforced on the Heston
-          characteristic function across every regime.
+          Some things must be true of any correct price, regardless of method: a call and a put at
+          the same strike are linked by a fixed relationship, prices must stay within no-arbitrage
+          bounds, and a more valuable position cannot be worth less. These identities are checked
+          as a matter of course, and the Heston pricing formula is held to the mathematical
+          properties that define it.
         </p>
         <RelatedExperiments ids={["EXP-09", "EXP-15"]} />
       </Section>
 
-      <Section idx="04.4" title="Confidence coverage" id="coverage">
+      <Section idx="D" title="Confidence intervals that mean what they say" id="coverage">
         <p>
-          A reported 95% interval is only worth trusting if it covers at the rate it claims.
-          EXP-14 measures that directly, and finds that at a small sample with a severely skewed
-          payoff the interval under-covers — a warning, because a reader quoting the interval in
-          that regime would be quoting something the experiment disproved. More paths restore
-          it.
+          When simulation reports a 95% confidence interval, that claim can itself be tested: run
+          the experiment many times and count how often the interval really contains the true value.
+          The project finds that the interval is trustworthy in normal conditions and{" "}
+          <em>not</em> trustworthy for a rare, extreme payoff with too few paths — a caveat worth
+          knowing before quoting the number.
         </p>
         <Figure
           file="exp14_coverage.png"
@@ -88,13 +88,12 @@ export default function ValidationPage() {
         <RelatedExperiments ids={["EXP-14"]} />
       </Section>
 
-      <Section idx="04.5" title="PDE, Heston, and edge cases" id="other">
+      <Section idx="E" title="Behaviour at the edges" id="edges">
         <p>
-          The finite-difference engine is validated by its convergence order — a first-order
-          drop would betray a misplaced boundary, so the order is a standing regression, not a
-          one-time check. The Heston discretisation is validated against the semi-analytic
-          reference. Every numerical edge case must either produce the correct limiting value or
-          refuse explicitly; no non-finite value may escape.
+          Finally, the methods are pushed to their limits: a maturity shrinking to zero, a barrier
+          already breached, a correlation at its extreme. Each such case must either return the
+          correct limiting value or refuse cleanly — never quietly return a plausible but wrong
+          number. Refusing, here, is the correct behaviour.
         </p>
         <RelatedExperiments ids={["EXP-06", "EXP-10", "EXP-15"]} />
       </Section>

@@ -40,7 +40,7 @@ export function SiteNav() {
       </div>
 
       <nav className={styles.nav} aria-label="Sections">
-        <p className={styles.spineLabel}>The pipeline</p>
+        <p className={styles.spineLabel}>Contents</p>
         <ul id="site-nav-list" className={styles.list} data-open={open}>
           {NAV.map((item) => {
             const active = isActive(pathname, item.href);
@@ -53,7 +53,7 @@ export function SiteNav() {
                   aria-current={active ? "page" : undefined}
                 >
                   <span className={styles.stage} aria-hidden="true">
-                    {item.stage}
+                    {item.index}
                   </span>
                   <span className={styles.linkBody}>
                     <span className={styles.linkLabel}>{item.label}</span>
@@ -67,10 +67,7 @@ export function SiteNav() {
       </nav>
 
       <div className={styles.foot}>
-        <a href="https://github.com/VM25/stochastic-lab" className={styles.footLink}>
-          Source ↗
-        </a>
-        <span className={styles.footNote}>Read-only over committed artifacts</span>
+        <span className={styles.footNote}>A quantitative research project in stochastic derivatives</span>
       </div>
     </header>
   );

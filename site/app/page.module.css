@@ -22,18 +22,33 @@
   font-size: var(--step-1);
   line-height: 1.55;
   color: var(--ink);
-  max-width: 60ch;
+  max-width: 62ch;
   margin-bottom: var(--sp-6);
+}
+
+.heroCaption {
+  margin: var(--sp-4) 0 0;
+}
+.heroCaption .equation-block,
+.heroCaption :global(.equation-block) {
+  margin-top: var(--sp-4);
+}
+.heroCaption figcaption {
+  font-size: var(--step--1);
+  color: var(--ink-faint);
+  max-width: var(--measure);
+  line-height: 1.5;
+  margin-top: var(--sp-2);
 }
 
 .ledger {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   background: var(--line);
   border: 1px solid var(--line);
-  max-width: 620px;
-  margin: 0 0 var(--sp-4);
+  max-width: 520px;
+  margin: var(--sp-5) 0 var(--sp-4);
 }
 .ledgerItem {
   background: var(--surface);

@@ -1,19 +1,17 @@
 import styles from "./Figure.module.css";
 
-// A committed figure, presented with the context DESIGN-SPEC requires of every
-// chart: what it shows, and a text alternative for readers who cannot see it. The
-// PNG is a pre-rendered engine artifact, lazy-loaded, never recomputed in the page.
+// A study figure, presented with the context a chart needs: what it shows, and a text
+// alternative for readers who cannot see it. The image is a rendered result, shown for
+// reading — not offered as a file to download.
 
 export function Figure({
   file,
   alt,
   caption,
-  source,
 }: {
   file: string;
   alt: string;
   caption: React.ReactNode;
-  source?: string;
 }) {
   return (
     <figure className={styles.figure}>
@@ -24,9 +22,6 @@ export function Figure({
       <figcaption className={styles.caption}>
         <span className={styles.figLabel}>Figure</span>
         <span className={styles.figText}>{caption}</span>
-        <a className={styles.figSource} href={source ?? `/figures/${file}`} download>
-          {file}
-        </a>
       </figcaption>
     </figure>
   );

@@ -7,27 +7,27 @@ import { RelatedExperiments } from "@/components/RelatedExperiments";
 import { FIGURE_COPY } from "@/lib/figure-copy";
 
 export const metadata: Metadata = {
-  title: "Calibration & market surface",
+  title: "Heston calibration",
   description:
-    "A synthetic surface recovered to machine precision, and a real SPY surface that every scenario fits and none identifies.",
+    "Fitting the Heston model to option prices — a controlled test it passes exactly, and a real market that reveals a limit of what the data can determine.",
 };
 
 export default function CalibrationPage() {
   return (
     <div className="page">
       <PageHeader
-        stage="Stage 05 — calibration"
-        title="Calibration & market surface"
-        lede="Two calibration experiments are deliberately paired, and the contrast between them is the finding: a synthetic surface the calibrator recovers exactly, and a real surface it fits well and pins down only in part."
+        stage="Heston calibration"
+        title="Fitting a model to a market"
+        lede="Calibration finds the model parameters that best reproduce a set of observed option prices. Two versions of the exercise are run side by side, and the contrast between them is the finding: one the model recovers perfectly, one it fits well while leaving half its parameters undetermined."
       />
 
-      <Section idx="05.1" title="Synthetic recovery — the control" id="synthetic">
+      <Section idx="A" title="The controlled test" id="synthetic">
         <p>
-          A surface is generated from known Heston parameters, and the calibrator is asked to
-          recover them. It does, to near machine precision — and the headline is read from a{" "}
-          <strong>blind</strong> start, one that did not begin at the answer. A start seeded at
-          the truth recovering the truth would prove nothing about calibration. This is the
-          control that shows the optimiser itself is sound.
+          First, a fair test with a known answer. A set of option prices is manufactured from chosen
+          Heston parameters, and the calibration is asked to recover them — starting from a guess
+          that deliberately does <em>not</em> begin at the answer. It recovers them essentially
+          exactly. This confirms the fitting procedure itself is sound: when the parameters really
+          are determined by the data, it finds them.
         </p>
         <Figure
           file="exp11_recovery.png"
@@ -37,25 +37,23 @@ export default function CalibrationPage() {
         <RelatedExperiments ids={["EXP-11"]} />
       </Section>
 
-      <Section idx="05.2" title="A real surface, and what it does not determine" id="market">
+      <Section idx="B" title="A real market" id="market">
         <p>
-          The same calibrator is pointed at a real SPY option surface with documented
-          provenance and timestamp — quotes across three maturities, none excluded by the
-          validation filters. Seven scenarios vary the initial guess, the quote weighting, the
-          parameter bounds, and the strike/maturity subset. <strong>All seven converge, and all
-          seven fit</strong>, with no scenario leaning on a bounds penalty.
+          Then the same procedure is turned on a real S&amp;P 500 option market — a genuine set of
+          quotes across several maturities. To test how stable the result is, the fit is repeated
+          seven times under different reasonable choices of starting guess, weighting, and which
+          quotes to include. <strong>All seven fit the market well.</strong> A reader stopping there
+          would conclude the model was pinned down.
         </p>
-        <p>
-          A reader stopping at the fit quality would conclude the model was pinned down. It is
-          not. Across those same scenarios:
-        </p>
+        <p>It was not. Look at how much the fitted parameters disagree across those seven fits:</p>
         <DispersionTable />
         <p>
-          The parameters governing the short end are determined by this surface. The pair
-          governing the long-run variance level is not: <span className="numeric">κ</span> and{" "}
-          <span className="numeric">θ</span> trade off against each other along a valley the
-          data does not resolve, because three maturities carry little information about a
-          long-run level. <strong>A good fit is not an identified parameter set.</strong>
+          The parameters controlling near-term behaviour — the correlation and the current
+          volatility level — are tightly determined. But mean reversion and the long-run variance
+          level swing by more than their own size from one fit to the next. Those two parameters
+          trade off against each other in a way this market cannot separate, because a handful of
+          maturities carries almost no information about the long run.{" "}
+          <strong>A good fit is not the same as a determined model.</strong>
         </p>
         <Figure
           file="exp12_parameter_dispersion.png"
@@ -64,12 +62,12 @@ export default function CalibrationPage() {
         />
       </Section>
 
-      <Section idx="05.3" title="Model error, reported not hidden" id="residual">
+      <Section idx="C" title="What the model cannot capture" id="residual">
         <p>
-          Because a real surface is not generated by Heston, the fit carries genuine model
-          error. The engine reports the implied-volatility residual by strike and maturity
-          rather than summarising it into a single number, so a reader can see where the model
-          tracks the smile and where it cannot.
+          Because a real market is not generated by the Heston model, the best fit still leaves a
+          gap between model and market. That gap is reported strike by strike rather than hidden in
+          a single average, so a reader can see where the model tracks the volatility smile and
+          where it cannot.
         </p>
         <Figure
           file="exp12_residual_surface.png"
@@ -77,10 +75,10 @@ export default function CalibrationPage() {
           caption={FIGURE_COPY["exp12_residual_surface.png"].caption}
         />
         <p>
-          This is why the record keeps objective value, surface fit, parameter dispersion, and
-          penalty reliance as four separate findings, and why EXP-12 stands at a warning:
-          collapsing them into &ldquo;the calibration converged&rdquo; would state the one that
-          is true and hide the one that matters.
+          This is why the study reports the quality of the fit and the determinacy of the parameters
+          as two separate things. Treating a good fit as a determined model would state the part
+          that is true and quietly hide the part that matters — which is exactly the caveat this
+          study exists to make visible.
         </p>
         <RelatedExperiments ids={["EXP-11", "EXP-12"]} />
       </Section>

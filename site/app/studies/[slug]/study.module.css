@@ -33,10 +33,25 @@
 }
 .question {
   font-size: var(--step-1);
-  color: var(--ink-dim);
+  color: var(--ink);
   max-width: var(--measure);
   line-height: 1.5;
   margin: 0;
+}
+.qlabel {
+  display: block;
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.68rem;
+  color: var(--accent);
+  margin-bottom: var(--sp-2);
+}
+
+.lead {
+  font-size: var(--step-1);
+  color: var(--ink);
+  line-height: 1.55;
 }
 
 .limitations {
@@ -83,8 +98,10 @@
   align-items: flex-end;
 }
 .pagerDir {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.68rem;
   color: var(--accent);
 }
 .pagerName {

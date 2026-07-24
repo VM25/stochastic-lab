@@ -3,13 +3,30 @@ import "../styles/globals.css";
 import { display, body, mono, label } from "./fonts";
 import { SiteNav } from "@/components/SiteNav";
 
+const SITE_URL = "https://diffusionworks.netlify.app";
+const DESCRIPTION =
+  "A study of stochastic models, numerical pricing methods, calibration and validation — fifteen investigations of how derivative-pricing methods behave, and where they fall short.";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "DiffusionWorks — Stochastic Derivatives Numerics",
     template: "%s · DiffusionWorks",
   },
-  description:
-    "A read-only presentation of the DiffusionWorks stochastic-derivatives engine: fifteen numerical experiments, ten pass and five warning, every number traceable to a committed artifact.",
+  description: DESCRIPTION,
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: SITE_URL,
+    siteName: "DiffusionWorks",
+    title: "DiffusionWorks — Stochastic Derivatives Numerics",
+    description: DESCRIPTION,
+  },
+  twitter: {
+    card: "summary",
+    title: "DiffusionWorks — Stochastic Derivatives Numerics",
+    description: DESCRIPTION,
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -26,10 +43,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
             <footer className="site-footer">
               <p>
-                Presentation layer only. Every figure and number derives from the committed
-                records at generator commit <code>3846fb3</code>; nothing here recomputes the
-                engine.
+                DiffusionWorks is a personal quantitative research project studying stochastic
+                models and the numerical methods used to price derivatives.
               </p>
+              <a href="https://github.com/VM25/stochastic-lab">GitHub ↗</a>
             </footer>
           </main>
         </div>

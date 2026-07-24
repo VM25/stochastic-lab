@@ -3,51 +3,50 @@ import Link from "next/link";
 import { PageHeader } from "@/components/PageHeader";
 import { Section } from "@/components/Section";
 import { StatusBadge } from "@/components/StatusBadge";
-import { ORDERED_RECORDS } from "@/lib/records.generated";
+import { ORDERED_RECORDS, STUDY_IDS } from "@/lib/records.generated";
 import styles from "./limitations.module.css";
 
 export const metadata: Metadata = {
-  title: "Limitations & failure regions",
+  title: "Limitations & findings",
   description:
-    "The five warning experiments, what each caveat means, and the regions where each method stops working.",
+    "The five flagged studies, what each caveat means for a reader, and the regions where each method stops being reliable.",
 };
 
-// Editorial framing for each warning — what the caveat means and why it is a warning
-// rather than a pass. Number-free; the specific figures live on each experiment's own
-// page, rendered from its record.
+// Plain-English framing for each flagged study — what the caveat means and why it is a
+// caveat rather than a clean pass. Keyed by the internal study id, not shown to readers.
 const WARNING_MEANING: Record<string, string> = {
   "EXP-02":
-    "The full-range convergence slopes fall short of theory while the asymptotic-window slopes cover it, because the error is only leading-order a power law. Both fits are published; the local orders climb toward theory as the grid refines, which is what distinguishes this from a wrong order.",
+    "The convergence rate looks slightly too slow if you measure it on coarse steps, and reaches its textbook value only once the steps are fine enough. Both estimates are shown, so the rate is never quoted before it has genuinely settled.",
   "EXP-07":
-    "Two caveats a bare pass would hide. One barrier arm's bias never cleared its own noise, so the experiment refuses to fit it rather than publish a fitted order for a curve of noise. And the closed-form continuity correction, reliable for down-barriers, is measurably wrong for up-barriers — kept in the record as a reference that fails there, not removed.",
+    "Two caveats a clean pass would hide. For one barrier the bias was too small to measure reliably, so the study declines to fit a number to noise rather than publish a shaky one. And a standard textbook correction, accurate for one type of barrier, turns out to be measurably wrong for the other — a useful thing to know before relying on it.",
   "EXP-10":
-    "Full truncation prices every regime without a single non-finite path, and its bias decays measurably where it can be resolved — but that is only one of the two regimes. In the benign regime the bias never clears the noise, so no decay order is fitted, and the scheme's order is established for one regime and not the other.",
+    "The pricing scheme handles the difficult, near-degenerate regime and its error shrinks in the expected way there. In the easy regime the error is already so small it cannot be measured, so the convergence rate is confirmed for one regime and left open for the other rather than assumed to hold for both.",
   "EXP-12":
-    "Every calibration scenario converges and fits the real surface well, and the parameters still disagree by more than an order of magnitude on the pair governing the long run. A good fit is not an identified parameter set, so the record reports fit quality and parameter dispersion as separate findings.",
+    "Every fit to the real market matches the observed prices well, yet the fitted parameters disagree by more than their own size from one fit to the next. A good fit is not a determined model, so the study reports fit quality and parameter certainty as two separate findings.",
   "EXP-14":
-    "The nominal 95% confidence interval covers at its claimed rate where the central limit theorem holds, and under-covers at a small sample with a severely skewed payoff. The degradation is expected and explained, and it is still a warning: quoting the interval in that regime would quote something the experiment disproved.",
+    "The reported 95% confidence interval is trustworthy in normal conditions and unreliable for a rare, extreme payoff when too few paths are used — where it covers the true value far less often than it claims. More paths restore it; the caveat is about knowing when it applies.",
 };
 
 const FAILURE_REGIONS = [
   {
     region: "Deep out-of-the-money, short maturity",
     detail:
-      "The worst region for every sampled estimator. Few paths pay, so relative noise is largest; the likelihood-ratio Greek variance is worst here, and it is where the confidence interval under-covers.",
+      "The hardest region for any simulation-based estimate. The option pays on very few paths, so every sampled quantity is noisy, and it is where a confidence interval is least reliable.",
   },
   {
-    region: "Up-and-out barriers near the spot",
+    region: "Barriers close to the current price",
     detail:
-      "The continuity correction is not usable, and the contract's tiny price makes the relative monitoring bias enormous.",
+      "A knock-out barrier just above the spot makes the contract nearly worthless and acutely sensitive to how it is monitored, and the usual closed-form correction does not apply there.",
   },
   {
-    region: "Long-run Heston parameters from a short-dated surface",
+    region: "Long-run volatility from a short-dated market",
     detail:
-      "Mean reversion and the long-run variance level are not identified: they trade off along a valley the data does not resolve.",
+      "A market with only a few maturities cannot separate how fast volatility reverts from the level it reverts to; those parameters are simply not determined by the data.",
   },
   {
-    region: "Plain Crank–Nicolson on a kinked payoff at coarse steps",
+    region: "A kinked payoff on a coarse grid",
     detail:
-      "The scheme oscillates. Use the Rannacher start-up, whose cost and benefit are both measured in EXP-06.",
+      "One popular grid-based scheme oscillates on coarse time steps near an option's payoff kink. A standard smoothing step fixes it, at a cost that is measured rather than assumed.",
   },
 ];
 
@@ -57,36 +56,39 @@ export default function LimitationsPage() {
   return (
     <div className="page">
       <PageHeader
-        stage="Stage 07 — the limits"
-        title="Limitations & failure regions"
-        lede="The five warnings are the most useful results in the programme, because each is a place where the obvious reading of a number would be wrong. None is a defect in the engine; each is a fact about the numerics that a project reporting only its successes would not have found."
+        stage="Limitations & findings"
+        title="Where the methods fall short"
+        lede="Five of the fifteen studies end in a caveat rather than a clean result, and these are the most useful findings in the project. Each is a place where the obvious reading of a number would be wrong — and none is a malfunction, only an honest limit worth stating out loud."
       />
 
-      <Section idx="07.1" title="The five warnings" id="warnings">
+      <Section idx="A" title="The five flagged studies" id="warnings">
         <ul className={styles.warnings}>
-          {warnings.map((r) => (
-            <li key={r.id} className={styles.warning}>
-              <div className={styles.warningHead}>
-                <Link href={`/experiments/${r.id.toLowerCase()}/`} className={styles.warningTitle}>
-                  <span className={styles.warningId}>{r.id}</span>
-                  <span>{r.name}</span>
+          {warnings.map((r) => {
+            const position = (STUDY_IDS as readonly string[]).indexOf(r.id) + 1;
+            return (
+              <li key={r.id} className={styles.warning}>
+                <div className={styles.warningHead}>
+                  <Link href={`/studies/${r.slug}/`} className={styles.warningTitle}>
+                    <span className={styles.warningId}>Study {String(position).padStart(2, "0")}</span>
+                    <span>{r.name}</span>
+                  </Link>
+                  <StatusBadge status={r.status} />
+                </div>
+                <p className={styles.warningQ}>{r.question}</p>
+                <p className={styles.warningMeaning}>{WARNING_MEANING[r.id]}</p>
+                <Link href={`/studies/${r.slug}/`} className={styles.warningMore}>
+                  Read the full study →
                 </Link>
-                <StatusBadge status={r.status} />
-              </div>
-              <p className={styles.warningQ}>{r.question}</p>
-              <p className={styles.warningMeaning}>{WARNING_MEANING[r.id]}</p>
-              <Link href={`/experiments/${r.id.toLowerCase()}/`} className={styles.warningMore}>
-                Full record & figures →
-              </Link>
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       </Section>
 
-      <Section idx="07.2" title="Known failure regions" id="regions">
+      <Section idx="B" title="Known trouble spots" id="regions">
         <p>
-          Independent of the experiment statuses, four regions are where a given method should
-          not be trusted without care:
+          Independent of the individual studies, four regions are where a given method should not be
+          trusted without care:
         </p>
         <dl className={styles.regions}>
           {FAILURE_REGIONS.map((f) => (
@@ -98,12 +100,12 @@ export default function LimitationsPage() {
         </dl>
       </Section>
 
-      <Section idx="07.3" title="What none of this is" id="not">
+      <Section idx="C" title="What this says about the project" id="conclusion">
         <p>
-          A warning is not a malfunction, and none of these regions is hidden. Every one is
-          measured, published, and kept in a committed record — which is the whole point of the
-          programme. The engine&apos;s value is not that it never falls short, but that it says
-          exactly where it does.
+          None of these is hidden, and none is a defect in the work — each was found by looking for
+          it and is reported in full. The value of the project is not that the methods never fall
+          short, but that it says clearly where they do. A number you can trust is one that comes
+          with an honest account of when it can be trusted.
         </p>
       </Section>
     </div>

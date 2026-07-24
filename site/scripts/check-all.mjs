@@ -10,7 +10,8 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const CHECKS = [
   ["Static export integrity", "check-export.mjs"],
   ["Broken internal links", "check-links.mjs"],
-  ["Artifact presentation & stale claims", "check-artifacts.mjs"],
+  ["Figures & stale claims", "check-artifacts.mjs"],
+  ["Public-facing: no exposed files or developer language", "check-public.mjs"],
   ["Accessibility regressions", "check-a11y.mjs"],
 ];
 

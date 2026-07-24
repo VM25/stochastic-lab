@@ -1,0 +1,7 @@
+.diagrams {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--sp-4);
+  margin: var(--sp-5) 0;
+  max-width: 620px;
+}

@@ -1,12 +1,10 @@
-// Copy the committed engine artifacts into the site and generate a typed data
-// module from them. This is the whole basis of the site's data-integrity claim:
-// the pages import records.generated.ts, which is produced here from the same
-// results/EXP-*.json the C++ engine wrote, so no displayed number is hand-authored.
-//
-// Reporting only. This script reads the committed records and copies them; it
-// computes nothing a record does not already state.
+// Read the committed study records and generate a typed data module the pages render
+// from. The records are the source of truth for every number the site shows, so no
+// figure caption or result is authored by hand — but the raw record files, their
+// checksums, and the repository mechanics around them are NOT exposed to visitors.
+// Only the rendered figures are copied into the site; nothing downloadable beyond
+// them is published.
 
-import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,18 +17,13 @@ const RESULTS = path.join(repo, "results");
 const FIGURES = path.join(repo, "docs", "figures");
 
 const PUBLIC_FIGURES = path.join(site, "public", "figures");
-const PUBLIC_ARTIFACTS = path.join(site, "public", "artifacts");
 const GENERATED = path.join(site, "lib", "records.generated.ts");
 
-const EXPERIMENT_IDS = Array.from({ length: 15 }, (_, i) => `EXP-${String(i + 1).padStart(2, "0")}`);
+const STUDY_IDS = Array.from({ length: 15 }, (_, i) => `EXP-${String(i + 1).padStart(2, "0")}`);
 
 function fail(message) {
   console.error(`prepare-artifacts: FAIL: ${message}`);
   process.exit(1);
-}
-
-function sha256(buffer) {
-  return createHash("sha256").update(buffer).digest("hex");
 }
 
 function resetDir(dir) {
@@ -38,81 +31,75 @@ function resetDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
+function slugify(name) {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 resetDir(PUBLIC_FIGURES);
-resetDir(PUBLIC_ARTIFACTS);
+// Any previously exposed raw artifacts must not linger.
+fs.rmSync(path.join(site, "public", "artifacts"), { recursive: true, force: true });
 fs.mkdirSync(path.dirname(GENERATED), { recursive: true });
 
-// 1. Copy every figure, and record which experiment each belongs to.
+// 1. Copy every rendered figure, and map each to its study.
 const figureFiles = fs
   .readdirSync(FIGURES)
   .filter((f) => f.endsWith(".png"))
   .sort();
-if (figureFiles.length !== 21) {
-  fail(`expected 21 committed figures, found ${figureFiles.length}`);
-}
+if (figureFiles.length !== 21) fail(`expected 21 figures, found ${figureFiles.length}`);
 for (const file of figureFiles) {
   fs.copyFileSync(path.join(FIGURES, file), path.join(PUBLIC_FIGURES, file));
 }
-const figuresByExperiment = {};
+const figuresByStudy = {};
 for (const file of figureFiles) {
   const m = file.match(/^exp(\d{2})_/);
-  if (!m) fail(`figure ${file} does not name an experiment`);
-  const id = `EXP-${m[1]}`;
-  (figuresByExperiment[id] ||= []).push(file);
+  if (!m) fail(`figure ${file} does not name a study`);
+  (figuresByStudy[`EXP-${m[1]}`] ||= []).push(file);
 }
 
-// 2. Read every record, copy its JSON and CSV for download, and collect the fields
-//    the site renders. Nothing is transformed; the record's own values are carried.
-const records = {};
-for (const id of EXPERIMENT_IDS) {
+// The records cross-reference one another by internal identifier (EXP-NN). Those
+// identifiers are a repository mechanic and must not reach a reader, so they are
+// replaced with the referenced study's actual name — a proper research cross-reference.
+const rawBydId = {};
+const idToName = {};
+for (const id of STUDY_IDS) {
   const jsonPath = path.join(RESULTS, `${id}.json`);
-  const csvPath = path.join(RESULTS, `${id}.csv`);
   if (!fs.existsSync(jsonPath)) fail(`${id}: no committed record`);
-  if (!fs.existsSync(csvPath)) fail(`${id}: no committed CSV`);
+  rawBydId[id] = JSON.parse(fs.readFileSync(jsonPath).toString());
+  idToName[id] = rawBydId[id].name;
+}
+const namesById = new RegExp(`\\b(${STUDY_IDS.join("|")})\\b`, "g");
+const sanitize = (text) =>
+  typeof text === "string" ? text.replace(namesById, (m) => `the ${idToName[m]} study`) : text;
 
-  const jsonBuf = fs.readFileSync(jsonPath);
-  const csvBuf = fs.readFileSync(csvPath);
-  fs.copyFileSync(jsonPath, path.join(PUBLIC_ARTIFACTS, `${id}.json`));
-  fs.copyFileSync(csvPath, path.join(PUBLIC_ARTIFACTS, `${id}.csv`));
-
-  const record = JSON.parse(jsonBuf.toString());
-  const figures = figuresByExperiment[id] || [];
-  if (figures.length === 0) fail(`${id}: no committed figure`);
+// 2. Collect only the fields the reader-facing pages need: the question, the finding,
+//    the interpretation and limitations, the results the figures and tables are drawn
+//    from, and the summary table. No configuration, reproduction command, provenance,
+//    or checksums — and no internal identifiers in the prose.
+const records = {};
+const slugs = {};
+for (const id of STUDY_IDS) {
+  const record = rawBydId[id];
+  const figures = figuresByStudy[id] || [];
+  if (figures.length === 0) fail(`${id}: no figure`);
+  const slug = slugify(record.name);
+  if (slugs[slug]) fail(`slug collision: ${slug}`);
+  slugs[slug] = id;
 
   records[id] = {
     id: record.id,
+    slug,
     name: record.name,
     question: record.question,
     status: record.status,
-    interpretation: record.interpretation,
-    limitations: record.limitations,
-    reproduction_command: record.reproduction_command,
-    configuration: record.configuration,
+    interpretation: sanitize(record.interpretation),
+    limitations: record.limitations.map(sanitize),
     results: record.results,
     table: record.table,
-    runtime_seconds: record.runtime_seconds,
-    build_metadata: record.build_metadata,
     figures,
-    json_sha256: sha256(jsonBuf),
-    csv_sha256: sha256(csvBuf),
   };
-}
-
-// 3. Copy the manifest, the reconciliation prose, and the technical paper for linking.
-const manifestBuf = fs.readFileSync(path.join(RESULTS, "MANIFEST.json"));
-fs.copyFileSync(path.join(RESULTS, "MANIFEST.json"), path.join(PUBLIC_ARTIFACTS, "MANIFEST.json"));
-const manifest = JSON.parse(manifestBuf.toString());
-
-// Cross-check: the generator commit and every record's provenance must agree, or
-// the site would present artifacts from more than one build as one set.
-const commits = new Set(Object.values(records).map((r) => r.build_metadata.git_commit_short));
-if (commits.size !== 1) fail(`records span more than one generator commit: ${[...commits].join(", ")}`);
-const generator = [...commits][0];
-if (manifest.generator_commit_short !== generator) {
-  fail(`manifest generator ${manifest.generator_commit_short} != records ${generator}`);
-}
-for (const [id, r] of Object.entries(records)) {
-  if (r.build_metadata.git_dirty) fail(`${id}: generated from a dirty tree`);
 }
 
 const statusCounts = Object.values(records).reduce((acc, r) => {
@@ -120,71 +107,47 @@ const statusCounts = Object.values(records).reduce((acc, r) => {
   return acc;
 }, {});
 
-// 4. Emit the typed module. Values are embedded verbatim from the records.
-const banner = `// GENERATED by scripts/prepare-artifacts.mjs from the committed engine records.
-// Do not edit. Every value here is copied verbatim from results/EXP-*.json at
-// generator commit ${generator}. Re-run \`npm run prepare-artifacts\` to refresh.
+const banner = `// GENERATED by scripts/prepare-artifacts.mjs from the committed study records.
+// Do not edit. Every value here is copied from the records so the pages never carry a
+// hand-authored number. Re-run \`npm run prepare-artifacts\` to refresh.
 `;
 
 const body = `${banner}
-export type ExperimentStatus = "pass" | "warning" | "fail" | "inconclusive";
+export type StudyStatus = "pass" | "warning" | "fail" | "inconclusive";
 
 export interface SummaryTable {
   headers: string[];
   rows: (string | number)[][];
 }
 
-export interface BuildMetadata {
-  compiler_id: string;
-  compiler_version: string;
-  build_flags: string;
-  build_type: string;
-  cxx_standard: string;
-  git_branch: string;
-  git_commit: string;
-  git_commit_short: string;
-  git_dirty: boolean;
-  cpu_brand: string;
-  logical_cores: number;
-  os_name: string;
-  os_version: string;
-  hostname: string;
-  version: string;
-  timestamp_utc: string;
-}
-
-export interface ExperimentRecord {
+export interface StudyRecord {
   id: string;
+  slug: string;
   name: string;
   question: string;
-  status: ExperimentStatus;
+  status: StudyStatus;
   interpretation: string;
   limitations: string[];
-  reproduction_command: string;
-  configuration: Record<string, unknown>;
   results: Record<string, unknown>;
   table: SummaryTable;
-  runtime_seconds: number;
-  build_metadata: BuildMetadata;
   figures: string[];
-  json_sha256: string;
-  csv_sha256: string;
 }
 
-export const GENERATOR_COMMIT = ${JSON.stringify(generator)};
 export const STATUS_COUNTS: Record<string, number> = ${JSON.stringify(statusCounts)};
-export const EXPERIMENT_IDS = ${JSON.stringify(EXPERIMENT_IDS)} as const;
+export const STUDY_IDS = ${JSON.stringify(STUDY_IDS)} as const;
+export const SLUGS: Record<string, string> = ${JSON.stringify(slugs)};
 
-export const MANIFEST = ${JSON.stringify(manifest)} as const;
+export const RECORDS: Record<string, StudyRecord> = ${JSON.stringify(records, null, 2)};
 
-export const RECORDS: Record<string, ExperimentRecord> = ${JSON.stringify(records, null, 2)};
-
-export const ORDERED_RECORDS: ExperimentRecord[] = EXPERIMENT_IDS.map((id) => RECORDS[id]);
+export const ORDERED_RECORDS: StudyRecord[] = STUDY_IDS.map((id) => RECORDS[id]);
+export const RECORD_BY_SLUG: Record<string, StudyRecord> = Object.fromEntries(
+  ORDERED_RECORDS.map((r) => [r.slug, r])
+);
 `;
 
 fs.writeFileSync(GENERATED, body);
 
 console.log(
-  `prepare-artifacts: OK — ${Object.keys(records).length} records, ${figureFiles.length} figures, ` +
-    `generator ${generator}, statuses ${JSON.stringify(statusCounts)}`
+  `prepare-artifacts: OK — ${Object.keys(records).length} studies, ${figureFiles.length} figures, ` +
+    `no raw artifacts exposed, statuses ${JSON.stringify(statusCounts)}`
 );

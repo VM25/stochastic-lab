@@ -33,7 +33,7 @@ export function DispersionTable() {
     <div className={styles.scroll}>
       <table className={styles.table}>
         <caption className={styles.caption}>
-          EXP-12 calibrated parameters across seven scenarios (from EXP-12.json)
+          Calibrated Heston parameters across seven fitting scenarios
         </caption>
         <thead>
           <tr>

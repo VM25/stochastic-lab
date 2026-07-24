@@ -191,14 +191,29 @@ img {
   padding-top: var(--sp-5);
   border-top: 1px solid var(--line);
   max-width: var(--content-max);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-5);
+  flex-wrap: wrap;
 }
 .site-footer p {
   font-size: var(--step--1);
   color: var(--ink-faint);
   max-width: var(--measure);
+  margin: 0;
 }
-.site-footer code {
+.site-footer a {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.72rem;
   color: var(--ink-dim);
+  border-bottom: none;
+  white-space: nowrap;
+}
+.site-footer a:hover {
+  color: var(--accent);
 }
 
 /* ---- Page container and section rhythm ---- */

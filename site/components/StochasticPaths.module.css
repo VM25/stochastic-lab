@@ -1,0 +1,69 @@
+.wrap {
+  position: relative;
+  width: 100%;
+  /* A wide, shallow band — the process running left to right. */
+  aspect-ratio: 1000 / 440;
+  max-height: 380px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--bg-2), var(--bg));
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.reference {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+  stroke-dasharray: 4 5;
+}
+
+.path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.1;
+  opacity: 0.32;
+  /* Draw the path in once, then rest. The base state (no motion) is fully drawn, so
+     under reduced-motion the paths simply appear. */
+  stroke-dasharray: 2600;
+  animation: draw 2.4s ease-out both;
+}
+.paths .path:nth-child(3n) {
+  stroke: var(--series-3);
+  opacity: 0.28;
+}
+.paths .path:nth-child(5n) {
+  stroke: var(--accent-dim);
+  opacity: 0.4;
+}
+
+@keyframes draw {
+  from {
+    stroke-dashoffset: 2600;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.hist rect {
+  fill: var(--accent);
+  opacity: 0.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .path {
+    /* Show the fully drawn paths with no animation. */
+    stroke-dasharray: none;
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .wrap {
+    aspect-ratio: 1000 / 520;
+  }
+}

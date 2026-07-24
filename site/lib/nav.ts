@@ -1,23 +1,21 @@
-// The primary navigation is the project's own pipeline, made into a table of
-// contents: Model -> Numerical Method -> Computation -> Error -> Validation ->
-// Evidence. Each stage names a real page, and the meta pages follow.
+// The site reads as a research project: what it studies, the models and instruments,
+// the methods, the studies and their results, calibration, validation, and what the
+// work concludes. Each entry is a section of that narrative.
 
 export interface NavItem {
   href: string;
   label: string;
-  stage: string;
+  index: string;
   blurb: string;
 }
 
 export const NAV: NavItem[] = [
-  { href: "/", label: "Overview", stage: "00", blurb: "What was built, and what it found" },
-  { href: "/models/", label: "Models & instruments", stage: "01", blurb: "Black–Scholes, Heston, and the contracts" },
-  { href: "/methods/", label: "Numerical methods", stage: "02", blurb: "Simulation, PDE, Greeks, calibration" },
-  { href: "/experiments/", label: "Experiment program", stage: "03", blurb: "Fifteen experiments, ten pass, five warn" },
-  { href: "/validation/", label: "Validation", stage: "04", blurb: "References, invariants, coverage" },
-  { href: "/calibration/", label: "Calibration & market surface", stage: "05", blurb: "A good fit that identifies little" },
-  { href: "/architecture/", label: "Architecture & reproducibility", stage: "06", blurb: "How a number traces to a commit" },
-  { href: "/limitations/", label: "Limitations & failure regions", stage: "07", blurb: "Where the numerics fall short" },
+  { href: "/", label: "Overview", index: "01", blurb: "What DiffusionWorks studies" },
+  { href: "/models/", label: "Stochastic models", index: "02", blurb: "Black–Scholes and Heston dynamics" },
+  { href: "/instruments/", label: "Derivative structures", index: "03", blurb: "The contracts and their payoffs" },
+  { href: "/methods/", label: "Numerical methods", index: "04", blurb: "Simulation, PDE, and calibration" },
+  { href: "/studies/", label: "Research studies & results", index: "05", blurb: "Fifteen investigations, five caveats" },
+  { href: "/calibration/", label: "Heston calibration", index: "06", blurb: "Fitting a model to a real market" },
+  { href: "/validation/", label: "Validation", index: "07", blurb: "How the results are checked" },
+  { href: "/limitations/", label: "Limitations & findings", index: "08", blurb: "Where the methods fall short" },
 ];
-
-export const SPINE = ["Model", "Numerical method", "Computation", "Error", "Validation", "Evidence"];

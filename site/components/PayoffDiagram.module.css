@@ -1,0 +1,44 @@
+.fig {
+  margin: 0;
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  padding: var(--sp-3);
+}
+.fig svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.fig figcaption {
+  font-family: var(--font-label);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 0.66rem;
+  color: var(--ink-dim);
+  text-align: center;
+  margin-top: var(--sp-2);
+}
+
+.axis {
+  stroke: var(--line-strong);
+  stroke-width: 1;
+}
+.payoff {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+.strike {
+  stroke: var(--ink-faint);
+  stroke-width: 1;
+}
+.barrier {
+  stroke: var(--status-warning);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+.tick {
+  fill: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}

@@ -7,105 +7,92 @@ import { RelatedExperiments } from "@/components/RelatedExperiments";
 export const metadata: Metadata = {
   title: "Numerical methods",
   description:
-    "Simulation and discretisation, variance reduction, finite differences, Greek estimators, characteristic-function pricing, and calibration.",
+    "How a model becomes a number: simulation, variance reduction, finite differences, sensitivities, and calibration.",
 };
 
 export default function MethodsPage() {
   return (
     <div className="page">
       <PageHeader
-        stage="Stage 02 — numerical method"
-        title="Numerical methods"
-        lede="Every price here is produced by more than one method, so the methods can be checked against each other. The programme measures the rate at which each converges, and refuses to fit where a rate is not resolved."
+        stage="Numerical methods"
+        title="Turning a model into a number"
+        lede="A model is a set of equations; a price is a single number. Several different methods bridge that gap, each with its own error and its own blind spots. The project prices the same contracts several ways precisely so the methods can be checked against one another."
       />
 
-      <Section idx="02.1" title="Monte Carlo and its error" id="monte-carlo">
+      <Section idx="A" title="Simulation" id="monte-carlo">
         <p>
-          A Monte Carlo price is the discounted sample mean of the payoff over{" "}
-          <InlineMath tex="N" /> paths, reported with the standard error that quantifies how
-          much it can be trusted:
+          The most direct method simulates thousands of possible price paths, values the option on
+          each, and averages. Because it is an average of random samples, it comes with a built-in
+          measure of its own reliability — a standard error that shrinks as more paths are added:
         </p>
         <EquationBlock
-          tex="\hat{V}_N = e^{-rT}\,\frac{1}{N}\sum_{i=1}^{N} g(S^{(i)}), \qquad \mathrm{SE} = \frac{s}{\sqrt{N}}"
-          describe="The estimator is the discounted average of the payoff g over N sampled terminal prices, and its standard error is the sample standard deviation divided by the square root of N."
+          tex="\text{price} \approx e^{-rT}\,\frac{1}{N}\sum_{i=1}^{N} \text{payoff}\big(S^{(i)}\big), \qquad \text{error} \sim \frac{1}{\sqrt{N}}"
+          describe="The price is approximated by the discounted average payoff over N simulated paths, and the statistical error shrinks in proportion to one over the square root of N."
         />
         <p>
-          The error decays as <InlineMath tex="N^{-1/2}" />, and EXP-01 confirms that rate
-          across every scenario. Randomness is a counter-based Philox stream: a path&apos;s
-          draws depend only on its index and the master seed, never on scheduling, which is
-          what lets a threaded run reproduce a serial one bit for bit.
+          That <InlineMath tex="1/\sqrt{N}" /> rate is a promise the theory makes, and the first
+          study confirms the method keeps it: to halve the error you need four times the paths. It
+          is reliable and general, but slow to reach high precision, which motivates the sharper
+          methods that follow.
         </p>
         <RelatedExperiments ids={["EXP-01", "EXP-04"]} />
       </Section>
 
-      <Section idx="02.2" title="Discretisation: Euler–Maruyama and Milstein" id="discretisation">
-        <p>Where the transition is not sampled exactly, the SDE is discretised. Euler–Maruyama takes</p>
-        <EquationBlock
-          tex="S_{t+\Delta t} = S_t + (r - q)\,S_t\,\Delta t + \sigma\,S_t\,\Delta W"
-          describe="The next price equals the current price plus the drift term times the time step plus sigma times the price times the Brownian increment."
-        />
-        <p>and Milstein adds the second-order correction</p>
-        <EquationBlock
-          tex="+\; \tfrac{1}{2}\sigma^2 S_t\big((\Delta W)^2 - \Delta t\big)"
-          describe="Plus one half sigma squared times the price times the Brownian increment squared minus the time step."
-        />
+      <Section idx="B" title="Discretising the path" id="discretisation">
         <p>
-          Euler–Maruyama is strong order <InlineMath tex="\tfrac{1}{2}" /> and Milstein strong
-          order 1; both are weak order 1. EXP-02 and EXP-03 measure these orders, and publish
-          both a full-range and an asymptotic-window fit where the two disagree, because a
-          theoretical order is an asymptotic statement.
+          A simulated path is built one small time step at a time, and there is more than one recipe
+          for taking a step. The simplest, Euler–Maruyama, moves the price by its drift and a random
+          shock; a refinement, Milstein, adds a correction term that makes each path more faithful
+          to the true dynamics. How quickly the error falls as the steps shrink — the{" "}
+          <em>order of convergence</em> — is a precise theoretical claim, and two studies measure it
+          directly, publishing both an honest full-range estimate and the sharper value that holds
+          once the steps are fine enough.
         </p>
         <RelatedExperiments ids={["EXP-02", "EXP-03"]} />
       </Section>
 
-      <Section idx="02.3" title="Variance reduction" id="variance-reduction">
+      <Section idx="C" title="Doing more with fewer paths" id="variance-reduction">
         <p>
-          Antithetic sampling, a geometric-Asian control variate, and their combination reduce
-          variance without bias. The engine ranks them by <em>work-normalised</em> efficiency —
-          reciprocal variance times deterministic work units — rather than by wall-clock time,
-          so the ranking is a property of the estimators and not of the machine.
+          Simulation error can be cut without simply adding paths, by using clever sampling tricks:
+          pairing each random path with its mirror image, or exploiting a related contract whose
+          answer is known exactly. The project measures how much each trick is worth in a way that
+          reflects the extra work it costs, so the comparison reflects the method rather than the
+          machine it happened to run on.
         </p>
         <RelatedExperiments ids={["EXP-05"]} />
       </Section>
 
-      <Section idx="02.4" title="Finite differences" id="finite-differences">
-        <p>The Black–Scholes price also solves a backward parabolic PDE:</p>
-        <EquationBlock
-          tex="\frac{\partial V}{\partial t} + \tfrac{1}{2}\sigma^2 S^2 \frac{\partial^2 V}{\partial S^2} + (r - q)S\frac{\partial V}{\partial S} - rV = 0"
-          describe="The time derivative of the value plus one half sigma squared S squared times the second spatial derivative plus the drift times the first spatial derivative minus r times the value equals zero."
-        />
+      <Section idx="D" title="Solving the pricing equation directly" id="finite-differences">
         <p>
-          The engine discretises it with explicit, fully implicit, and Crank–Nicolson time
-          stepping, plus an optional Rannacher start-up. Spatial and temporal orders are
-          measured <em>separately</em>, each with the other&apos;s error driven down and the
-          premise then verified — a joint sweep measures a mixture, not an order. Barrier
-          contracts are solved with an absorbing boundary at the barrier.
+          A price can also be found without simulation at all. Under Black–Scholes it satisfies a
+          differential equation, and solving that equation on a grid gives the price directly. The
+          project measures how the grid method converges as the grid is refined, and shows a
+          well-known instability in one popular scheme — and the standard fix for it — measured
+          rather than merely asserted.
         </p>
         <RelatedExperiments ids={["EXP-06", "EXP-07"]} />
       </Section>
 
-      <Section idx="02.5" title="Greeks" id="greeks">
+      <Section idx="E" title="Sensitivities" id="greeks">
         <p>
-          Four estimators of each sensitivity: analytic, central finite differences under
-          common random numbers, pathwise, and likelihood-ratio. No single one wins
-          everywhere, and the engine reports the trade-off per regime rather than declaring a
-          winner. EXP-08 corrects a textbook heuristic about how the finite-difference
-          variance behaves under common random numbers.
+          Traders care not only about a price but about how it moves as the market moves — the{" "}
+          &ldquo;Greeks.&rdquo; There are several ways to estimate them, from simple bumping of the
+          inputs to more refined formulas, and no single method is best everywhere. One study
+          compares them and overturns a textbook rule of thumb about how noisy the simple method
+          really is.
         </p>
         <RelatedExperiments ids={["EXP-08"]} />
       </Section>
 
-      <Section idx="02.6" title="Heston pricing and calibration" id="calibration">
+      <Section idx="F" title="Calibration" id="calibration">
         <p>
-          Heston prices come from integrating the characteristic function; the engine checks
-          the function&apos;s own invariants — <InlineMath tex="\varphi(0)=1" />, conjugate
-          symmetry, and the martingale identity{" "}
-          <InlineMath tex="\varphi_2(-i) = S_0 e^{(r-q)T}" /> — before trusting a price.
-          Calibration minimises a weighted objective by Levenberg–Marquardt from multiple
-          starts, reporting convergence, fit, parameter dispersion, and penalty reliance
-          separately.
+          Finally, a model is only useful once its parameters are set to match the market. Calibration
+          searches for the parameter values that best reproduce a set of observed option prices. The
+          project runs this both on a controlled test with a known answer and on a real market — and
+          reports not just how well the fit matches, but whether the fit actually determines the
+          parameters, which turns out to be a subtler question.
         </p>
-        <RelatedExperiments ids={["EXP-09", "EXP-11", "EXP-12"]} />
+        <RelatedExperiments ids={["EXP-11", "EXP-12"]} />
       </Section>
     </div>
   );
