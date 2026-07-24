@@ -1,19 +1,31 @@
-# Netlify build for the public results site.
+# Netlify configuration for the public results site (diffusionworks.netlify.app).
 #
-# The site lives in site/ and is a static export: Netlify runs the build there and
-# serves the emitted files. prepare-artifacts (run by the build's prebuild step) reads
-# ../results and ../docs/figures relative to the base, which resolve to the committed
-# engine artifacts at the repository root.
+# Deployment is continuous from Git: every push to `main` triggers an automatic
+# production build and publish, and pull requests get Deploy Previews. This file is the
+# reproducible source of those build settings — base directory, build command, publish
+# directory, and Node version — so the deployment does not depend on anything typed into
+# the Netlify dashboard. See site/DEPLOYMENT.md for the workflow and the one-time repo
+# connection steps.
+#
+# The site lives in site/ and is a static export. prepare-artifacts (run by the build's
+# prebuild step) reads ../results and ../docs/figures relative to the base, which resolve
+# to the committed study data at the repository root.
 
 [build]
   base = "site"
   command = "npm run build"
+  # Resolved relative to `base`, i.e. site/out.
   publish = "out"
 
 [build.environment]
+  # Pinned to the Node version the CI build uses, so Netlify, CI, and local builds match.
   NODE_VERSION = "20"
   # The site is a static export; no Next.js runtime is deployed.
   NEXT_TELEMETRY_DISABLED = "1"
+
+# Deploy Previews for pull requests build exactly as production does.
+[context.deploy-preview]
+  command = "npm run build"
 
 # Conservative security headers for a fully self-contained static site. Everything the
 # pages load — fonts, styles, scripts, figures — is same-origin, so nothing external is
@@ -29,8 +41,8 @@
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     Content-Security-Policy = "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self'; base-uri 'self'; frame-ancestors 'none'"
 
-# Long-cache the fingerprinted framework assets; the artifacts and figures are content
-# a reader may want fresh, so they are left to the default.
+# Long-cache the fingerprinted framework assets; the figures and pages are content a
+# reader may want fresh, so they are left to the default.
 [[headers]]
   for = "/_next/static/*"
   [headers.values]
