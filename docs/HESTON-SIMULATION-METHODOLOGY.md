@@ -137,6 +137,25 @@ In the default study (`configs/experiment/heston_simulation.json`, spot 100, str
 The Feller condition is reported, never treated as automatic invalidity: the violating
 regime is priced, with its bias measured and its uncertainty attached.
 
+## 7.1 Status: why this is a warning
+
+`EXP-10` reports **`warning`**, and the reason is the sentence above about resolution.
+
+A `fail` is reserved for full truncation producing a non-finite path, or for prices not
+approaching the reference as the step shrinks. Neither happens. What does happen is that
+only **one of the two regimes resolves a decay order**: the Feller-violating regime gives
+≈ 1.09, and the Feller-satisfying regime's bias never clears the sampling noise, so no
+order is fitted there.
+
+"Full truncation converges at first order" is therefore established for the regime that
+resolved and not for the other, and a reader quoting a single order for the scheme should
+know that. An earlier revision required only that *some* regime resolve, which let one
+measured order stand in for both; the condition now requires every regime to resolve
+before the record passes.
+
+This is a statement about resolution at this path count, not evidence the scheme fails to
+converge in the benign regime — where the bias is, if anything, reassuringly small.
+
 ## 8. Limitations
 
 - Full truncation is one of several fixes for the CIR positivity problem. This study

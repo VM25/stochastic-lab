@@ -383,6 +383,24 @@ record if any fitted order drops below 1.5, because that is what a real defect �
 a barrier boundary half a cell out of place, a wrong live-index range — would look
 like. The arm passing is a standing regression on the engine, not a one-time check.
 
+## 8.1 Status: why this is a warning
+
+`EXP-07` reports **`warning`**. Both arms worked — the bridge reproduces the continuous
+price and the PDE arm converges at order ~2 — so this is not a `fail`, and the coarse
+bias resolved, so it is not `inconclusive`. Two measured facts nonetheless change what
+may be quoted from the record, and both are described above:
+
+1. **An arm has no fitted order.** The B=70 bias never clears its own across-seed noise,
+   so §4 refuses to fit it (see "Resolution, and refusing to fit noise"). A reader
+   quoting a decay order for every barrier would be quoting one that does not exist.
+2. **The continuity correction is not an oracle everywhere.** Tallied per geometry, it
+   is resolved as wrong at 23 of 24 up-barrier cells against 2 of 18 down-barrier ones
+   (§6.2). It is kept in the record — where an approximation breaks down is a result —
+   but it must not be carried into the up-barrier geometry as a reference.
+
+Neither is a defect in the engine. They are what was found, and a bare `pass` would
+invite a reader to ignore both.
+
 ## 9. Limitations
 
 * **Calls only.** Puts are a separate set of cases the analytic engine does not

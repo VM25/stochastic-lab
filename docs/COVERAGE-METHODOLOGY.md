@@ -41,14 +41,27 @@ the coverage degrades most at a small sample on a deeply out-of-the-money option
 
 ## 4. Status
 
-`pass` requires two things. First, the intervals must be **defensible where the central limit
-theorem should hold** -- at the largest sample, across every moneyness. A large-sample
-under-coverage would be a real methodology failure and fails the record. Second, the sweep
-must actually **reach the regime where coverage degrades** -- some small-sample skewed cell
-must under-cover -- otherwise the experiment has not exercised the defect it exists to detect,
-and the result is `inconclusive` rather than a clean pass. The intervals are not revised: they
-are correct where they are used at production path counts, and the small-sample under-coverage
-is a documented property of the normal approximation, not a bug.
+The status describes **what was measured**, not whether the sweep ran.
+
+- **`fail`** -- under-coverage at the largest sample, where the central limit theorem should
+  hold. That would be a real methodology failure.
+- **`warning`** -- a resolved under-coverage anywhere. This is the current result: the
+  reported 95% interval is not worth 95% in the small-sample skewed corner, so a reader
+  quoting it there would be quoting something this experiment disproved.
+- **`inconclusive`** -- nothing under-covered, but nothing stressed the interval either
+  (maximum payoff skewness below `kStressSkewness = 5`). A sweep of mild payoffs cannot
+  license "the intervals are calibrated".
+- **`pass`** -- the sweep reached a genuinely skewed payoff and nothing under-covered.
+
+An earlier revision had this inverted: it made *observing* the degradation the `pass`
+condition and "no degradation anywhere" `inconclusive`. That let the experiment earn a pass
+for successfully finding its own target defect, which describes the harness rather than the
+finding. The guard against a too-easy sweep was a real concern and is kept — it is now the
+`inconclusive` branch, gated on payoff skewness rather than on having found a failure.
+
+The intervals themselves are not revised: they are correct where they are used at production
+path counts, and the small-sample under-coverage is a documented property of the normal
+approximation, not a bug in the estimator.
 
 ## 5. Limitations
 

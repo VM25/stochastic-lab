@@ -175,6 +175,26 @@ whenever the best fit left any quote unpriceable — and the `calibrate` command
 penalized-quote count shown. A low objective bought partly with penalty mass is not a
 good fit, and the pipeline refuses to present it as one.
 
+### 8.1 Dispersion gates the status, not just the report
+
+Penalty reliance and convergence are properties of the *solver*. On their own they
+cannot answer the question EXP-12 asks, which is whether the surface determines the
+parameters. So the status also reads the finding: **a parameter whose spread across the
+scenarios exceeds half its own mean (`kDispersionWarning = 0.50`) is treated as not
+identified by that surface, and the record warns.**
+
+This is what the real SPY surface does. All seven scenarios converge, none leans on a
+penalty, and every one fits — and mean reversion still varies by 145% of its mean and
+long-run variance by 95%. Reporting that as a pass because the solver succeeded would
+state the solver's health in place of the answer. The four quantities — objective value,
+surface fit, parameter dispersion, penalty reliance — are reported separately *and*
+gate separately, because collapsing them into "the calibration converged" hides the one
+that matters.
+
+`EXP-11` needs no such gate: it already warns when a synthetic surface is fitted well
+from parameters materially away from the truth, which is the same failure detected
+against a known answer.
+
 ## 9. Limitations
 
 - Synthetic recovery bounds the calibration's accuracy under the model's own
