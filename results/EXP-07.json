@@ -7,14 +7,14 @@
     "cpu_brand": "Apple M1",
     "cxx_standard": "20",
     "git_branch": "main",
-    "git_commit": "ee713508c7f74df3b01422b1ce8c0da8aa276aca",
-    "git_commit_short": "ee71350",
-    "git_dirty": true,
+    "git_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+    "git_commit_short": "3846fb3",
+    "git_dirty": false,
     "hostname": "MacBookPro",
     "logical_cores": 8,
     "os_name": "Darwin",
     "os_version": "25.5.0",
-    "timestamp_utc": "2026-07-17T17:42:46Z",
+    "timestamp_utc": "2026-07-24T00:59:27Z",
     "version": "0.1.0"
   },
   "configuration": {
@@ -111,6 +111,7 @@
   "id": "EXP-07",
   "interpretation": "Discrete monitoring biases a knock-out upward, and by far more than intuition allows. The barrier is unobserved between fixes, so excursions that would have killed the option go unseen and it survives paths it should not -- making it worth more than the continuously monitored contract the closed form prices. Every one of the 42 resolved cells is biased high, across both barrier directions.\n\nThe size is the finding, and it is worst exactly where the contract is cheapest. An up-and-out call struck at the spot with its barrier 5% above knocks out in precisely the states where it would have paid, so what survives is worth almost nothing -- 0.0088 here -- and daily monitoring biases that by +67% of its own value. A down-and-out 0.26 sigma*sqrt(T) away is biased +10.1% at the same frequency; further out, +3.0% and +0.28%. The bias tracks sigma*sqrt(dt), the distance the price can wander unobserved: at daily monitoring a down-and-out at B=90 runs +0.30%, +3.01%, +10.03% of price at volatilities of 0.1, 0.2 and 0.4. None of this is about the calendar.\n\nThe decay rate needs care, and this experiment is a good illustration of why a fitted slope is not a measured order. Theory (Broadie-Glasserman-Kou) says the bias decays as O(1/sqrt(m)) -- order 0.5 against the monitoring interval. Almost no fitted interval here contains 0.5, and, revealingly, they miss it from *both sides*: down-barriers come in low (0.248, 0.395, 0.437 as the barrier nears the spot) while close up-barriers come in high (0.630 at B=105, 0.552 at B=110). A single-direction study would have read its own miss as a signed correction to theory; seeing both signs shows it for what it is -- the higher-order terms the asymptotic statement discards, which carry opposite signs for the two geometries. The local orders climb monotonically toward 0.5 for down-barriers (0.342, 0.375, 0.390, 0.431, 0.435 at B=90) and the asymptotic-window fits recover 0.5 at five of the seven fitted arms. The measured statement is that the bias decays at a rate approaching 0.5 over the frequencies tested, not that it decays at 0.5, and not that theory is wrong.\n\nWhat settles that is a check needing no fit: the same theory predicts the bias's *size* in closed form, by moving the barrier away from the spot through the mean overshoot exp(+/- beta*sigma*sqrt(dt)). It was not fitted to this data -- beta is -zeta(1/2)/sqrt(2*pi) -- and for down-barriers it lands within 2 across-seed standard errors at 16 of 18 resolved cells. A theory with the rate wrong could not predict the size to within its noise across three barriers and six frequencies.\n\nFor up-barriers the same correction is resolved as *wrong* at 23 of the 24 cells, and that is the most informative result here. It is not a sign error: the shift direction was checked independently, and reversing it misses by an order of magnitude rather than a few percent. The residual is systematically negative -- the correction over-predicts -- and small in absolute terms (0.0006 to 0.008), running -275 standard errors at B=105, m=5 and draining to -5.4 by m=250. The single cell that does *not* disagree is the farthest up-barrier at the finest monitoring, B=140 at m=250 -- exactly where an o(1/sqrt(m)) remainder should have drained away, which is the behaviour the theory predicts rather than an exception to it. Two things make it visible. First, an up-and-out call near the spot pays on almost no paths, so the estimator's variance collapses and a remainder that would hide under a down-barrier's noise is glaring here: the same absolute error is 0.1% of a down-barrier price and 4% of this one. Second, the geometry is genuinely harder. An up-and-out call pays B-K *just below* its barrier and zero at it, so the value is discontinuous across the boundary -- while a down-and-out call struck above its barrier approaches zero smoothly there. A continuity correction built on an overshoot argument is weakest exactly where the value jumps. So the experiment does not merely use the correction as an oracle; it locates where the oracle stops being trustworthy, and the answer is not where a down-barrier-only study would have suggested.\n\nThe Brownian-bridge correction removes the bias rather than shrinking it, in both directions. Between two observed points log-GBM is a Brownian bridge whose crossing probability is known exactly, so a simulation can account for the excursions it did not observe instead of pretending they did not happen -- and because log-GBM is exactly Brownian motion with drift, that correction is exact rather than asymptotic. No bridge cell shows a bias this run can resolve: the largest across all 48 is 2.4 across-seed standard errors, against a discrete arm reaching 563. It holds at m=5 as well as m=250, which is the point -- it is a correction, not a refinement, and five observations with the bridge beat 250 without it.\n\nThe PDE arm answers a different question and anchors the whole record. It prices the *continuous* contract directly -- solving the Black-Scholes equation with an absorbing boundary at the barrier -- rather than measuring a monitoring bias, and it converges to the same analytic reference the discrete arm measures against, at the second order Crank-Nicolson with Rannacher smoothing predicts. Two independent routes therefore reach one continuous price: the closed form the analytic engine evaluates, and the grid the PDE refines toward it. The Monte Carlo bias and the PDE's grid error are then errors against the same number, which is what lets the two arms sit in one experiment without conflating the discretisation of a path with the discretisation of an observation. The fitted orders are in `pde_convergence`; the arm fails the record if any falls below a second-order floor, since a misplaced barrier boundary would show up there first.\n\nThe practical reading is that the monitoring convention is a contract term worth more than most modelling choices, and that its cost is not uniform: it concentrates in the cheap, nearly-knocked-out contracts where a relative error is largest and a trader's intuition is weakest. It is a term of the contract, not an approximation to be tuned away, and a system that leaves it implicit will silently price one contract and report another.",
   "limitations": [
+    "The continuity correction is resolved as wrong at 23 of 24 resolved up_and_out cells, so it is not an oracle in that geometry. It is kept in the record as a measured reference that fails here, not removed, because where an approximation breaks down is itself a result.",
     "The path is simulated with the exact scheme at exactly the monitoring dates, so it carries no path-discretisation error: log-GBM is Brownian motion with drift, and the exact scheme samples the true joint law of the price at any finite set of dates. What is measured here is therefore monitoring bias alone. A production simulation on a finer path grid, or with Euler steps, would additionally carry a path error this experiment cannot see and does not bound.",
     "The Brownian-bridge correction is exact for geometric Brownian motion and for that reason only. Under Heston, or any model whose log-price is not Brownian motion with constant coefficients, the bridge law is an approximation, and nothing measured here says how good an approximation it is.",
     "Calls only. Puts are a separate set of cases the analytic engine does not implement, so no trusted continuous reference exists for them.",
@@ -127,6 +128,7 @@
   "question": "How much error results from discrete barrier monitoring?",
   "reproduction_command": "diffusionworks experiment --id EXP-07 --config configs/experiment/barrier.json",
   "results": {
+    "any_arm_refused_its_fit": true,
     "arms": [
       {
         "barrier": 70.0,
@@ -158,7 +160,7 @@
             "price": 10.458479758624861,
             "relative_bias": 0.0008466210568997035,
             "rmse": 0.025720729227794198,
-            "runtime_seconds": 0.7152021669999999,
+            "runtime_seconds": 0.722203457,
             "seed_count": 16
           },
           {
@@ -181,7 +183,7 @@
             "price": 10.44598138974912,
             "relative_bias": -0.00034943712236783773,
             "rmse": 0.026019746283695296,
-            "runtime_seconds": 1.514957418,
+            "runtime_seconds": 1.5504660409999997,
             "seed_count": 16
           },
           {
@@ -204,7 +206,7 @@
             "price": 10.44670766977808,
             "relative_bias": -0.0002799341994095066,
             "rmse": 0.031191317951101565,
-            "runtime_seconds": 3.1377370410000003,
+            "runtime_seconds": 3.1858912509999993,
             "seed_count": 16
           },
           {
@@ -227,7 +229,7 @@
             "price": 10.45841765157376,
             "relative_bias": 0.0008406775896200992,
             "rmse": 0.01883529178182655,
-            "runtime_seconds": 6.344641294999999,
+            "runtime_seconds": 6.242879999,
             "seed_count": 16
           },
           {
@@ -250,7 +252,7 @@
             "price": 10.46213515145514,
             "relative_bias": 0.0011964317031174666,
             "rmse": 0.03001651703281458,
-            "runtime_seconds": 13.348008541,
+            "runtime_seconds": 12.34980054,
             "seed_count": 16
           },
           {
@@ -273,7 +275,7 @@
             "price": 10.459459214063003,
             "relative_bias": 0.0009403521429051225,
             "rmse": 0.029411464977001766,
-            "runtime_seconds": 39.38746087499999,
+            "runtime_seconds": 30.757822539999996,
             "seed_count": 16
           }
         ],
@@ -329,7 +331,7 @@
             "price": 10.457673998698432,
             "relative_bias": 0.0007695121349185846,
             "rmse": 0.025436410780283334,
-            "runtime_seconds": 0.984471999,
+            "runtime_seconds": 1.049970877,
             "seed_count": 16
           },
           {
@@ -347,7 +349,7 @@
             "price": 10.4452623822611,
             "relative_bias": -0.00041824408394404205,
             "rmse": 0.026191495477791687,
-            "runtime_seconds": 2.8718575000000004,
+            "runtime_seconds": 2.210776498,
             "seed_count": 16
           },
           {
@@ -365,7 +367,7 @@
             "price": 10.446047823978217,
             "relative_bias": -0.0003430795565218502,
             "rmse": 0.031247478100872278,
-            "runtime_seconds": 5.757610997999999,
+            "runtime_seconds": 4.697848041,
             "seed_count": 16
           },
           {
@@ -383,7 +385,7 @@
             "price": 10.457957366249712,
             "relative_bias": 0.000796629599670645,
             "rmse": 0.01857691128751583,
-            "runtime_seconds": 12.298392167,
+            "runtime_seconds": 9.175866123999999,
             "seed_count": 16
           },
           {
@@ -401,7 +403,7 @@
             "price": 10.461733929064076,
             "relative_bias": 0.001158035867044399,
             "rmse": 0.029846760409201898,
-            "runtime_seconds": 18.426150502000002,
+            "runtime_seconds": 17.956477662999994,
             "seed_count": 16
           },
           {
@@ -419,7 +421,7 @@
             "price": 10.459203537211845,
             "relative_bias": 0.0009158845990105091,
             "rmse": 0.02935351522848832,
-            "runtime_seconds": 47.025600832,
+            "runtime_seconds": 43.051193208,
             "seed_count": 16
           }
         ],
@@ -471,7 +473,7 @@
             "price": 10.437530783933495,
             "relative_bias": 0.008326027301174236,
             "rmse": 0.08949360740040771,
-            "runtime_seconds": 0.6908162500000002,
+            "runtime_seconds": 0.7105484579999999,
             "seed_count": 16
           },
           {
@@ -494,7 +496,7 @@
             "price": 10.410009391648076,
             "relative_bias": 0.005667301140417018,
             "rmse": 0.06389903969690044,
-            "runtime_seconds": 1.5419153319999999,
+            "runtime_seconds": 1.560678417,
             "seed_count": 16
           },
           {
@@ -517,7 +519,7 @@
             "price": 10.39714459534544,
             "relative_bias": 0.0044244871821728735,
             "rmse": 0.05527345862034163,
-            "runtime_seconds": 3.223117625,
+            "runtime_seconds": 3.218299458,
             "seed_count": 16
           },
           {
@@ -540,7 +542,7 @@
             "price": 10.398219579218582,
             "relative_bias": 0.004528336860861834,
             "rmse": 0.049789788332738005,
-            "runtime_seconds": 6.405831543,
+            "runtime_seconds": 6.292616624999999,
             "seed_count": 16
           },
           {
@@ -563,7 +565,7 @@
             "price": 10.392648701578272,
             "relative_bias": 0.003990157761233894,
             "rmse": 0.04962302279359881,
-            "runtime_seconds": 12.588466248000001,
+            "runtime_seconds": 12.375003750999998,
             "seed_count": 16
           },
           {
@@ -586,7 +588,7 @@
             "price": 10.38010630793884,
             "relative_bias": 0.0027784897706817917,
             "rmse": 0.03968907264608964,
-            "runtime_seconds": 31.380026999,
+            "runtime_seconds": 30.836981831999996,
             "seed_count": 16
           }
         ],
@@ -642,7 +644,7 @@
             "price": 10.358168815771728,
             "relative_bias": 0.0006592007564768904,
             "rmse": 0.024720746449036927,
-            "runtime_seconds": 0.967488918,
+            "runtime_seconds": 1.0153153339999998,
             "seed_count": 16
           },
           {
@@ -660,7 +662,7 @@
             "price": 10.348002741646308,
             "relative_bias": -0.0003229009827500409,
             "rmse": 0.02508652240849635,
-            "runtime_seconds": 2.095314666,
+            "runtime_seconds": 2.182292746,
             "seed_count": 16
           },
           {
@@ -678,7 +680,7 @@
             "price": 10.345874391375133,
             "relative_bias": -0.0005285119666181488,
             "rmse": 0.031010700332320326,
-            "runtime_seconds": 4.378788835,
+            "runtime_seconds": 4.552865377,
             "seed_count": 16
           },
           {
@@ -696,7 +698,7 @@
             "price": 10.360095571826266,
             "relative_bias": 0.0008453365694644756,
             "rmse": 0.019240555618724654,
-            "runtime_seconds": 8.640631498000001,
+            "runtime_seconds": 8.968591624,
             "seed_count": 16
           },
           {
@@ -714,7 +716,7 @@
             "price": 10.363536064848853,
             "relative_bias": 0.0011777081555452166,
             "rmse": 0.030127105010385385,
-            "runtime_seconds": 17.087393582999997,
+            "runtime_seconds": 17.634575040999998,
             "seed_count": 16
           },
           {
@@ -732,7 +734,7 @@
             "price": 10.360629401569577,
             "relative_bias": 0.000896907619693814,
             "rmse": 0.029034860294911397,
-            "runtime_seconds": 42.176637125000006,
+            "runtime_seconds": 44.684351833,
             "seed_count": 16
           }
         ],
@@ -784,7 +786,7 @@
             "price": 9.884109616260096,
             "relative_bias": 0.14063146313043762,
             "rmse": 1.2188694832170341,
-            "runtime_seconds": 0.7066250829999999,
+            "runtime_seconds": 0.7039887919999999,
             "seed_count": 16
           },
           {
@@ -807,7 +809,7 @@
             "price": 9.56868027207251,
             "relative_bias": 0.10423075043669328,
             "rmse": 0.9036110793682168,
-            "runtime_seconds": 1.5480132500000001,
+            "runtime_seconds": 1.538155708,
             "seed_count": 16
           },
           {
@@ -830,7 +832,7 @@
             "price": 9.351236316236106,
             "relative_bias": 0.0791376032414686,
             "rmse": 0.6862972182935776,
-            "runtime_seconds": 3.205714417,
+            "runtime_seconds": 3.1681558769999993,
             "seed_count": 16
           },
           {
@@ -853,7 +855,7 @@
             "price": 9.188809627244963,
             "relative_bias": 0.06039347765926961,
             "rmse": 0.52356274948687,
-            "runtime_seconds": 6.326597250000001,
+            "runtime_seconds": 6.254167958000001,
             "seed_count": 16
           },
           {
@@ -876,7 +878,7 @@
             "price": 9.053692462594896,
             "relative_bias": 0.04480088559055102,
             "rmse": 0.3892090003076147,
-            "runtime_seconds": 12.611626499999996,
+            "runtime_seconds": 12.280145001000001,
             "seed_count": 16
           },
           {
@@ -899,7 +901,7 @@
             "price": 8.926082882497251,
             "relative_bias": 0.030074672739088218,
             "rmse": 0.2620008080697647,
-            "runtime_seconds": 31.191456414999994,
+            "runtime_seconds": 30.522874458,
             "seed_count": 16
           }
         ],
@@ -955,7 +957,7 @@
             "price": 8.673991682117357,
             "relative_bias": 0.0009832152487143744,
             "rmse": 0.024109785214455167,
-            "runtime_seconds": 0.912051668,
+            "runtime_seconds": 0.932111875,
             "seed_count": 16
           },
           {
@@ -973,7 +975,7 @@
             "price": 8.663415882185905,
             "relative_bias": -0.00023723764162416673,
             "rmse": 0.026373678325628966,
-            "runtime_seconds": 1.983321042,
+            "runtime_seconds": 2.0020628329999997,
             "seed_count": 16
           },
           {
@@ -991,7 +993,7 @@
             "price": 8.658157969194441,
             "relative_bias": -0.0008440035741467172,
             "rmse": 0.030686009025370987,
-            "runtime_seconds": 4.040844585,
+            "runtime_seconds": 4.113733335,
             "seed_count": 16
           },
           {
@@ -1009,7 +1011,7 @@
             "price": 8.672755279491145,
             "relative_bias": 0.0008405337335037814,
             "rmse": 0.016921999542285047,
-            "runtime_seconds": 7.886565623999999,
+            "runtime_seconds": 8.066282831999999,
             "seed_count": 16
           },
           {
@@ -1027,7 +1029,7 @@
             "price": 8.672310666684885,
             "relative_bias": 0.0007892251811484248,
             "rmse": 0.026624412522414136,
-            "runtime_seconds": 15.669775916999999,
+            "runtime_seconds": 15.922860208000001,
             "seed_count": 16
           },
           {
@@ -1045,7 +1047,7 @@
             "price": 8.675740256719752,
             "relative_bias": 0.0011850016801236015,
             "rmse": 0.030552119396303853,
-            "runtime_seconds": 38.948620082,
+            "runtime_seconds": 41.23267175,
             "seed_count": 16
           }
         ],
@@ -1097,7 +1099,7 @@
             "price": 8.77824836496223,
             "relative_bias": 0.5574603212078534,
             "rmse": 3.142064619520004,
-            "runtime_seconds": 0.6929896240000001,
+            "runtime_seconds": 0.6973402089999999,
             "seed_count": 16
           },
           {
@@ -1120,7 +1122,7 @@
             "price": 7.828643567507075,
             "relative_bias": 0.3889788962839201,
             "rmse": 2.1924945630118557,
-            "runtime_seconds": 1.5324479159999997,
+            "runtime_seconds": 1.533375914,
             "seed_count": 16
           },
           {
@@ -1143,7 +1145,7 @@
             "price": 7.2295035122494555,
             "relative_bias": 0.2826778639920366,
             "rmse": 1.5934626465207367,
-            "runtime_seconds": 3.2004489149999995,
+            "runtime_seconds": 3.1865652469999994,
             "seed_count": 16
           },
           {
@@ -1166,7 +1168,7 @@
             "price": 6.817643700043925,
             "relative_bias": 0.20960459370606985,
             "rmse": 1.181582840516212,
-            "runtime_seconds": 6.494039499,
+            "runtime_seconds": 6.152938957999999,
             "seed_count": 16
           },
           {
@@ -1189,7 +1191,7 @@
             "price": 6.503290103710096,
             "relative_bias": 0.15383113723004813,
             "rmse": 0.867307469864935,
-            "runtime_seconds": 12.497843374999999,
+            "runtime_seconds": 12.995309082,
             "seed_count": 16
           },
           {
@@ -1212,7 +1214,7 @@
             "price": 6.20484841728097,
             "relative_bias": 0.10088081439992866,
             "rmse": 0.5692087813648193,
-            "runtime_seconds": 31.348892709,
+            "runtime_seconds": 30.493723083999996,
             "seed_count": 16
           }
         ],
@@ -1268,7 +1270,7 @@
             "price": 5.643579585620392,
             "relative_bias": 0.0012989959666329643,
             "rmse": 0.028570445016767806,
-            "runtime_seconds": 0.8525209549999999,
+            "runtime_seconds": 0.8725273349999999,
             "seed_count": 16
           },
           {
@@ -1286,7 +1288,7 @@
             "price": 5.639663561962308,
             "relative_bias": 0.0006042045673922339,
             "rmse": 0.020349262461663062,
-            "runtime_seconds": 1.8605412510000001,
+            "runtime_seconds": 2.0050491650000004,
             "seed_count": 16
           },
           {
@@ -1304,7 +1306,7 @@
             "price": 5.633508596643019,
             "relative_bias": -0.00048782585424231816,
             "rmse": 0.020574788715111408,
-            "runtime_seconds": 4.619809246,
+            "runtime_seconds": 4.011389042,
             "seed_count": 16
           },
           {
@@ -1322,7 +1324,7 @@
             "price": 5.636871928615268,
             "relative_bias": 0.00010890550673556623,
             "rmse": 0.022424367668455528,
-            "runtime_seconds": 7.622403124999998,
+            "runtime_seconds": 7.287781501,
             "seed_count": 16
           },
           {
@@ -1340,7 +1342,7 @@
             "price": 5.634670005733457,
             "relative_bias": -0.0002817655447315118,
             "rmse": 0.02577205734894069,
-            "runtime_seconds": 14.772197875,
+            "runtime_seconds": 15.034041999,
             "seed_count": 16
           },
           {
@@ -1358,7 +1360,7 @@
             "price": 5.64684139166231,
             "relative_bias": 0.0018777143253026448,
             "rmse": 0.02673603952237494,
-            "runtime_seconds": 35.609788081000005,
+            "runtime_seconds": 36.52084270900001,
             "seed_count": 16
           }
         ],
@@ -1410,7 +1412,7 @@
             "price": 0.07841946344018563,
             "relative_bias": 7.920192743521084,
             "rmse": 0.06963493271242857,
-            "runtime_seconds": 0.70042071,
+            "runtime_seconds": 0.7053762499999999,
             "seed_count": 16
           },
           {
@@ -1433,7 +1435,7 @@
             "price": 0.047092965652556606,
             "relative_bias": 4.356812098124561,
             "rmse": 0.038305595342262876,
-            "runtime_seconds": 1.531782372,
+            "runtime_seconds": 1.5427476669999995,
             "seed_count": 16
           },
           {
@@ -1456,7 +1458,7 @@
             "price": 0.03215606456025082,
             "relative_bias": 2.657743641275108,
             "rmse": 0.02337312625092326,
-            "runtime_seconds": 3.1866563329999997,
+            "runtime_seconds": 3.183300375,
             "seed_count": 16
           },
           {
@@ -1479,7 +1481,7 @@
             "price": 0.02385404657978091,
             "relative_bias": 1.7133913427866718,
             "rmse": 0.015070396098985549,
-            "runtime_seconds": 6.250128875,
+            "runtime_seconds": 6.2884477479999985,
             "seed_count": 16
           },
           {
@@ -1502,7 +1504,7 @@
             "price": 0.018858317357708997,
             "relative_bias": 1.1451284957791503,
             "rmse": 0.010083003039361675,
-            "runtime_seconds": 12.300884959000003,
+            "runtime_seconds": 12.443755791,
             "seed_count": 16
           },
           {
@@ -1525,7 +1527,7 @@
             "price": 0.014714620795624777,
             "relative_bias": 0.6737841332581028,
             "rmse": 0.0059389415641085495,
-            "runtime_seconds": 30.596440913000002,
+            "runtime_seconds": 31.411992793,
             "seed_count": 16
           }
         ],
@@ -1581,7 +1583,7 @@
             "price": 0.0087271113272174,
             "relative_bias": -0.007293448362810697,
             "rmse": 0.00029181148401095355,
-            "runtime_seconds": 0.817945832,
+            "runtime_seconds": 0.8392081250000001,
             "seed_count": 16
           },
           {
@@ -1599,7 +1601,7 @@
             "price": 0.008856446239567318,
             "relative_bias": 0.007418362914853205,
             "rmse": 0.00026642940734383964,
-            "runtime_seconds": 1.741347586,
+            "runtime_seconds": 1.773263626,
             "seed_count": 16
           },
           {
@@ -1617,7 +1619,7 @@
             "price": 0.008786348215607306,
             "relative_bias": -0.0005552683398444213,
             "rmse": 0.00023542727645411903,
-            "runtime_seconds": 5.751022582999999,
+            "runtime_seconds": 3.635772792,
             "seed_count": 16
           },
           {
@@ -1635,7 +1637,7 @@
             "price": 0.008809212472474997,
             "relative_bias": 0.0020455346910606765,
             "rmse": 0.0003019199251381869,
-            "runtime_seconds": 8.633559583,
+            "runtime_seconds": 7.091388334,
             "seed_count": 16
           },
           {
@@ -1653,7 +1655,7 @@
             "price": 0.008873712467644412,
             "relative_bias": 0.00938239168583212,
             "rmse": 0.00029687343402537474,
-            "runtime_seconds": 14.097316168000003,
+            "runtime_seconds": 14.732922667,
             "seed_count": 16
           },
           {
@@ -1671,7 +1673,7 @@
             "price": 0.008767713012204739,
             "relative_bias": -0.002675017683608042,
             "rmse": 0.00028664516313419477,
-            "runtime_seconds": 34.217751416,
+            "runtime_seconds": 35.19139233599999,
             "seed_count": 16
           }
         ],
@@ -1723,7 +1725,7 @@
             "price": 0.42968514177097705,
             "relative_bias": 2.6225483546618773,
             "rmse": 0.31108768003585874,
-            "runtime_seconds": 0.6848694999999999,
+            "runtime_seconds": 0.744625748,
             "seed_count": 16
           },
           {
@@ -1746,7 +1748,7 @@
             "price": 0.3074374412426952,
             "relative_bias": 1.5919141451923675,
             "rmse": 0.18883114305558807,
-            "runtime_seconds": 1.5122302940000005,
+            "runtime_seconds": 1.5444672929999999,
             "seed_count": 16
           },
           {
@@ -1769,7 +1771,7 @@
             "price": 0.2443395090607762,
             "relative_bias": 1.0599541396262255,
             "rmse": 0.12574405414052267,
-            "runtime_seconds": 3.151447791,
+            "runtime_seconds": 3.227212541,
             "seed_count": 16
           },
           {
@@ -1792,7 +1794,7 @@
             "price": 0.20423257495543418,
             "relative_bias": 0.7218244394578205,
             "rmse": 0.08564722313016329,
-            "runtime_seconds": 6.192265376000001,
+            "runtime_seconds": 6.534957249,
             "seed_count": 16
           },
           {
@@ -1815,7 +1817,7 @@
             "price": 0.17795332889961402,
             "relative_bias": 0.5002718878175624,
             "rmse": 0.059364845743105986,
-            "runtime_seconds": 12.280159878000001,
+            "runtime_seconds": 13.253746750999998,
             "seed_count": 16
           },
           {
@@ -1838,7 +1840,7 @@
             "price": 0.15435512283088654,
             "relative_bias": 0.30132239141443873,
             "rmse": 0.035797990882019015,
-            "runtime_seconds": 30.542744998000003,
+            "runtime_seconds": 31.277879874,
             "seed_count": 16
           }
         ],
@@ -1894,7 +1896,7 @@
             "price": 0.11870192181385371,
             "relative_bias": 0.0007407977610991441,
             "rmse": 0.0015748430647503323,
-            "runtime_seconds": 0.869013416,
+            "runtime_seconds": 0.9049569980000001,
             "seed_count": 16
           },
           {
@@ -1912,7 +1914,7 @@
             "price": 0.11873443901547749,
             "relative_bias": 0.0010149406713123468,
             "rmse": 0.000867169030415344,
-            "runtime_seconds": 1.86788746,
+            "runtime_seconds": 2.0872823329999997,
             "seed_count": 16
           },
           {
@@ -1930,7 +1932,7 @@
             "price": 0.11861352827966438,
             "relative_bias": -4.4219840390870085e-06,
             "rmse": 0.0015376668639366718,
-            "runtime_seconds": 3.839863209,
+            "runtime_seconds": 4.154322500999999,
             "seed_count": 16
           },
           {
@@ -1948,7 +1950,7 @@
             "price": 0.11878976728118869,
             "relative_bias": 0.001481396916674372,
             "rmse": 0.0018778172737001963,
-            "runtime_seconds": 8.088005792,
+            "runtime_seconds": 7.956879832999999,
             "seed_count": 16
           },
           {
@@ -1966,7 +1968,7 @@
             "price": 0.1186029530233905,
             "relative_bias": -9.357884214508903e-05,
             "rmse": 0.001551089133693893,
-            "runtime_seconds": 17.300916957,
+            "runtime_seconds": 16.174605416000002,
             "seed_count": 16
           },
           {
@@ -1984,7 +1986,7 @@
             "price": 0.11829471490896148,
             "relative_bias": -0.00269224322617908,
             "rmse": 0.0018293242431376964,
-            "runtime_seconds": 40.03688887500001,
+            "runtime_seconds": 39.140247835000004,
             "seed_count": 16
           }
         ],
@@ -2036,7 +2038,7 @@
             "price": 2.181518306493365,
             "relative_bias": 0.8549294173112659,
             "rmse": 1.00546931331479,
-            "runtime_seconds": 0.691638167,
+            "runtime_seconds": 0.7899436270000001,
             "seed_count": 16
           },
           {
@@ -2059,7 +2061,7 @@
             "price": 1.8481739625025717,
             "relative_bias": 0.5714891051569436,
             "rmse": 0.6721640421128582,
-            "runtime_seconds": 1.5201840020000004,
+            "runtime_seconds": 1.5651563339999999,
             "seed_count": 16
           },
           {
@@ -2082,7 +2084,7 @@
             "price": 1.6488138858446226,
             "relative_bias": 0.4019746574763808,
             "rmse": 0.4727973147275821,
-            "runtime_seconds": 3.243894294,
+            "runtime_seconds": 3.3344325429999992,
             "seed_count": 16
           },
           {
@@ -2105,7 +2107,7 @@
             "price": 1.511140768899422,
             "relative_bias": 0.2849121905539364,
             "rmse": 0.33512143762141794,
-            "runtime_seconds": 6.273076582,
+            "runtime_seconds": 6.270144916,
             "seed_count": 16
           },
           {
@@ -2128,7 +2130,7 @@
             "price": 1.4150381620519963,
             "relative_bias": 0.20319683112239667,
             "rmse": 0.2390944724315523,
-            "runtime_seconds": 13.274334291000002,
+            "runtime_seconds": 12.670349457000002,
             "seed_count": 16
           },
           {
@@ -2151,7 +2153,7 @@
             "price": 1.3261166272216784,
             "relative_bias": 0.12758748587956023,
             "rmse": 0.15015152249477257,
-            "runtime_seconds": 32.803199376,
+            "runtime_seconds": 31.560137169,
             "seed_count": 16
           }
         ],
@@ -2207,7 +2209,7 @@
             "price": 1.174428830968517,
             "relative_bias": -0.0013915626480635616,
             "rmse": 0.005810312226975692,
-            "runtime_seconds": 1.222384707,
+            "runtime_seconds": 0.9931503740000001,
             "seed_count": 16
           },
           {
@@ -2225,7 +2227,7 @@
             "price": 1.1728476001041248,
             "relative_bias": -0.0027360719456435492,
             "rmse": 0.00606758599539323,
-            "runtime_seconds": 2.0264457059999996,
+            "runtime_seconds": 2.1385149570000004,
             "seed_count": 16
           },
           {
@@ -2243,7 +2245,7 @@
             "price": 1.1751250975576364,
             "relative_bias": -0.00079953214591056,
             "rmse": 0.00469907457918198,
-            "runtime_seconds": 4.273494207999999,
+            "runtime_seconds": 4.653406584,
             "seed_count": 16
           },
           {
@@ -2261,7 +2263,7 @@
             "price": 1.1751487019648283,
             "relative_bias": -0.0007794614872558956,
             "rmse": 0.0050997678456072525,
-            "runtime_seconds": 8.630313458999998,
+            "runtime_seconds": 8.659106168000001,
             "seed_count": 16
           },
           {
@@ -2279,7 +2281,7 @@
             "price": 1.175105953261161,
             "relative_bias": -0.0008158104043145461,
             "rmse": 0.006375139434380644,
-            "runtime_seconds": 17.254701960000002,
+            "runtime_seconds": 18.510948207,
             "seed_count": 16
           },
           {
@@ -2297,7 +2299,7 @@
             "price": 1.1750036193066342,
             "relative_bias": -0.0009028242341213465,
             "rmse": 0.005272902310467743,
-            "runtime_seconds": 42.374858126,
+            "runtime_seconds": 42.555638793,
             "seed_count": 16
           }
         ],
@@ -2349,7 +2351,7 @@
             "price": 6.864225086524148,
             "relative_bias": 0.20192134615628532,
             "rmse": 1.1534057379149956,
-            "runtime_seconds": 1.5113907919999998,
+            "runtime_seconds": 0.7136259609999999,
             "seed_count": 16
           },
           {
@@ -2372,7 +2374,7 @@
             "price": 6.5506840063449445,
             "relative_bias": 0.14702050703547653,
             "rmse": 0.8398278744651031,
-            "runtime_seconds": 1.540979626,
+            "runtime_seconds": 1.57217179,
             "seed_count": 16
           },
           {
@@ -2395,7 +2397,7 @@
             "price": 6.335397784453082,
             "relative_bias": 0.10932402966716277,
             "rmse": 0.6247847754270489,
-            "runtime_seconds": 3.1786712910000006,
+            "runtime_seconds": 3.233931542,
             "seed_count": 16
           },
           {
@@ -2418,7 +2420,7 @@
             "price": 6.170975262807051,
             "relative_bias": 0.0805337531153083,
             "rmse": 0.46025845540249954,
-            "runtime_seconds": 6.2830045409999995,
+            "runtime_seconds": 6.342401623,
             "seed_count": 16
           },
           {
@@ -2441,7 +2443,7 @@
             "price": 6.050836708098775,
             "relative_bias": 0.05949757035904587,
             "rmse": 0.3400100207974391,
-            "runtime_seconds": 13.789310499,
+            "runtime_seconds": 12.456272875,
             "seed_count": 16
           },
           {
@@ -2464,7 +2466,7 @@
             "price": 5.9295585675249045,
             "relative_bias": 0.03826184685923727,
             "rmse": 0.21935972068545861,
-            "runtime_seconds": 35.031590580999996,
+            "runtime_seconds": 31.005862124000004,
             "seed_count": 16
           }
         ],
@@ -2520,7 +2522,7 @@
             "price": 5.713035348644664,
             "relative_bias": 0.0003487721231623158,
             "rmse": 0.019304180088199115,
-            "runtime_seconds": 0.9626442910000002,
+            "runtime_seconds": 1.034830666,
             "seed_count": 16
           },
           {
@@ -2538,7 +2540,7 @@
             "price": 5.704686286682475,
             "relative_bias": -0.0011131431937517588,
             "rmse": 0.015193810270220603,
-            "runtime_seconds": 2.1083393310000003,
+            "runtime_seconds": 2.250141584,
             "seed_count": 16
           },
           {
@@ -2556,7 +2558,7 @@
             "price": 5.709517114810792,
             "relative_bias": -0.0002672683318633851,
             "rmse": 0.022299298339091077,
-            "runtime_seconds": 6.558562042,
+            "runtime_seconds": 4.658455957999999,
             "seed_count": 16
           },
           {
@@ -2574,7 +2576,7 @@
             "price": 5.713538173936831,
             "relative_bias": 0.00043681650463634267,
             "rmse": 0.017859427687605053,
-            "runtime_seconds": 11.425063376000002,
+            "runtime_seconds": 9.216129083,
             "seed_count": 16
           },
           {
@@ -2592,7 +2594,7 @@
             "price": 5.711657307275679,
             "relative_bias": 0.00010747797613301463,
             "rmse": 0.012258865708815016,
-            "runtime_seconds": 19.551075417,
+            "runtime_seconds": 19.167225372,
             "seed_count": 16
           },
           {
@@ -2610,7 +2612,7 @@
             "price": 5.710830279498768,
             "relative_bias": -3.73340494640473e-05,
             "rmse": 0.02038812291814925,
-            "runtime_seconds": 49.094950918,
+            "runtime_seconds": 43.049242544,
             "seed_count": 16
           }
         ],
@@ -2619,6 +2621,18 @@
     ],
     "bridge_defect_threshold": 5.0,
     "continuity_correction_beta": 0.5825971579390106,
+    "continuity_correction_by_geometry": {
+      "down_and_out": {
+        "cells_disagreeing_with_correction": 2,
+        "correction_is_usable_here": true,
+        "resolved_cells": 18
+      },
+      "up_and_out": {
+        "cells_disagreeing_with_correction": 23,
+        "correction_is_usable_here": false,
+        "resolved_cells": 24
+      }
+    },
     "pde_arm_converged": true,
     "pde_convergence": [
       {
@@ -3230,8 +3244,8 @@
       }
     ]
   },
-  "runtime_seconds": 1153.93149975,
-  "status": "pass",
+  "runtime_seconds": 1121.578699583,
+  "status": "warning",
   "table": {
     "headers": [
       "barrier_type",

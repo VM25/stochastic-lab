@@ -111,9 +111,67 @@ empirical results, preserve disappointing and failed outcomes, and verify every 
 claim traces to generated evidence. The existing EXP-01–12 work is input to Phase 13; it does
 not by itself complete it. Nothing in the catalog is externally blocked.
 
+## Phase 13 outcome
+
+**Re-audited after execution. Generator commit `3846fb3`; every gap above is closed.**
+
+Everything above this heading is the *pre-execution* state, kept as written. It is the record
+of what was missing, which is worth more than a document that only ever describes the present.
+
+| Readiness | Then | Now |
+| --- | --- | --- |
+| `READY` | 4 | **15** |
+| `PARTIAL` | 3 | 0 |
+| `IMPLEMENTED_NOT_GENERATED` | 3 | 0 |
+| `NOT_IMPLEMENTED` | 5 | 0 |
+
+What closed each class of gap:
+
+- **The five unimplemented experiments** (EXP-05, 09, 13, 14, 15) were implemented with stored
+  configs, CLI dispatch, permanent tests, and methodology notes. EXP-05 measures *work-normalised*
+  statistical efficiency — reciprocal variance times deterministic work units — so its ranking is
+  a property of the estimators rather than of the machine that ran them.
+- **The chart-tooling dependency**, called out above as the single largest cross-cutting gap, was
+  closed by `python/plot_experiments.py`, which owns EXP-05–15 alongside `plot_convergence.py`
+  for EXP-01–04. **21 figures** are committed and every one regenerates from a committed record,
+  which is the catalog's "all published charts can be regenerated automatically" gate.
+- **The `PARTIAL` trio** gained their figures; EXP-06 gained the summary CSV it lacked, and EXP-08
+  gained `docs/GREEKS-METHODOLOGY.md`.
+- **The ungenerated trio** (EXP-10, 11, 12) were generated and committed.
+
+Two defects surfaced during execution and were fixed rather than documented around:
+
+- The committed `EXP-NN.json` and `EXP-NN.csv` pairs had been produced by *separate runs* of the
+  same experiment, because `--format csv` re-runs it; they disagreed on every runtime column.
+  CSVs are now derived from the record's own summary table (`python/derive_csv.py`), making each
+  pair provably one execution.
+- Four experiments reported `pass` for completing rather than for what they measured, and two of
+  those treated *finding* their target limitation as the pass condition. Status now describes the
+  empirical result, which moved EXP-07, EXP-10, EXP-12, and EXP-14 to `warning`.
+
+Final reconciliation — ten pass, five warning, none fail, none inconclusive:
+
+```
+warning: EXP-02, EXP-07, EXP-10, EXP-12, EXP-14
+pass:    EXP-01, EXP-03, EXP-04, EXP-05, EXP-06, EXP-08,
+         EXP-09, EXP-11, EXP-13, EXP-15
+```
+
+Every warning is a disclosed limitation with its evidence preserved, not a malfunction: a
+pre-asymptotic fit (02), a refused fit and a reference measurably wrong in one geometry (07), a
+decay order resolved in one regime of two (10), a well-fitting surface that does not identify its
+parameters (12), and a nominal 95% interval that covers 87.75% in the small-sample skewed corner
+(14). `results/README.md` states each in full.
+
+The artifact set is inventoried in `results/MANIFEST.json` with a SHA-256 for every record, CSV,
+and figure, and `python/generate_manifest.py --check` re-runs the completeness audit. Every
+headline claim in `results/README.md` is mechanically re-derived from the records by
+`python/verify_claims.py`.
+
 ## Staleness
 
-This audit reflects the scope-change increment only. Any later commit — a generated result, a
-new plotter, or a new experiment implementation — can change a readiness status, and this
-document is **not** updated automatically. Re-run the audit against the then current commit
-before relying on it to plan the remaining Phase 13 work.
+The pre-execution table reflects the scope-change increment; the outcome section reflects
+generator commit `3846fb3`. Any later commit — a regenerated result, a new plotter, a new
+experiment — can change a readiness status, and this document is **not** updated automatically.
+Re-run `python3 python/generate_manifest.py --check` and `python3 python/verify_claims.py`
+against the then current commit before relying on this file.

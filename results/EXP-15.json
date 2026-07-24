@@ -1,0 +1,410 @@
+{
+  "build_metadata": {
+    "build_flags": "-ffp-contract=off -O3 -DNDEBUG",
+    "build_type": "Release",
+    "compiler_id": "AppleClang",
+    "compiler_version": "21.0.0.21000101",
+    "cpu_brand": "Apple M1",
+    "cxx_standard": "20",
+    "git_branch": "main",
+    "git_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+    "git_commit_short": "3846fb3",
+    "git_dirty": false,
+    "hostname": "MacBookPro",
+    "logical_cores": 8,
+    "os_name": "Darwin",
+    "os_version": "25.5.0",
+    "timestamp_utc": "2026-07-24T00:40:45Z",
+    "version": "0.1.0"
+  },
+  "configuration": {
+    "dividend_yield": 0.0,
+    "limit_tolerance": 1e-06,
+    "rate": 0.05,
+    "spot": 100.0,
+    "tiny_maturity": 1e-08,
+    "tiny_volatility": 1e-08,
+    "volatility": 0.2,
+    "zero_tolerance": 1e-08
+  },
+  "configuration_document": {
+    "command": "experiment",
+    "edge_cases": {
+      "dividend_yield": 0.0,
+      "limit_tolerance": 1e-06,
+      "rate": 0.05,
+      "spot": 100.0,
+      "tiny_maturity": 1e-08,
+      "tiny_volatility": 1e-08,
+      "volatility": 0.2,
+      "zero_tolerance": 1e-08
+    },
+    "schema_version": 1
+  },
+  "configuration_source": "configs/experiment/edge_cases.json",
+  "id": "EXP-15",
+  "interpretation": "Under limiting and difficult inputs the system does exactly one of two things: it returns the correct value, or it refuses with an explicit error. In no case does a NaN, an infinity, or a silently wrong number escape, which is the property the experiment exists to establish.\n\nThe Black-Scholes limits land on the values theory demands. As the maturity goes to zero the price approaches the intrinsic value; as the volatility goes to zero it approaches the discounted forward intrinsic; and exactly-zero maturity and exactly-zero volatility are handled as the limits they are, not as errors. Deep in and out of the money, and at extreme but valid strikes and maturities, the price stays inside the no-arbitrage bounds and finite.\n\nAn already-breached barrier is worth zero, and the engine returns zero: the barrier construction does not see the spot, so the knock-out is detected at pricing, and a down-and-out below its barrier or an up-and-out above it prices to zero rather than to a non-finite value.\n\nThe Heston integral has regions it cannot resolve -- the correlation at the boundary, the variance near zero -- and there it refuses, with an explicit ConvergenceFailure, rather than returning a plausible wrong price. That is the correct behaviour at a numerical boundary: a failure that stops is safe, a confident wrong answer is not. Where the Heston parameters are extreme but the integral still converges -- a fifty-year maturity, a very short one, a small but non-degenerate variance -- it prices, bounded and finite.\n\nInvalid inputs are rejected at construction: a negative volatility, a negative maturity or strike, a correlation outside [-1, 1] never reach an engine at all. Every edge case is resolved -- correct, bounded, zero, safely refused, or rejected -- so none is left to block completion.",
+  "limitations": [
+    "The Heston refusal at the correlation boundary and near-zero variance is a property of this engine's Gauss-Legendre integration, which does not converge there, not a statement that those prices do not exist. The engine fails safely rather than pricing them; a different quadrature might price a wider region. What is established here is that it refuses explicitly rather than returning a wrong number.",
+    "The limiting values are checked at a small but non-zero maturity and volatility (and at exactly zero where the engine accepts it). 'Approaches the limit' is verified at these points, not proved as a limit; the tolerance is set so the discretization at these points is well inside it.",
+    "The edge cases are a fixed, curated list covering the catalog's named limits. They are not exhaustive over the parameter space; a case not listed here is not tested here."
+  ],
+  "name": "Numerical Edge Cases",
+  "question": "Does the system fail safely or remain correct under limiting and difficult inputs?",
+  "reproduction_command": "diffusionworks experiment --id EXP-15 --config configs/experiment/edge_cases.json",
+  "results": {
+    "cases": [
+      {
+        "behavior": "priced",
+        "case": "maturity_to_zero_itm",
+        "category": "limiting_behavior",
+        "error": 4.5000007276030374e-08,
+        "expectation": "matches_limit",
+        "finite": true,
+        "passed": true,
+        "target": 10.0,
+        "value": 10.000000045000007
+      },
+      {
+        "behavior": "priced",
+        "case": "maturity_to_zero_otm",
+        "category": "limiting_behavior",
+        "error": 0.0,
+        "expectation": "matches_limit",
+        "finite": true,
+        "passed": true,
+        "target": 0.0,
+        "value": 0.0
+      },
+      {
+        "behavior": "priced",
+        "case": "maturity_exactly_zero_itm",
+        "category": "limiting_behavior",
+        "error": 0.0,
+        "expectation": "matches_limit",
+        "finite": true,
+        "passed": true,
+        "target": 10.0,
+        "value": 10.0
+      },
+      {
+        "behavior": "priced",
+        "case": "volatility_to_zero_itm",
+        "category": "limiting_behavior",
+        "error": 0.0,
+        "expectation": "matches_limit",
+        "finite": true,
+        "passed": true,
+        "target": 14.389351794935735,
+        "value": 14.389351794935735
+      },
+      {
+        "behavior": "priced",
+        "case": "volatility_exactly_zero_itm",
+        "category": "limiting_behavior",
+        "error": 0.0,
+        "expectation": "matches_limit",
+        "finite": true,
+        "passed": true,
+        "target": 14.389351794935735,
+        "value": 14.389351794935735
+      },
+      {
+        "behavior": "priced",
+        "case": "deep_in_the_money",
+        "category": "extreme_valid",
+        "expectation": "within_bounds",
+        "finite": true,
+        "lower_bound": 99.04877057549929,
+        "passed": true,
+        "upper_bound": 100.0,
+        "value": 99.04877057549929
+      },
+      {
+        "behavior": "priced",
+        "case": "deep_out_of_the_money",
+        "category": "extreme_valid",
+        "expectation": "zero",
+        "finite": true,
+        "passed": true,
+        "value": 5.367287066220126e-29
+      },
+      {
+        "behavior": "priced",
+        "case": "extreme_maturity",
+        "category": "extreme_valid",
+        "expectation": "within_bounds",
+        "finite": true,
+        "lower_bound": 0.0,
+        "passed": true,
+        "upper_bound": 100.0,
+        "value": 92.31057316927286
+      },
+      {
+        "behavior": "priced",
+        "case": "extreme_small_strike",
+        "category": "extreme_valid",
+        "expectation": "within_bounds",
+        "finite": true,
+        "lower_bound": 99.9990487705755,
+        "passed": true,
+        "upper_bound": 100.0,
+        "value": 99.9990487705755
+      },
+      {
+        "behavior": "priced",
+        "case": "down_and_out_already_breached",
+        "category": "already_breached",
+        "expectation": "zero",
+        "finite": true,
+        "passed": true,
+        "value": 0.0
+      },
+      {
+        "behavior": "priced",
+        "case": "up_and_out_already_breached",
+        "category": "already_breached",
+        "expectation": "zero",
+        "finite": true,
+        "passed": true,
+        "value": 0.0
+      },
+      {
+        "actual_status": "convergence_failure",
+        "behavior": "refused",
+        "case": "heston_correlation_plus_one",
+        "category": "degenerate_refusal",
+        "expectation": "refused_safely",
+        "expected_status": "convergence_failure",
+        "passed": true
+      },
+      {
+        "actual_status": "convergence_failure",
+        "behavior": "refused",
+        "case": "heston_correlation_minus_one",
+        "category": "degenerate_refusal",
+        "expectation": "refused_safely",
+        "expected_status": "convergence_failure",
+        "passed": true
+      },
+      {
+        "actual_status": "convergence_failure",
+        "behavior": "refused",
+        "case": "heston_near_zero_variance",
+        "category": "degenerate_refusal",
+        "expectation": "refused_safely",
+        "expected_status": "convergence_failure",
+        "passed": true
+      },
+      {
+        "behavior": "priced",
+        "case": "heston_extreme_maturity",
+        "category": "extreme_valid",
+        "expectation": "within_bounds",
+        "finite": true,
+        "lower_bound": 0.0,
+        "passed": true,
+        "upper_bound": 100.0,
+        "value": 92.43152000383189
+      },
+      {
+        "behavior": "priced",
+        "case": "heston_tiny_maturity",
+        "category": "extreme_valid",
+        "expectation": "within_bounds",
+        "finite": true,
+        "lower_bound": 0.0,
+        "passed": true,
+        "upper_bound": 100.0,
+        "value": 0.08003691833133075
+      },
+      {
+        "behavior": "priced",
+        "case": "heston_small_variance",
+        "category": "extreme_valid",
+        "expectation": "within_bounds",
+        "finite": true,
+        "lower_bound": 0.0,
+        "passed": true,
+        "upper_bound": 100.0,
+        "value": 6.81432131663162
+      },
+      {
+        "behavior": "rejected",
+        "case": "negative_volatility",
+        "category": "invalid_input_rejected",
+        "expectation": "rejected_at_construction",
+        "passed": true,
+        "reason": "a negative volatility is not a valid Black-Scholes parameter"
+      },
+      {
+        "behavior": "rejected",
+        "case": "negative_maturity",
+        "category": "invalid_input_rejected",
+        "expectation": "rejected_at_construction",
+        "passed": true,
+        "reason": "a negative maturity is not a valid option"
+      },
+      {
+        "behavior": "rejected",
+        "case": "correlation_out_of_range",
+        "category": "invalid_input_rejected",
+        "expectation": "rejected_at_construction",
+        "passed": true,
+        "reason": "a correlation outside [-1, 1] is not a valid Heston parameter"
+      },
+      {
+        "behavior": "rejected",
+        "case": "negative_strike",
+        "category": "invalid_input_rejected",
+        "expectation": "rejected_at_construction",
+        "passed": true,
+        "reason": "a negative strike is not a valid option"
+      }
+    ],
+    "summary": {
+      "all_resolved": true,
+      "any_non_finite_escaped": false,
+      "passed": 21,
+      "total_cases": 21
+    }
+  },
+  "runtime_seconds": 0.226215334,
+  "status": "pass",
+  "table": {
+    "headers": [
+      "case",
+      "category",
+      "behavior",
+      "passed"
+    ],
+    "rows": [
+      [
+        "maturity_to_zero_itm",
+        "limiting_behavior",
+        "priced",
+        "yes"
+      ],
+      [
+        "maturity_to_zero_otm",
+        "limiting_behavior",
+        "priced",
+        "yes"
+      ],
+      [
+        "maturity_exactly_zero_itm",
+        "limiting_behavior",
+        "priced",
+        "yes"
+      ],
+      [
+        "volatility_to_zero_itm",
+        "limiting_behavior",
+        "priced",
+        "yes"
+      ],
+      [
+        "volatility_exactly_zero_itm",
+        "limiting_behavior",
+        "priced",
+        "yes"
+      ],
+      [
+        "deep_in_the_money",
+        "extreme_valid",
+        "priced",
+        "yes"
+      ],
+      [
+        "deep_out_of_the_money",
+        "extreme_valid",
+        "priced",
+        "yes"
+      ],
+      [
+        "extreme_maturity",
+        "extreme_valid",
+        "priced",
+        "yes"
+      ],
+      [
+        "extreme_small_strike",
+        "extreme_valid",
+        "priced",
+        "yes"
+      ],
+      [
+        "down_and_out_already_breached",
+        "already_breached",
+        "priced",
+        "yes"
+      ],
+      [
+        "up_and_out_already_breached",
+        "already_breached",
+        "priced",
+        "yes"
+      ],
+      [
+        "heston_correlation_plus_one",
+        "degenerate_refusal",
+        "refused",
+        "yes"
+      ],
+      [
+        "heston_correlation_minus_one",
+        "degenerate_refusal",
+        "refused",
+        "yes"
+      ],
+      [
+        "heston_near_zero_variance",
+        "degenerate_refusal",
+        "refused",
+        "yes"
+      ],
+      [
+        "heston_extreme_maturity",
+        "extreme_valid",
+        "priced",
+        "yes"
+      ],
+      [
+        "heston_tiny_maturity",
+        "extreme_valid",
+        "priced",
+        "yes"
+      ],
+      [
+        "heston_small_variance",
+        "extreme_valid",
+        "priced",
+        "yes"
+      ],
+      [
+        "negative_volatility",
+        "invalid_input_rejected",
+        "rejected",
+        "yes"
+      ],
+      [
+        "negative_maturity",
+        "invalid_input_rejected",
+        "rejected",
+        "yes"
+      ],
+      [
+        "correlation_out_of_range",
+        "invalid_input_rejected",
+        "rejected",
+        "yes"
+      ],
+      [
+        "negative_strike",
+        "invalid_input_rejected",
+        "rejected",
+        "yes"
+      ]
+    ]
+  }
+}

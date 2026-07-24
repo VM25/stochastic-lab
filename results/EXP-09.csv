@@ -1,0 +1,6 @@
+case,provenance,maturity,feller_ratio,price,reference,absolute_error,relative_error
+fang_oosterlee_2008,published,1,0.379492,5.78516,5.78516,1.06581e-14,1.84233e-15
+feller_violating,independently_generated,1,0.36,13.1365,13.1365,1.77636e-14,1.35223e-15
+long_maturity_trap_t5,independently_generated,5,0.333333,23.5061,23.5061,7.10543e-15,3.0228e-16
+long_maturity_trap_t10,independently_generated,10,0.333333,36.4421,36.4421,8.52651e-14,2.33974e-15
+long_maturity_trap_t15,independently_generated,15,0.333333,46.4382,46.4382,3.55271e-14,7.65041e-16

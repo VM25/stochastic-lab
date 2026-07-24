@@ -1,0 +1,381 @@
+{
+  "schema_version": 1,
+  "generated_utc": "2026-07-24T01:40:07Z",
+  "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+  "generator_commit_short": "3846fb3",
+  "generator_tree_clean": true,
+  "artifact_commit": null,
+  "artifact_commit_note": "Null by construction: this manifest is committed by the artifact commit and cannot name it. Resolve it with `git log --follow results/MANIFEST.json`. The generator_commit above is the source revision the records were produced from, and is the one that matters for reproducing them.",
+  "experiment_count": 15,
+  "status_counts": {
+    "pass": 10,
+    "warning": 5
+  },
+  "experiments": [
+    {
+      "id": "EXP-01",
+      "name": "Monte Carlo Sampling Convergence",
+      "status": "pass",
+      "runtime_seconds": 21.029975375,
+      "config": "configs/experiment/convergence.json",
+      "record_json": "results/EXP-01.json",
+      "record_csv": "results/EXP-01.csv",
+      "figures": [
+        "docs/figures/exp01_sampling_convergence.png"
+      ],
+      "methodology": "docs/CONVERGENCE-METHODOLOGY.md",
+      "seed_policy": {
+        "master_seed": 20260715,
+        "seed_count": 32
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-01.json": "11d132091f1c7afb947c7b2dc8635f919d4e0c5a89c897999896c685b41aed24",
+        "results/EXP-01.csv": "ca273a1eb514f4e0ef8e94a77b5bf14be57c474268df59881c238a02dcad61cc",
+        "docs/figures/exp01_sampling_convergence.png": "d7e86c7fe699d03d967eb92b1e0a6afc4a33d89e078165aea8eaaa63a4774094"
+      }
+    },
+    {
+      "id": "EXP-02",
+      "name": "Strong SDE Convergence",
+      "status": "warning",
+      "runtime_seconds": 65.509327959,
+      "config": "configs/experiment/convergence.json",
+      "record_json": "results/EXP-02.json",
+      "record_csv": "results/EXP-02.csv",
+      "figures": [
+        "docs/figures/exp02_local_orders.png",
+        "docs/figures/exp02_strong_convergence.png"
+      ],
+      "methodology": "docs/CONVERGENCE-METHODOLOGY.md",
+      "seed_policy": {
+        "master_seed": 20260715,
+        "seed_count": 32
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-02.json": "211e5842e12bec42fbf782674f79c25d35868d2ef0084a456c3480cb12f0ef7f",
+        "results/EXP-02.csv": "e8da13da56fbbc9a4c67358a4ff0058ab5696a493adb7c38ddfc9c28b259fa87",
+        "docs/figures/exp02_local_orders.png": "0b78ad656f17912d9a4a04a94e18c7d61bc4c1be8f8180181a341f18f821ea86",
+        "docs/figures/exp02_strong_convergence.png": "452e59d8c0207360815e82da9854da2d03d39117f3f6a920144fc391817253f5"
+      }
+    },
+    {
+      "id": "EXP-03",
+      "name": "Weak SDE Convergence",
+      "status": "pass",
+      "runtime_seconds": 53.191224666,
+      "config": "configs/experiment/convergence.json",
+      "record_json": "results/EXP-03.json",
+      "record_csv": "results/EXP-03.csv",
+      "figures": [
+        "docs/figures/exp03_weak_convergence.png"
+      ],
+      "methodology": "docs/CONVERGENCE-METHODOLOGY.md",
+      "seed_policy": {
+        "master_seed": 20260715,
+        "seed_count": 32
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-03.json": "75e134b1bb069d784ec01890ed389aa1640fcf9abfabd3ebe147700126b2e812",
+        "results/EXP-03.csv": "09cc765a5aa1142f210a3e0798575bb144cf99b99583531f99ed42b3e0f1d9fd",
+        "docs/figures/exp03_weak_convergence.png": "e5962f0628a19370f7adf0553e784c538ba5bc713559062bf5274c57a5a4c6f4"
+      }
+    },
+    {
+      "id": "EXP-04",
+      "name": "Sampling Error Versus Discretization Bias",
+      "status": "pass",
+      "runtime_seconds": 12.9426345,
+      "config": "configs/experiment/convergence.json",
+      "record_json": "results/EXP-04.json",
+      "record_csv": "results/EXP-04.csv",
+      "figures": [
+        "docs/figures/exp04_bias_variance.png"
+      ],
+      "methodology": "docs/CONVERGENCE-METHODOLOGY.md",
+      "seed_policy": {
+        "master_seed": 20260715,
+        "seed_count": 32
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-04.json": "2e4e355543dac4cdc0fa0b0fb9b14bad267b6f4ac25c81668df36fc1943c928f",
+        "results/EXP-04.csv": "4274305d8fa5d6508b54e9885b79a03a034419a85697ef608a2bc2f9b9df8f94",
+        "docs/figures/exp04_bias_variance.png": "72f4ab0d3ce6b8b85b72313693901f81c4c0b66c0ff786b89f0f54bcde06d268"
+      }
+    },
+    {
+      "id": "EXP-05",
+      "name": "Variance-Reduction Efficiency",
+      "status": "pass",
+      "runtime_seconds": 35.270376084,
+      "config": "configs/experiment/variance_reduction.json",
+      "record_json": "results/EXP-05.json",
+      "record_csv": "results/EXP-05.csv",
+      "figures": [
+        "docs/figures/exp05_work_normalised_efficiency.png"
+      ],
+      "methodology": "docs/VARIANCE-REDUCTION-METHODOLOGY.md",
+      "seed_policy": {
+        "master_seed": 20260717,
+        "seed_count": 12
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-05.json": "262842c1266c803871b17689c6f973222022522f312931c43dc76daf9367d723",
+        "results/EXP-05.csv": "6ca768ceca55cb6f7e05784581207bebd1aca80fe813ddd01432729a65575770",
+        "docs/figures/exp05_work_normalised_efficiency.png": "401d44981988fcd15858ad752451d2d2439b54ab8824697635503922a15e3c2f"
+      }
+    },
+    {
+      "id": "EXP-06",
+      "name": "PDE Stability and Grid Convergence",
+      "status": "pass",
+      "runtime_seconds": 38.850225125,
+      "config": "configs/experiment/pde.json",
+      "record_json": "results/EXP-06.json",
+      "record_csv": "results/EXP-06.csv",
+      "figures": [
+        "docs/figures/exp06_explicit_stability.png",
+        "docs/figures/exp06_space_convergence.png",
+        "docs/figures/exp06_time_convergence.png"
+      ],
+      "methodology": "docs/PDE-CONVERGENCE-METHODOLOGY.md",
+      "seed_policy": {
+        "deterministic": "no sampling; the record is exactly reproducible"
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-06.json": "50fd5a7ded8875acc9abfc8f61ac9251f748cae98dcf537d4dd9215460368ea9",
+        "results/EXP-06.csv": "c21cdd93346819697215f9cfde689d8731d21b90dff8d106ca192179d025e736",
+        "docs/figures/exp06_explicit_stability.png": "5d372f4f45f008d0865e1bdf6d478b83382885b2ba0d75b3ee3d74d81b34d072",
+        "docs/figures/exp06_space_convergence.png": "303c01faaa07f1f0c3fba01b2db87fe3b3a0134911659ee059da6d2709b7ade6",
+        "docs/figures/exp06_time_convergence.png": "b859cd2dbaf5ef115a9667bef350090070a7958fa47d846edca48dc5f27404a4"
+      }
+    },
+    {
+      "id": "EXP-07",
+      "name": "Barrier Monitoring Bias",
+      "status": "warning",
+      "runtime_seconds": 1121.578699583,
+      "config": "configs/experiment/barrier.json",
+      "record_json": "results/EXP-07.json",
+      "record_csv": "results/EXP-07.csv",
+      "figures": [
+        "docs/figures/exp07_monitoring_bias.png",
+        "docs/figures/exp07_pde_convergence.png"
+      ],
+      "methodology": "docs/BARRIER-MONITORING-METHODOLOGY.md",
+      "seed_policy": {
+        "master_seed": 20260716,
+        "seed_count": 16
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-07.json": "ce6cf62a262cdc168ee56b0011c7a8c6f979250c73825fe97258e147eabfc3c0",
+        "results/EXP-07.csv": "1185a794007705c8c5174812a051891a247bf8cdd3417243d894096ad8db6134",
+        "docs/figures/exp07_monitoring_bias.png": "9997867c3143af161b7c53bb7884172bff152d683c8eb519b5e37abff3c86219",
+        "docs/figures/exp07_pde_convergence.png": "aa7f79355ee733c5e3060c485fcfaa1291055617e0b04694adfbb1cc8be5b44b"
+      }
+    },
+    {
+      "id": "EXP-08",
+      "name": "Greek Estimator Comparison",
+      "status": "pass",
+      "runtime_seconds": 14.952257,
+      "config": "configs/experiment/greeks.json",
+      "record_json": "results/EXP-08.json",
+      "record_csv": "results/EXP-08.csv",
+      "figures": [
+        "docs/figures/exp08_estimator_standard_error.png",
+        "docs/figures/exp08_fd_variance_scaling.png"
+      ],
+      "methodology": "docs/GREEKS-METHODOLOGY.md",
+      "seed_policy": {
+        "master_seed": 20260717,
+        "seed_count": 16
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-08.json": "35cf38c3ff0d8263051d66d5dfbe76b554ee684e66c053e0d469c0aec295806f",
+        "results/EXP-08.csv": "5fb84f34adef7ef95dd330b792470afaa090551ad5c92a14e90fd6435b304952",
+        "docs/figures/exp08_estimator_standard_error.png": "d2da1756c6691df167547a6cd468065360f68f5f705ee12a39c34391dc56a35f",
+        "docs/figures/exp08_fd_variance_scaling.png": "573c5df224126be6719c30dd4d4115382f45eab81005bce4d156ae02adc5366e"
+      }
+    },
+    {
+      "id": "EXP-09",
+      "name": "Heston Characteristic-Function Validation",
+      "status": "pass",
+      "runtime_seconds": 12.833119416,
+      "config": "configs/experiment/heston_cf_validation.json",
+      "record_json": "results/EXP-09.json",
+      "record_csv": "results/EXP-09.csv",
+      "figures": [
+        "docs/figures/exp09_cf_validation.png"
+      ],
+      "methodology": "docs/HESTON-CF-VALIDATION-METHODOLOGY.md",
+      "seed_policy": {
+        "deterministic": "no sampling; the record is exactly reproducible"
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-09.json": "9f211f1f912695a58082d2fb3cfedeabb6dee0c2d1a28df76e8e3f344d4e9439",
+        "results/EXP-09.csv": "77f97785bb9a39a65896987ab42caef33367b0f42152eaaa102bed1618dc868b",
+        "docs/figures/exp09_cf_validation.png": "08c3d5aa36027a4b4ee3c1a8a81e516726679968e71c2a96f30446d998725e60"
+      }
+    },
+    {
+      "id": "EXP-10",
+      "name": "Heston Variance Discretization",
+      "status": "warning",
+      "runtime_seconds": 15.186517125,
+      "config": "configs/experiment/heston_simulation.json",
+      "record_json": "results/EXP-10.json",
+      "record_csv": "results/EXP-10.csv",
+      "figures": [
+        "docs/figures/exp10_variance_discretization.png"
+      ],
+      "methodology": "docs/HESTON-SIMULATION-METHODOLOGY.md",
+      "seed_policy": {
+        "master_seed": 20260717,
+        "seed_count": 8
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-10.json": "75df2715e5be4f7914797b72b97567559d9a9669fa63bf0764d9c385ecf30c7a",
+        "results/EXP-10.csv": "e604aca23445cc2536e621d491495bc15a0a1ee0a348e79d3746d471e548ddbf",
+        "docs/figures/exp10_variance_discretization.png": "5ae8b9b9adad328c1baebab7f81ed942254361d032e87ce080dd0b03e1e8b4da"
+      }
+    },
+    {
+      "id": "EXP-11",
+      "name": "Heston Calibration Recovery",
+      "status": "pass",
+      "runtime_seconds": 130.619169625,
+      "config": "configs/experiment/calibration.json",
+      "record_json": "results/EXP-11.json",
+      "record_csv": "results/EXP-11.csv",
+      "figures": [
+        "docs/figures/exp11_recovery.png"
+      ],
+      "methodology": "docs/CALIBRATION-METHODOLOGY.md",
+      "seed_policy": {
+        "deterministic": "no sampling; the record is exactly reproducible"
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-11.json": "3eb646d025b56bba841c265c9200806de90968360eb130984a0c7f8be2d81d77",
+        "results/EXP-11.csv": "90af2d9cfb1429b2ec2b230814efc408f4daf3208dd884dbb3095f2124600c3e",
+        "docs/figures/exp11_recovery.png": "287bf809cea0baa028d3f6da387402fa7f1a3e2207b2206ee60532330d300f58"
+      }
+    },
+    {
+      "id": "EXP-12",
+      "name": "Market-Surface Calibration Stability",
+      "status": "warning",
+      "runtime_seconds": 1121.1371875,
+      "config": "configs/experiment/calibration_stability.json",
+      "record_json": "results/EXP-12.json",
+      "record_csv": "results/EXP-12.csv",
+      "figures": [
+        "docs/figures/exp12_parameter_dispersion.png",
+        "docs/figures/exp12_residual_surface.png"
+      ],
+      "methodology": "docs/CALIBRATION-METHODOLOGY.md",
+      "seed_policy": {
+        "deterministic": "no sampling; the record is exactly reproducible"
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-12.json": "c6b94573bdd96ab118e29079e029653b2fa72a29dd71ed9d7f7134c11b12a7bc",
+        "results/EXP-12.csv": "73f0922cb08d8dfff2538d6421326ab42f148979b5ec9be86bbc5ce90a1d211e",
+        "docs/figures/exp12_parameter_dispersion.png": "31ddccfbdf0c74ec23d09c530832deb78725c09d024b8376cef127c20b2cab2b",
+        "docs/figures/exp12_residual_surface.png": "20bf6fcd39e49b45da406081bf441863119f969d39c51744d521bf85cb478c1c"
+      }
+    },
+    {
+      "id": "EXP-13",
+      "name": "Cross-Method Accuracy and Agreement",
+      "status": "pass",
+      "runtime_seconds": 7.160006,
+      "config": "configs/experiment/cross_method.json",
+      "record_json": "results/EXP-13.json",
+      "record_csv": "results/EXP-13.csv",
+      "figures": [
+        "docs/figures/exp13_agreement.png"
+      ],
+      "methodology": "docs/CROSS-METHOD-METHODOLOGY.md",
+      "seed_policy": {
+        "monte_carlo_seed": 20260717
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-13.json": "a624f00bc2674df9bc944bae335795dce4f12b45c539d33c360cd21125b58de9",
+        "results/EXP-13.csv": "8391714930e94a01693228987641150380420fd3304ae050c4e1072290476f8c",
+        "docs/figures/exp13_agreement.png": "e3690cd48c86b19f8d224fc71bc31ebc2b6a3fa0309aa04ce78449e949e9c3b2"
+      }
+    },
+    {
+      "id": "EXP-14",
+      "name": "Statistical Confidence Coverage",
+      "status": "warning",
+      "runtime_seconds": 3.823014417,
+      "config": "configs/experiment/coverage.json",
+      "record_json": "results/EXP-14.json",
+      "record_csv": "results/EXP-14.csv",
+      "figures": [
+        "docs/figures/exp14_coverage.png"
+      ],
+      "methodology": "docs/COVERAGE-METHODOLOGY.md",
+      "seed_policy": {
+        "master_seed": 20260717
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-14.json": "b83bdabc801496a9fe83cfc8857d46ba8cc51d7a776a50b7a7c0db5dfef7d5cc",
+        "results/EXP-14.csv": "8d90d0c6498f1ae3496f5b9ce4c16fffff9ee55bac643e96ac44d379525bdf24",
+        "docs/figures/exp14_coverage.png": "8ba314292cdca1e59f779335eab9bbd08b7bb68a70f5950e5f7676cdcea4f3dc"
+      }
+    },
+    {
+      "id": "EXP-15",
+      "name": "Numerical Edge Cases",
+      "status": "pass",
+      "runtime_seconds": 0.226215334,
+      "config": "configs/experiment/edge_cases.json",
+      "record_json": "results/EXP-15.json",
+      "record_csv": "results/EXP-15.csv",
+      "figures": [
+        "docs/figures/exp15_edge_cases.png"
+      ],
+      "methodology": "docs/EDGE-CASES-METHODOLOGY.md",
+      "seed_policy": {
+        "deterministic": "no sampling; the record is exactly reproducible"
+      },
+      "generator_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+      "generator_tree_clean": true,
+      "checksums_sha256": {
+        "results/EXP-15.json": "4bb504bcc63dc590b7ad444b9bf2bb74328e2d0f0309a38b874c986436438741",
+        "results/EXP-15.csv": "7c6267a0cc75422c350c080432850c586b46a7b4c979ba612c5bbeba7a41cccd",
+        "docs/figures/exp15_edge_cases.png": "292350ba16c642b18878532dab72506951b398f7582e0b1758ac3e94d41020a5"
+      }
+    }
+  ]
+}

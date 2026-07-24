@@ -1,0 +1,262 @@
+{
+  "build_metadata": {
+    "build_flags": "-ffp-contract=off -O3 -DNDEBUG",
+    "build_type": "Release",
+    "compiler_id": "AppleClang",
+    "compiler_version": "21.0.0.21000101",
+    "cpu_brand": "Apple M1",
+    "cxx_standard": "20",
+    "git_branch": "main",
+    "git_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+    "git_commit_short": "3846fb3",
+    "git_dirty": false,
+    "hostname": "MacBookPro",
+    "logical_cores": 8,
+    "os_name": "Darwin",
+    "os_version": "25.5.0",
+    "timestamp_utc": "2026-07-24T00:40:41Z",
+    "version": "0.1.0"
+  },
+  "configuration": {
+    "confidence_level": 0.95,
+    "dividend_yield": 0.0,
+    "master_seed": 20260717,
+    "maturity": 1.0,
+    "rate": 0.05,
+    "sample_sizes": [
+      2000,
+      50000
+    ],
+    "spot": 100.0,
+    "strikes": [
+      100.0,
+      130.0,
+      160.0
+    ],
+    "trial_count": 400,
+    "volatility": 0.2
+  },
+  "configuration_document": {
+    "command": "experiment",
+    "coverage": {
+      "confidence_level": 0.95,
+      "dividend_yield": 0.0,
+      "master_seed": 20260717,
+      "maturity": 1.0,
+      "rate": 0.05,
+      "sample_sizes": [
+        2000,
+        50000
+      ],
+      "spot": 100.0,
+      "strikes": [
+        100.0,
+        130.0,
+        160.0
+      ],
+      "trial_count": 400,
+      "volatility": 0.2
+    },
+    "schema_version": 1
+  },
+  "configuration_source": "configs/experiment/coverage.json",
+  "id": "EXP-14",
+  "interpretation": "The confidence intervals cover the true value as often as they claim where the central limit theorem holds, and they under-cover where it does not -- and the experiment locates that boundary rather than reporting only the easy case.\n\nAt the large sample the observed coverage sits within a few of its own standard errors of the nominal level, at every moneyness, including the deep-out-of-the-money call whose payoff is severely right-skewed. That is the methodology working: with enough paths the sample mean is approximately normal even for a skewed payoff, so the Student-t interval built on it is well calibrated.\n\nAt the small sample the picture changes with the payoff. At the money the coverage is still close to nominal, because the payoff is only mildly skewed. Deep out of the money it under-covers: the option pays on a small fraction of paths, so at a small sample the payoff distribution is far from normal, the estimated standard error is itself unreliable, and the interval is too narrow and slightly mis-centred. The payoff_skewness column is the explanation -- it grows sharply with moneyness -- and the under-coverage tracks it. This is a property of the estimator at small samples on a skewed payoff, exactly the defect the experiment exists to detect, reported rather than hidden.\n\nThe practical reading is that a Monte Carlo interval on a rare-payoff option needs enough paths for the central limit theorem before its stated coverage can be trusted, and that the number of paths required grows with the payoff's skewness. The intervals are not revised here because they are correct where they are used at production path counts; the small-sample under-coverage is a documented limitation of the normal approximation, not a bug in the interval.",
+  "limitations": [
+    "Coverage is estimated from a finite number of trials, so it carries its own standard error (reported per cell). A defensible cell is one whose observed coverage is statistically consistent with the nominal level, not one that hits it exactly.",
+    "Only the European call under Black-Scholes is used, where an exact reference exists to test coverage against. The finding -- coverage degrades at small samples on skewed payoffs -- is a property of the interval and the payoff, but the specific path counts at which it bites are for this instrument and these parameters.",
+    "The interval is the Student-t interval on the sample mean. A different interval construction (a bootstrap, a skew-adjusted interval) would move the small-sample boundary; this experiment characterises the interval the engine actually reports, not the best possible one."
+  ],
+  "name": "Statistical Confidence Coverage",
+  "question": "Do reported Monte Carlo confidence intervals achieve their intended coverage?",
+  "reproduction_command": "diffusionworks experiment --id EXP-14 --config configs/experiment/coverage.json",
+  "results": {
+    "cells": [
+      {
+        "coverage_standard_error": 0.008866192813152663,
+        "covered": 387,
+        "defensible": true,
+        "deviation_sigmas": 1.9737896940431388,
+        "is_largest_sample": false,
+        "mean_interval_width": 1.2897179255903355,
+        "moneyness": 1.0,
+        "nominal_coverage": 0.95,
+        "observed_coverage": 0.9675,
+        "payoff_skewness": 1.7862812134658386,
+        "reference": 10.450583572185558,
+        "sample_size": 2000,
+        "strike": 100.0,
+        "trials": 400,
+        "under_covers": false
+      },
+      {
+        "coverage_standard_error": 0.009188987974744557,
+        "covered": 386,
+        "defensible": true,
+        "deviation_sigmas": 1.6323886853728302,
+        "is_largest_sample": true,
+        "mean_interval_width": 0.25798594985633705,
+        "moneyness": 1.0,
+        "nominal_coverage": 0.95,
+        "observed_coverage": 0.965,
+        "payoff_skewness": 1.7862812134658386,
+        "reference": 10.450583572185558,
+        "sample_size": 50000,
+        "strike": 100.0,
+        "trials": 400,
+        "under_covers": false
+      },
+      {
+        "coverage_standard_error": 0.010365206220813944,
+        "covered": 382,
+        "defensible": true,
+        "deviation_sigmas": 0.482383070194948,
+        "is_largest_sample": false,
+        "mean_interval_width": 0.5377144798452934,
+        "moneyness": 1.3,
+        "nominal_coverage": 0.95,
+        "observed_coverage": 0.955,
+        "payoff_skewness": 5.334835873102612,
+        "reference": 1.6395929155861246,
+        "sample_size": 2000,
+        "strike": 130.0,
+        "trials": 400,
+        "under_covers": false
+      },
+      {
+        "coverage_standard_error": 0.009797958971132717,
+        "covered": 384,
+        "defensible": true,
+        "deviation_sigmas": 1.020620726159658,
+        "is_largest_sample": true,
+        "mean_interval_width": 0.10812828690017877,
+        "moneyness": 1.3,
+        "nominal_coverage": 0.95,
+        "observed_coverage": 0.96,
+        "payoff_skewness": 5.334835873102612,
+        "reference": 1.6395929155861246,
+        "sample_size": 50000,
+        "strike": 130.0,
+        "trials": 400,
+        "under_covers": false
+      },
+      {
+        "coverage_standard_error": 0.016393119745795798,
+        "covered": 351,
+        "defensible": false,
+        "deviation_sigmas": 4.422587105092883,
+        "is_largest_sample": false,
+        "mean_interval_width": 0.15572148833250077,
+        "moneyness": 1.6,
+        "nominal_coverage": 0.95,
+        "observed_coverage": 0.8775,
+        "payoff_skewness": 17.253155861638405,
+        "reference": 0.15895425470111846,
+        "sample_size": 2000,
+        "strike": 160.0,
+        "trials": 400,
+        "under_covers": true
+      },
+      {
+        "coverage_standard_error": 0.012103072956898178,
+        "covered": 375,
+        "defensible": true,
+        "deviation_sigmas": 1.0327955589886408,
+        "is_largest_sample": true,
+        "mean_interval_width": 0.0327077954699392,
+        "moneyness": 1.6,
+        "nominal_coverage": 0.95,
+        "observed_coverage": 0.9375,
+        "payoff_skewness": 17.253155861638405,
+        "reference": 0.15895425470111846,
+        "sample_size": 50000,
+        "strike": 160.0,
+        "trials": 400,
+        "under_covers": false
+      }
+    ],
+    "summary": {
+      "coverage_deviation_threshold_sigmas": 3.0,
+      "maximum_payoff_skewness_tested": 17.253155861638405,
+      "methodology_sound_at_largest_sample": true,
+      "observed_under_coverage_somewhere": true,
+      "stress_skewness_threshold": 5.0
+    }
+  },
+  "runtime_seconds": 3.823014417,
+  "status": "warning",
+  "table": {
+    "headers": [
+      "strike",
+      "skewness",
+      "sample_size",
+      "coverage",
+      "coverage_se",
+      "nominal",
+      "mean_ci_width",
+      "defensible"
+    ],
+    "rows": [
+      [
+        "100",
+        "1.78628",
+        "2000",
+        "0.9675",
+        "0.00886619",
+        "0.95",
+        "1.28972",
+        "yes"
+      ],
+      [
+        "100",
+        "1.78628",
+        "50000",
+        "0.965",
+        "0.00918899",
+        "0.95",
+        "0.257986",
+        "yes"
+      ],
+      [
+        "130",
+        "5.33484",
+        "2000",
+        "0.955",
+        "0.0103652",
+        "0.95",
+        "0.537714",
+        "yes"
+      ],
+      [
+        "130",
+        "5.33484",
+        "50000",
+        "0.96",
+        "0.00979796",
+        "0.95",
+        "0.108128",
+        "yes"
+      ],
+      [
+        "160",
+        "17.2532",
+        "2000",
+        "0.8775",
+        "0.0163931",
+        "0.95",
+        "0.155721",
+        "NO"
+      ],
+      [
+        "160",
+        "17.2532",
+        "50000",
+        "0.9375",
+        "0.0121031",
+        "0.95",
+        "0.0327078",
+        "yes"
+      ]
+    ]
+  }
+}

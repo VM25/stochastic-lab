@@ -1,0 +1,326 @@
+{
+  "build_metadata": {
+    "build_flags": "-ffp-contract=off -O3 -DNDEBUG",
+    "build_type": "Release",
+    "compiler_id": "AppleClang",
+    "compiler_version": "21.0.0.21000101",
+    "cpu_brand": "Apple M1",
+    "cxx_standard": "20",
+    "git_branch": "main",
+    "git_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+    "git_commit_short": "3846fb3",
+    "git_dirty": false,
+    "hostname": "MacBookPro",
+    "logical_cores": 8,
+    "os_name": "Darwin",
+    "os_version": "25.5.0",
+    "timestamp_utc": "2026-07-24T00:35:16Z",
+    "version": "0.1.0"
+  },
+  "configuration": {
+    "cf_grid_max_u": 50.0,
+    "cf_grid_points": 1000,
+    "correlations": [
+      -0.7,
+      0.0,
+      0.7
+    ],
+    "dividend_yield": 0.0,
+    "initial_variance": 0.04,
+    "long_run_variance": 0.04,
+    "maturities": [
+      0.25,
+      1.0,
+      5.0
+    ],
+    "mean_reversions": [
+      1.0,
+      2.0
+    ],
+    "quadrature_node_counts": [
+      16,
+      32,
+      64,
+      128,
+      256,
+      512
+    ],
+    "rate": 0.05,
+    "reference_quadrature_nodes": 1024,
+    "spot": 100.0,
+    "strikes": [
+      80.0,
+      100.0,
+      120.0
+    ],
+    "vol_of_variances": [
+      0.3,
+      0.6,
+      1.0
+    ]
+  },
+  "configuration_document": {
+    "command": "experiment",
+    "heston_cf_validation": {
+      "cf_grid_max_u": 50.0,
+      "cf_grid_points": 1000,
+      "correlations": [
+        -0.7,
+        0.0,
+        0.7
+      ],
+      "dividend_yield": 0.0,
+      "initial_variance": 0.04,
+      "long_run_variance": 0.04,
+      "maturities": [
+        0.25,
+        1.0,
+        5.0
+      ],
+      "mean_reversions": [
+        1.0,
+        2.0
+      ],
+      "quadrature_node_counts": [
+        16,
+        32,
+        64,
+        128,
+        256,
+        512
+      ],
+      "rate": 0.05,
+      "reference_quadrature_nodes": 1024,
+      "spot": 100.0,
+      "strikes": [
+        80.0,
+        100.0,
+        120.0
+      ],
+      "vol_of_variances": [
+        0.3,
+        0.6,
+        1.0
+      ]
+    },
+    "schema_version": 1
+  },
+  "configuration_source": "configs/experiment/heston_cf_validation.json",
+  "id": "EXP-09",
+  "interpretation": "The experiment validates the characteristic function the price is built from, not only the prices, and it keeps three kinds of evidence honestly separate rather than calling them all independent oracles.\n\nThe characteristic function's own analytic properties are internal checks: because phi is the characteristic function of a real log-price under a risk-neutral measure, it must satisfy phi_j(0) = 1, conjugate symmetry phi(-u) = conj(phi(u)), the martingale identity phi_2(-i) = S_0 e^{(r-q)T}, finiteness and continuity across a dense frequency grid, and |phi| <= 1. These hold to near machine precision across every swept regime, including the Feller-violating ones -- which says the function is self-consistent and correctly normalised, not that it prices correctly.\n\nWhether it prices correctly is the separate question of the external references. The one genuinely published benchmark is the Fang-Oosterlee (2008) COS value; the Feller-violating and long-maturity cases are independently generated to 40 digits with mpmath and cross-checked against QuantLib, and are labelled as such rather than as literature. Price recovery matches every reference within its stated tolerance. The long-maturity cases are the ones where Heston's original branch would return a discontinuous wrong price; the little-trap form used here stays correct, which the continuity check on phi corroborates from the other side.\n\nThe analytic invariants -- put-call parity, exact by construction, and the Black-Scholes limit as vol-of-variance vanishes -- are neither external prices nor CF identities but consistency conditions the price must meet. The internal numerical checks close the record: the integration error falls as the quadrature is refined, and the pathological deep-out-of-the-money short-maturity corner, which does not converge at a practical node count, is refused with the exact ConvergenceFailure status rather than returned as a plausible number. A failure that stops is the correct behaviour there; a number that looked like a price would be the defect.",
+  "limitations": [
+    "Only one of the reference prices is a published literature value (Fang-Oosterlee 2008). The others are independently generated to high precision with mpmath and cross-checked with QuantLib; they are strong external references but not literature benchmarks, and are labelled accordingly.",
+    "QuantLib provides the cross-check for the high-precision references but is not linked into this experiment binary; the agreement was established when the reference constants were produced, not recomputed at run time here. The live QuantLib cross-validation lives in the dedicated external-validation target.",
+    "The characteristic-function properties are checked on a finite, if wide, regime sweep and a finite frequency grid. They are exact identities, so passing them everywhere sampled is strong evidence, but the sweep does not prove them for every parameter, and the pathological corner shows the integral itself has regimes it cannot resolve.",
+    "The martingale identity is evaluated at the single complex point u = -i. It pins the first moment (the drift); it does not by itself validate higher moments, which the price recovery against references covers instead."
+  ],
+  "name": "Heston Characteristic-Function Validation",
+  "question": "Does native Heston integration reproduce trusted reference prices?",
+  "reproduction_command": "diffusionworks experiment --id EXP-09 --config configs/experiment/heston_cf_validation.json",
+  "results": {
+    "analytic_invariants": {
+      "black_scholes_limit_error": 2.11514691272896e-06,
+      "black_scholes_limit_note": "with xi = 1e-3 and v0 = theta the variance is near-deterministic, so the price approaches Black-Scholes at volatility sqrt(theta); a loose tolerance because xi is small but not zero",
+      "black_scholes_limit_passes": true,
+      "evidence_category": "analytic_invariant",
+      "put_call_parity_max_residual": 7.105427357601002e-15,
+      "put_call_parity_passes": true,
+      "put_call_parity_regimes_priced": 158,
+      "put_call_parity_regimes_refused": 4
+    },
+    "characteristic_function_properties": {
+      "all_finite": true,
+      "continuity_step_bound": 0.5,
+      "evidence_category": "internal_analytic_property",
+      "feller_satisfied": 27,
+      "feller_violated": 135,
+      "grid_spacing_du": 0.05,
+      "max_conjugate_symmetry_residual": 0.0,
+      "max_continuity_step": 0.23717902489512388,
+      "max_martingale_identity_relative_error": 5.613729857110919e-16,
+      "max_modulus": 1.0,
+      "max_phi_zero_deviation": 0.0,
+      "passes": true,
+      "regimes": 162
+    },
+    "external_references": [
+      {
+        "absolute_error": 1.0658141036401503e-14,
+        "case": "fang_oosterlee_2008",
+        "evidence_category": "external_reference",
+        "feller_ratio": 0.3794922785422908,
+        "maturity": 1.0,
+        "passes": true,
+        "price": 5.7851554343762,
+        "provenance": "Fang & Oosterlee (2008) COS-method benchmark",
+        "provenance_category": "published",
+        "reference": 5.78515543437619,
+        "relative_error": 1.8423257866278512e-15,
+        "tolerance": 1e-08
+      },
+      {
+        "absolute_error": 1.7763568394002505e-14,
+        "case": "feller_violating",
+        "evidence_category": "external_reference",
+        "feller_ratio": 0.36,
+        "maturity": 1.0,
+        "passes": true,
+        "price": 13.136532796089483,
+        "provenance": "40-digit mpmath integration, cross-checked with QuantLib (Feller ratio 0.36 < 1)",
+        "provenance_category": "independently_generated",
+        "reference": 13.1365327960895,
+        "relative_error": 1.3522265478825878e-15,
+        "tolerance": 1e-06
+      },
+      {
+        "absolute_error": 7.105427357601002e-15,
+        "case": "long_maturity_trap_t5",
+        "evidence_category": "external_reference",
+        "feller_ratio": 0.3333333333333333,
+        "maturity": 5.0,
+        "passes": true,
+        "price": 23.506147139989203,
+        "provenance": "40-digit mpmath integration; the regime where the naive branch fails",
+        "provenance_category": "independently_generated",
+        "reference": 23.50614713998921,
+        "relative_error": 3.0227954055103664e-16,
+        "tolerance": 1e-06
+      },
+      {
+        "absolute_error": 8.526512829121202e-14,
+        "case": "long_maturity_trap_t10",
+        "evidence_category": "external_reference",
+        "feller_ratio": 0.3333333333333333,
+        "maturity": 10.0,
+        "passes": true,
+        "price": 36.442076575169764,
+        "provenance": "40-digit mpmath integration; the regime where the naive branch fails",
+        "provenance_category": "independently_generated",
+        "reference": 36.44207657516968,
+        "relative_error": 2.339743952717245e-15,
+        "tolerance": 1e-06
+      },
+      {
+        "absolute_error": 3.552713678800501e-14,
+        "case": "long_maturity_trap_t15",
+        "evidence_category": "external_reference",
+        "feller_ratio": 0.3333333333333333,
+        "maturity": 15.0,
+        "passes": true,
+        "price": 46.43818472722811,
+        "provenance": "40-digit mpmath integration; the regime where the naive branch fails",
+        "provenance_category": "independently_generated",
+        "reference": 46.43818472722808,
+        "relative_error": 7.650414631124546e-16,
+        "tolerance": 1e-06
+      }
+    ],
+    "internal_numerical_checks": {
+      "evidence_category": "internal_numerical_check",
+      "final_integration_error": 2.1316282072803006e-14,
+      "integration_convergence": [
+        {
+          "integration_error": 0.04437967393240427,
+          "price": 5.787175858587894,
+          "quadrature_nodes": 16
+        },
+        {
+          "integration_error": 0.0020108095045614505,
+          "price": 5.785165049083332,
+          "quadrature_nodes": 32
+        },
+        {
+          "integration_error": 9.619798198912122e-06,
+          "price": 5.785155429285133,
+          "quadrature_nodes": 64
+        },
+        {
+          "integration_error": 5.091067123430548e-09,
+          "price": 5.7851554343762,
+          "quadrature_nodes": 128
+        },
+        {
+          "integration_error": 1.4210854715202004e-14,
+          "price": 5.785155434376186,
+          "quadrature_nodes": 256
+        },
+        {
+          "integration_error": 2.1316282072803006e-14,
+          "price": 5.785155434376165,
+          "quadrature_nodes": 512
+        }
+      ],
+      "integration_converges": true,
+      "pathological_actual_status": "convergence_failure",
+      "pathological_case": "K=150, T=0.001, xi=3.0, rho=0.9 (deep-OTM, short maturity)",
+      "pathological_expected_status": "ConvergenceFailure",
+      "pathological_refused_correctly": true
+    }
+  },
+  "runtime_seconds": 12.833119416,
+  "status": "pass",
+  "table": {
+    "headers": [
+      "case",
+      "provenance",
+      "maturity",
+      "feller_ratio",
+      "price",
+      "reference",
+      "absolute_error",
+      "relative_error"
+    ],
+    "rows": [
+      [
+        "fang_oosterlee_2008",
+        "published",
+        "1",
+        "0.379492",
+        "5.78516",
+        "5.78516",
+        "1.06581e-14",
+        "1.84233e-15"
+      ],
+      [
+        "feller_violating",
+        "independently_generated",
+        "1",
+        "0.36",
+        "13.1365",
+        "13.1365",
+        "1.77636e-14",
+        "1.35223e-15"
+      ],
+      [
+        "long_maturity_trap_t5",
+        "independently_generated",
+        "5",
+        "0.333333",
+        "23.5061",
+        "23.5061",
+        "7.10543e-15",
+        "3.0228e-16"
+      ],
+      [
+        "long_maturity_trap_t10",
+        "independently_generated",
+        "10",
+        "0.333333",
+        "36.4421",
+        "36.4421",
+        "8.52651e-14",
+        "2.33974e-15"
+      ],
+      [
+        "long_maturity_trap_t15",
+        "independently_generated",
+        "15",
+        "0.333333",
+        "46.4382",
+        "46.4382",
+        "3.55271e-14",
+        "7.65041e-16"
+      ]
+    ]
+  }
+}

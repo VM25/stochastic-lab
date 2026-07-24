@@ -7,14 +7,14 @@
     "cpu_brand": "Apple M1",
     "cxx_standard": "20",
     "git_branch": "main",
-    "git_commit": "08c6d9f13017d9f8059e8a267b9e93729e7e9c2c",
-    "git_commit_short": "08c6d9f",
-    "git_dirty": true,
+    "git_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+    "git_commit_short": "3846fb3",
+    "git_dirty": false,
     "hostname": "MacBookPro",
     "logical_cores": 8,
     "os_name": "Darwin",
     "os_version": "25.5.0",
-    "timestamp_utc": "2026-07-16T20:36:07Z",
+    "timestamp_utc": "2026-07-24T00:33:55Z",
     "version": "0.1.0"
   },
   "configuration": {
@@ -187,7 +187,7 @@
           "observed_stable": true,
           "outcome": "completed",
           "price": 10.411445807576985,
-          "runtime_seconds": 0.000317333,
+          "runtime_seconds": 0.00031925,
           "target_ratio": 0.25,
           "time_steps": 1568,
           "warnings": 1
@@ -199,7 +199,7 @@
           "observed_stable": true,
           "outcome": "completed",
           "price": 10.41212494547291,
-          "runtime_seconds": 0.000157083,
+          "runtime_seconds": 0.000160292,
           "target_ratio": 0.5,
           "time_steps": 784,
           "warnings": 2
@@ -211,7 +211,7 @@
           "observed_stable": true,
           "outcome": "completed",
           "price": 10.413209161477296,
-          "runtime_seconds": 8.85e-05,
+          "runtime_seconds": 9.5791e-05,
           "target_ratio": 0.9,
           "time_steps": 436,
           "warnings": 2
@@ -223,7 +223,7 @@
           "observed_stable": true,
           "outcome": "completed",
           "price": 10.413455903939616,
-          "runtime_seconds": 8.0375e-05,
+          "runtime_seconds": 8.1625e-05,
           "target_ratio": 0.99,
           "time_steps": 396,
           "warnings": 2
@@ -235,7 +235,7 @@
           "observed_stable": true,
           "outcome": "completed",
           "price": 10.413511358166508,
-          "runtime_seconds": 7.9333e-05,
+          "runtime_seconds": 8.05e-05,
           "target_ratio": 1.01,
           "time_steps": 388,
           "warnings": 3
@@ -247,7 +247,7 @@
           "observed_stable": true,
           "outcome": "completed",
           "price": 10.41484713533244,
-          "runtime_seconds": 5.4541e-05,
+          "runtime_seconds": 5.5667e-05,
           "target_ratio": 1.5,
           "time_steps": 261,
           "warnings": 4
@@ -259,7 +259,7 @@
           "observed_stable": false,
           "outcome": "completed",
           "price": -409265114799.41644,
-          "runtime_seconds": 4.1375e-05,
+          "runtime_seconds": 4.1875e-05,
           "target_ratio": 2.0,
           "time_steps": 196,
           "warnings": 4
@@ -278,7 +278,7 @@
               "error_vs_analytic": 0.1206280491510121,
               "most_negative_value": 0.0,
               "price": 10.329955523034545,
-              "runtime_seconds": 8.5291e-05,
+              "runtime_seconds": 8.2792e-05,
               "temporal_error": 0.11815688600615282,
               "time_steps": 10
             },
@@ -287,7 +287,7 @@
               "error_vs_analytic": 0.015289746332399545,
               "most_negative_value": 0.0,
               "price": 10.435293825853158,
-              "runtime_seconds": 0.000165334,
+              "runtime_seconds": 0.000157125,
               "temporal_error": 0.012818583187540256,
               "time_steps": 20
             },
@@ -296,7 +296,7 @@
               "error_vs_analytic": 0.002332019112824213,
               "most_negative_value": 0.0,
               "price": 10.448251553072733,
-              "runtime_seconds": 0.000297417,
+              "runtime_seconds": 0.000292541,
               "temporal_error": 0.00013914403203507675,
               "time_steps": 40
             },
@@ -305,7 +305,7 @@
               "error_vs_analytic": 0.002432317409535756,
               "most_negative_value": 0.0,
               "price": 10.448151254776022,
-              "runtime_seconds": 0.000658042,
+              "runtime_seconds": 0.000579667,
               "temporal_error": 3.884573532353386e-05,
               "time_steps": 80
             },
@@ -314,7 +314,7 @@
               "error_vs_analytic": 0.002461451800279235,
               "most_negative_value": 0.0,
               "price": 10.448122120385278,
-              "runtime_seconds": 0.001140709,
+              "runtime_seconds": 0.001163375,
               "temporal_error": 9.711344580054515e-06,
               "time_steps": 160
             }
@@ -336,7 +336,7 @@
               "error_vs_analytic": 0.006513633478769876,
               "most_negative_value": 0.0,
               "price": 10.444069938706788,
-              "runtime_seconds": 8.7e-05,
+              "runtime_seconds": 0.000100292,
               "temporal_error": 0.004042467708627484,
               "time_steps": 10
             },
@@ -345,7 +345,7 @@
               "error_vs_analytic": 0.003926886486526726,
               "most_negative_value": 0.0,
               "price": 10.44665668569903,
-              "runtime_seconds": 0.00016175,
+              "runtime_seconds": 0.000148209,
               "temporal_error": 0.0014557207163843344,
               "time_steps": 20
             },
@@ -354,7 +354,7 @@
               "error_vs_analytic": 0.002960091475230797,
               "most_negative_value": 0.0,
               "price": 10.447623480710327,
-              "runtime_seconds": 0.000290917,
+              "runtime_seconds": 0.00029125,
               "temporal_error": 0.0004889257050884055,
               "time_steps": 40
             },
@@ -363,7 +363,7 @@
               "error_vs_analytic": 0.002594985180298437,
               "most_negative_value": 0.0,
               "price": 10.44798858700526,
-              "runtime_seconds": 0.000576584,
+              "runtime_seconds": 0.000578167,
               "temporal_error": 0.00012381941015604525,
               "time_steps": 80
             },
@@ -372,7 +372,7 @@
               "error_vs_analytic": 0.0025022933765086464,
               "most_negative_value": 0.0,
               "price": 10.448081278809049,
-              "runtime_seconds": 0.001148833,
+              "runtime_seconds": 0.001172291,
               "temporal_error": 3.112760636625467e-05,
               "time_steps": 160
             }
@@ -394,7 +394,7 @@
               "error_vs_analytic": 0.020069823561474465,
               "most_negative_value": 0.0,
               "price": 10.430513748624083,
-              "runtime_seconds": 0.0001095,
+              "runtime_seconds": 8.8833e-05,
               "temporal_error": 0.017598655166057853,
               "time_steps": 10
             },
@@ -403,7 +403,7 @@
               "error_vs_analytic": 0.006960605342349879,
               "most_negative_value": 0.0,
               "price": 10.443622966843208,
-              "runtime_seconds": 0.000150458,
+              "runtime_seconds": 0.000145958,
               "temporal_error": 0.004489436946933267,
               "time_steps": 20
             },
@@ -412,7 +412,7 @@
               "error_vs_analytic": 0.0036071417448404475,
               "most_negative_value": 0.0,
               "price": 10.446976430440717,
-              "runtime_seconds": 0.000290834,
+              "runtime_seconds": 0.000285917,
               "temporal_error": 0.0011359733494238355,
               "time_steps": 40
             },
@@ -421,7 +421,7 @@
               "error_vs_analytic": 0.0027576966967703953,
               "most_negative_value": 0.0,
               "price": 10.447825875488787,
-              "runtime_seconds": 0.0005765,
+              "runtime_seconds": 0.000594333,
               "temporal_error": 0.0002865283013537834,
               "time_steps": 80
             },
@@ -430,7 +430,7 @@
               "error_vs_analytic": 0.00254313774304471,
               "most_negative_value": 0.0,
               "price": 10.448040434442513,
-              "runtime_seconds": 0.001191333,
+              "runtime_seconds": 0.001129333,
               "temporal_error": 7.196934762809803e-05,
               "time_steps": 160
             }
@@ -452,7 +452,7 @@
               "error_vs_analytic": 0.040445502966274915,
               "most_negative_value": 0.0,
               "price": 10.410138069219283,
-              "runtime_seconds": 8.3875e-05,
+              "runtime_seconds": 7.8833e-05,
               "temporal_error": 0.03797432932037026,
               "time_steps": 10
             },
@@ -461,7 +461,7 @@
               "error_vs_analytic": 0.012076605181530198,
               "most_negative_value": 0.0,
               "price": 10.438506967004027,
-              "runtime_seconds": 0.00014825,
+              "runtime_seconds": 0.000149542,
               "temporal_error": 0.009605431535625542,
               "time_steps": 20
             },
@@ -470,7 +470,7 @@
               "error_vs_analytic": 0.004901061306661347,
               "most_negative_value": 0.0,
               "price": 10.445682510878896,
-              "runtime_seconds": 0.000290875,
+              "runtime_seconds": 0.000300291,
               "temporal_error": 0.002429887660756691,
               "time_steps": 40
             },
@@ -479,7 +479,7 @@
               "error_vs_analytic": 0.0030832511716116784,
               "most_negative_value": 0.0,
               "price": 10.447500321013946,
-              "runtime_seconds": 0.000578708,
+              "runtime_seconds": 0.000566583,
               "temporal_error": 0.0006120775257070221,
               "time_steps": 80
             },
@@ -488,7 +488,7 @@
               "error_vs_analytic": 0.0026248348504527286,
               "most_negative_value": 0.0,
               "price": 10.447958737335105,
-              "runtime_seconds": 0.001149958,
+              "runtime_seconds": 0.001133666,
               "temporal_error": 0.0001536612045480723,
               "time_steps": 160
             }
@@ -514,7 +514,7 @@
           "asset_spacing": 0.5,
           "error": 0.0007133421077512025,
           "price": 10.449870230077806,
-          "runtime_seconds": 0.010877791,
+          "runtime_seconds": 0.010767333,
           "s_max": 150.0,
           "s_max_multiple": 1.5
         },
@@ -523,7 +523,7 @@
           "asset_spacing": 0.5,
           "error": 0.0006180412057847917,
           "price": 10.449965530979773,
-          "runtime_seconds": 0.014322083,
+          "runtime_seconds": 0.014264584,
           "s_max": 200.0,
           "s_max_multiple": 2.0
         },
@@ -532,7 +532,7 @@
           "asset_spacing": 0.5,
           "error": 0.000618041252863577,
           "price": 10.449965530932694,
-          "runtime_seconds": 0.0215655,
+          "runtime_seconds": 0.021154959,
           "s_max": 300.0,
           "s_max_multiple": 3.0
         },
@@ -541,7 +541,7 @@
           "asset_spacing": 0.5,
           "error": 0.000618041252863577,
           "price": 10.449965530932694,
-          "runtime_seconds": 0.028172333,
+          "runtime_seconds": 0.028002667,
           "s_max": 400.0,
           "s_max_multiple": 4.0
         },
@@ -550,7 +550,7 @@
           "asset_spacing": 0.5,
           "error": 0.000618041252863577,
           "price": 10.449965530932694,
-          "runtime_seconds": 0.042338959,
+          "runtime_seconds": 0.042007041,
           "s_max": 600.0,
           "s_max_multiple": 6.0
         },
@@ -559,7 +559,7 @@
           "asset_spacing": 0.5,
           "error": 0.000618041252863577,
           "price": 10.449965530932694,
-          "runtime_seconds": 0.056545458,
+          "runtime_seconds": 0.056123875,
           "s_max": 800.0,
           "s_max_multiple": 8.0
         }
@@ -577,7 +577,7 @@
         "peclet_violating_nodes": 4,
         "price": 2.654552814521902,
         "relative_error": 0.0038574312610804118,
-        "runtime_seconds": 0.002868167,
+        "runtime_seconds": 0.002820417,
         "sign_structure_holds": false,
         "volatility": 0.1
       },
@@ -591,7 +591,7 @@
         "peclet_violating_nodes": 4,
         "price": 6.799591014921514,
         "relative_error": 0.0007886447102635611,
-        "runtime_seconds": 0.002871167,
+        "runtime_seconds": 0.002816625,
         "sign_structure_holds": false,
         "volatility": 0.1
       },
@@ -605,7 +605,7 @@
         "peclet_violating_nodes": 4,
         "price": 15.638898976626042,
         "relative_error": 0.00020556273590665471,
-        "runtime_seconds": 0.002932042,
+        "runtime_seconds": 0.002826958,
         "sign_structure_holds": false,
         "volatility": 0.1
       },
@@ -619,7 +619,7 @@
         "peclet_violating_nodes": 1,
         "price": 4.610006639419845,
         "relative_error": 0.001081363659144782,
-        "runtime_seconds": 0.002822166,
+        "runtime_seconds": 0.002818584,
         "sign_structure_holds": false,
         "volatility": 0.2
       },
@@ -633,7 +633,7 @@
         "peclet_violating_nodes": 1,
         "price": 10.448100858696224,
         "relative_error": 0.00023756697146958615,
-        "runtime_seconds": 0.002820417,
+        "runtime_seconds": 0.00282075,
         "sign_structure_holds": false,
         "volatility": 0.2
       },
@@ -647,7 +647,7 @@
         "peclet_violating_nodes": 1,
         "price": 20.922941347906313,
         "relative_error": 6.784460429074717e-05,
-        "runtime_seconds": 0.002821833,
+        "runtime_seconds": 0.002824041,
         "sign_structure_holds": false,
         "volatility": 0.2
       },
@@ -661,7 +661,7 @@
         "peclet_violating_nodes": 0,
         "price": 8.55014912441864,
         "relative_error": 0.0002873693581700648,
-        "runtime_seconds": 0.002864709,
+        "runtime_seconds": 0.002820375,
         "sign_structure_holds": true,
         "volatility": 0.4
       },
@@ -675,7 +675,7 @@
         "peclet_violating_nodes": 0,
         "price": 18.021775132534366,
         "relative_error": 6.526776069788222e-05,
-        "runtime_seconds": 0.002871417,
+        "runtime_seconds": 0.002820334,
         "sign_structure_holds": true,
         "volatility": 0.4
       },
@@ -689,7 +689,7 @@
         "peclet_violating_nodes": 0,
         "price": 32.73704873427319,
         "relative_error": 3.0412084797776503e-05,
-        "runtime_seconds": 0.00285125,
+        "runtime_seconds": 0.002984375,
         "sign_structure_holds": true,
         "volatility": 0.4
       },
@@ -703,7 +703,7 @@
         "peclet_violating_nodes": 0,
         "price": 16.38099662334361,
         "relative_error": 7.243364862653293e-05,
-        "runtime_seconds": 0.002819458,
+        "runtime_seconds": 0.002819292,
         "sign_structure_holds": true,
         "volatility": 0.8
       },
@@ -717,7 +717,7 @@
         "peclet_violating_nodes": 0,
         "price": 32.815764840649784,
         "relative_error": 0.00015897227773471536,
-        "runtime_seconds": 0.002831042,
+        "runtime_seconds": 0.002833958,
         "sign_structure_holds": true,
         "volatility": 0.8
       },
@@ -731,7 +731,7 @@
         "peclet_violating_nodes": 0,
         "price": 53.963707667949805,
         "relative_error": 0.015183431977669637,
-        "runtime_seconds": 0.002823458,
+        "runtime_seconds": 0.002854417,
         "sign_structure_holds": true,
         "volatility": 0.8
       }
@@ -754,28 +754,28 @@
             "asset_spacing": 4.0,
             "error": 0.03981686018680719,
             "price": 10.41076671199875,
-            "runtime_seconds": 0.299473208
+            "runtime_seconds": 0.245569167
           },
           {
             "asset_nodes": 201,
             "asset_spacing": 2.0,
             "error": 0.009898309096509905,
             "price": 10.440685263089048,
-            "runtime_seconds": 0.565099833
+            "runtime_seconds": 0.553863791
           },
           {
             "asset_nodes": 401,
             "asset_spacing": 1.0,
             "error": 0.0024711637622480964,
             "price": 10.44811240842331,
-            "runtime_seconds": 0.910432541
+            "runtime_seconds": 1.013703417
           },
           {
             "asset_nodes": 801,
             "asset_spacing": 0.5,
             "error": 0.0006175788060840404,
             "price": 10.449965993379474,
-            "runtime_seconds": 1.816255209
+            "runtime_seconds": 2.053297916
           }
         ],
         "local_orders": [
@@ -815,28 +815,28 @@
             "asset_spacing": 4.0,
             "error": 0.03982517876522529,
             "price": 10.410758393420332,
-            "runtime_seconds": 0.248758875
+            "runtime_seconds": 0.245235834
           },
           {
             "asset_nodes": 201,
             "asset_spacing": 2.0,
             "error": 0.009906535581682974,
             "price": 10.440677036603875,
-            "runtime_seconds": 0.47253325
+            "runtime_seconds": 0.46638125
           },
           {
             "asset_nodes": 401,
             "asset_spacing": 1.0,
             "error": 0.002479367976492952,
             "price": 10.448104204209065,
-            "runtime_seconds": 1.153825917
+            "runtime_seconds": 0.907590209
           },
           {
             "asset_nodes": 801,
             "asset_spacing": 0.5,
             "error": 0.0006257775173494906,
             "price": 10.449957794668208,
-            "runtime_seconds": 1.859133125
+            "runtime_seconds": 1.798141084
           }
         ],
         "local_orders": [
@@ -870,7 +870,7 @@
           "error": 0.0024716264928024145,
           "price": 10.448111945692755,
           "requested_offset": 0.0,
-          "runtime_seconds": 0.014308792,
+          "runtime_seconds": 0.014145541,
           "s_max": 400.0
         },
         {
@@ -881,7 +881,7 @@
           "error": 0.000787635742772963,
           "price": 10.449795936442785,
           "requested_offset": 0.1,
-          "runtime_seconds": 0.015131458,
+          "runtime_seconds": 0.015017708,
           "s_max": 399.6003996003996
         },
         {
@@ -892,7 +892,7 @@
           "error": 0.0010334831393112864,
           "price": 10.451617055324869,
           "requested_offset": 0.25,
-          "runtime_seconds": 0.015029917,
+          "runtime_seconds": 0.014235375,
           "s_max": 399.00249376558605
         },
         {
@@ -903,7 +903,7 @@
           "error": 0.0021983867674322255,
           "price": 10.45278195895299,
           "requested_offset": 0.5,
-          "runtime_seconds": 0.014185417,
+          "runtime_seconds": 0.014239166,
           "s_max": 398.00995024875624
         },
         {
@@ -914,7 +914,7 @@
           "error": 0.001040505279927828,
           "price": 10.451624077465485,
           "requested_offset": 0.75,
-          "runtime_seconds": 0.014370166,
+          "runtime_seconds": 0.014199833,
           "s_max": 397.0223325062035
         },
         {
@@ -925,7 +925,7 @@
           "error": 0.0007619780205434523,
           "price": 10.449821594165014,
           "requested_offset": 0.9,
-          "runtime_seconds": 0.014549833,
+          "runtime_seconds": 0.014166041,
           "s_max": 396.4321110009911
         }
       ],
@@ -957,7 +957,7 @@
             "error_vs_same_grid_reference": 0.10431858160227847,
             "most_negative_value": 0.0,
             "price": 10.343741319935603,
-            "runtime_seconds": 8.375e-05,
+            "runtime_seconds": 8.2833e-05,
             "time_step": 0.1,
             "time_steps": 10
           },
@@ -967,7 +967,7 @@
             "error_vs_same_grid_reference": 0.05229856720501225,
             "most_negative_value": 0.0,
             "price": 10.39576133433287,
-            "runtime_seconds": 0.000148334,
+            "runtime_seconds": 0.00015225,
             "time_step": 0.05,
             "time_steps": 20
           },
@@ -977,7 +977,7 @@
             "error_vs_same_grid_reference": 0.02616262701316785,
             "most_negative_value": 0.0,
             "price": 10.421897274524714,
-            "runtime_seconds": 0.000292833,
+            "runtime_seconds": 0.000294209,
             "time_step": 0.025,
             "time_steps": 40
           },
@@ -987,7 +987,7 @@
             "error_vs_same_grid_reference": 0.013064732239939758,
             "most_negative_value": 0.0,
             "price": 10.434995169297942,
-            "runtime_seconds": 0.000578792,
+            "runtime_seconds": 0.000595167,
             "time_step": 0.0125,
             "time_steps": 80
           },
@@ -997,7 +997,7 @@
             "error_vs_same_grid_reference": 0.006508502138297345,
             "most_negative_value": 0.0,
             "price": 10.441551399399584,
-            "runtime_seconds": 0.001157417,
+            "runtime_seconds": 0.001133708,
             "time_step": 0.00625,
             "time_steps": 160
           }
@@ -1053,7 +1053,7 @@
             "error_vs_same_grid_reference": 0.11815688600615282,
             "most_negative_value": 0.0,
             "price": 10.329955523034545,
-            "runtime_seconds": 7.85e-05,
+            "runtime_seconds": 7.6208e-05,
             "time_step": 0.1,
             "time_steps": 10
           },
@@ -1063,7 +1063,7 @@
             "error_vs_same_grid_reference": 0.012818583187540256,
             "most_negative_value": 0.0,
             "price": 10.435293825853158,
-            "runtime_seconds": 0.000145542,
+            "runtime_seconds": 0.000149125,
             "time_step": 0.05,
             "time_steps": 20
           },
@@ -1073,7 +1073,7 @@
             "error_vs_same_grid_reference": 0.00013914403203507675,
             "most_negative_value": 0.0,
             "price": 10.448251553072733,
-            "runtime_seconds": 0.000286083,
+            "runtime_seconds": 0.000286917,
             "time_step": 0.025,
             "time_steps": 40
           },
@@ -1083,7 +1083,7 @@
             "error_vs_same_grid_reference": 3.884573532353386e-05,
             "most_negative_value": 0.0,
             "price": 10.448151254776022,
-            "runtime_seconds": 0.000566042,
+            "runtime_seconds": 0.000567,
             "time_step": 0.0125,
             "time_steps": 80
           },
@@ -1093,7 +1093,7 @@
             "error_vs_same_grid_reference": 9.711344580054515e-06,
             "most_negative_value": 0.0,
             "price": 10.448122120385278,
-            "runtime_seconds": 0.001132333,
+            "runtime_seconds": 0.001129042,
             "time_step": 0.00625,
             "time_steps": 160
           }
@@ -1149,7 +1149,7 @@
             "error_vs_same_grid_reference": 0.017598655166057853,
             "most_negative_value": 0.0,
             "price": 10.430513748624083,
-            "runtime_seconds": 9.8917e-05,
+            "runtime_seconds": 8.5583e-05,
             "time_step": 0.1,
             "time_steps": 10
           },
@@ -1159,7 +1159,7 @@
             "error_vs_same_grid_reference": 0.004489436946933267,
             "most_negative_value": 0.0,
             "price": 10.443622966843208,
-            "runtime_seconds": 0.000148542,
+            "runtime_seconds": 0.000146041,
             "time_step": 0.05,
             "time_steps": 20
           },
@@ -1169,7 +1169,7 @@
             "error_vs_same_grid_reference": 0.0011359733494238355,
             "most_negative_value": 0.0,
             "price": 10.446976430440717,
-            "runtime_seconds": 0.000290958,
+            "runtime_seconds": 0.00028625,
             "time_step": 0.025,
             "time_steps": 40
           },
@@ -1179,7 +1179,7 @@
             "error_vs_same_grid_reference": 0.0002865283013537834,
             "most_negative_value": 0.0,
             "price": 10.447825875488787,
-            "runtime_seconds": 0.000576708,
+            "runtime_seconds": 0.000566708,
             "time_step": 0.0125,
             "time_steps": 80
           },
@@ -1189,7 +1189,7 @@
             "error_vs_same_grid_reference": 7.196934762809803e-05,
             "most_negative_value": 0.0,
             "price": 10.448040434442513,
-            "runtime_seconds": 0.001148708,
+            "runtime_seconds": 0.001142583,
             "time_step": 0.00625,
             "time_steps": 160
           }
@@ -1222,7 +1222,7 @@
       }
     ]
   },
-  "runtime_seconds": 39.146930042,
+  "runtime_seconds": 38.850225125,
   "status": "pass",
   "table": {
     "headers": [
@@ -1242,7 +1242,7 @@
         "101",
         "10.41076671199875",
         "0.03981686018680719",
-        "0.29947320799999999"
+        "0.245569167"
       ],
       [
         "space_sweep",
@@ -1251,7 +1251,7 @@
         "201",
         "10.440685263089048",
         "0.0098983090965099052",
-        "0.565099833"
+        "0.55386379100000005"
       ],
       [
         "space_sweep",
@@ -1260,7 +1260,7 @@
         "401",
         "10.448112408423309",
         "0.0024711637622480964",
-        "0.91043254100000004"
+        "1.0137034170000001"
       ],
       [
         "space_sweep",
@@ -1269,7 +1269,7 @@
         "801",
         "10.449965993379474",
         "0.00061757880608404037",
-        "1.8162552089999999"
+        "2.053297916"
       ],
       [
         "space_sweep",
@@ -1278,7 +1278,7 @@
         "101",
         "10.410758393420332",
         "0.039825178765225289",
-        "0.24875887499999999"
+        "0.24523583400000001"
       ],
       [
         "space_sweep",
@@ -1287,7 +1287,7 @@
         "201",
         "10.440677036603875",
         "0.0099065355816829737",
-        "0.47253325000000002"
+        "0.46638125000000002"
       ],
       [
         "space_sweep",
@@ -1296,7 +1296,7 @@
         "401",
         "10.448104204209065",
         "0.0024793679764929522",
-        "1.153825917"
+        "0.90759020899999998"
       ],
       [
         "space_sweep",
@@ -1305,7 +1305,7 @@
         "801",
         "10.449957794668208",
         "0.00062577751734949061",
-        "1.8591331250000001"
+        "1.7981410840000001"
       ],
       [
         "time_sweep",
@@ -1314,7 +1314,7 @@
         "10",
         "10.343741319935603",
         "0.10431858160227847",
-        "8.3750000000000003e-05"
+        "8.2832999999999998e-05"
       ],
       [
         "time_sweep",
@@ -1323,7 +1323,7 @@
         "20",
         "10.395761334332869",
         "0.052298567205012247",
-        "0.00014833399999999999"
+        "0.00015224999999999999"
       ],
       [
         "time_sweep",
@@ -1332,7 +1332,7 @@
         "40",
         "10.421897274524714",
         "0.02616262701316785",
-        "0.00029283299999999999"
+        "0.00029420899999999997"
       ],
       [
         "time_sweep",
@@ -1341,7 +1341,7 @@
         "80",
         "10.434995169297942",
         "0.013064732239939758",
-        "0.00057879199999999996"
+        "0.00059516699999999996"
       ],
       [
         "time_sweep",
@@ -1350,7 +1350,7 @@
         "160",
         "10.441551399399584",
         "0.0065085021382973451",
-        "0.001157417"
+        "0.001133708"
       ],
       [
         "time_sweep",
@@ -1359,7 +1359,7 @@
         "10",
         "10.329955523034545",
         "0.11815688600615282",
-        "7.8499999999999997e-05"
+        "7.6207999999999999e-05"
       ],
       [
         "time_sweep",
@@ -1368,7 +1368,7 @@
         "20",
         "10.435293825853158",
         "0.012818583187540256",
-        "0.000145542"
+        "0.00014912500000000001"
       ],
       [
         "time_sweep",
@@ -1377,7 +1377,7 @@
         "40",
         "10.448251553072733",
         "0.00013914403203507675",
-        "0.00028608300000000002"
+        "0.00028691699999999998"
       ],
       [
         "time_sweep",
@@ -1386,7 +1386,7 @@
         "80",
         "10.448151254776022",
         "3.8845735323533859e-05",
-        "0.000566042"
+        "0.00056700000000000001"
       ],
       [
         "time_sweep",
@@ -1395,7 +1395,7 @@
         "160",
         "10.448122120385278",
         "9.7113445800545151e-06",
-        "0.0011323329999999999"
+        "0.001129042"
       ],
       [
         "time_sweep",
@@ -1404,7 +1404,7 @@
         "10",
         "10.430513748624083",
         "0.017598655166057853",
-        "9.8917000000000002e-05"
+        "8.5582999999999997e-05"
       ],
       [
         "time_sweep",
@@ -1413,7 +1413,7 @@
         "20",
         "10.443622966843208",
         "0.0044894369469332673",
-        "0.00014854199999999999"
+        "0.00014604099999999999"
       ],
       [
         "time_sweep",
@@ -1422,7 +1422,7 @@
         "40",
         "10.446976430440717",
         "0.0011359733494238355",
-        "0.00029095800000000002"
+        "0.00028624999999999999"
       ],
       [
         "time_sweep",
@@ -1431,7 +1431,7 @@
         "80",
         "10.447825875488787",
         "0.00028652830135378338",
-        "0.00057670799999999999"
+        "0.00056670799999999997"
       ],
       [
         "time_sweep",
@@ -1440,7 +1440,7 @@
         "160",
         "10.448040434442513",
         "7.1969347628098035e-05",
-        "0.001148708"
+        "0.001142583"
       ],
       [
         "s_max_sweep",
@@ -1449,7 +1449,7 @@
         "1.5",
         "10.449870230077806",
         "0.00071334210775120255",
-        "0.010877791"
+        "0.010767333"
       ],
       [
         "s_max_sweep",
@@ -1458,7 +1458,7 @@
         "2",
         "10.449965530979773",
         "0.00061804120578479171",
-        "0.014322082999999999"
+        "0.014264584"
       ],
       [
         "s_max_sweep",
@@ -1467,7 +1467,7 @@
         "3",
         "10.449965530932694",
         "0.00061804125286357703",
-        "0.021565500000000001"
+        "0.021154959000000001"
       ],
       [
         "s_max_sweep",
@@ -1476,7 +1476,7 @@
         "4",
         "10.449965530932694",
         "0.00061804125286357703",
-        "0.028172333000000001"
+        "0.028002666999999998"
       ],
       [
         "s_max_sweep",
@@ -1485,7 +1485,7 @@
         "6",
         "10.449965530932694",
         "0.00061804125286357703",
-        "0.042338959000000002"
+        "0.042007041000000002"
       ],
       [
         "s_max_sweep",
@@ -1494,7 +1494,7 @@
         "8",
         "10.449965530932694",
         "0.00061804125286357703",
-        "0.056545458"
+        "0.056123874999999997"
       ],
       [
         "strike_alignment",
@@ -1503,7 +1503,7 @@
         "0",
         "10.448111945692755",
         "0.0024716264928024145",
-        "0.014308792000000001"
+        "0.014145540999999999"
       ],
       [
         "strike_alignment",
@@ -1512,7 +1512,7 @@
         "0.10000000000000001",
         "10.449795936442785",
         "0.000787635742772963",
-        "0.015131458"
+        "0.015017707999999999"
       ],
       [
         "strike_alignment",
@@ -1521,7 +1521,7 @@
         "0.25",
         "10.451617055324869",
         "0.0010334831393112864",
-        "0.015029917"
+        "0.014235375"
       ],
       [
         "strike_alignment",
@@ -1530,7 +1530,7 @@
         "0.5",
         "10.45278195895299",
         "0.0021983867674322255",
-        "0.014185417000000001"
+        "0.014239165999999999"
       ],
       [
         "strike_alignment",
@@ -1539,7 +1539,7 @@
         "0.75",
         "10.451624077465485",
         "0.001040505279927828",
-        "0.014370166"
+        "0.014199833"
       ],
       [
         "strike_alignment",
@@ -1548,7 +1548,7 @@
         "0.90000000000000002",
         "10.449821594165014",
         "0.00076197802054345232",
-        "0.014549833"
+        "0.014166041000000001"
       ],
       [
         "explicit_stability",
@@ -1557,7 +1557,7 @@
         "0.25",
         "10.411445807576985",
         "0.039137764608572212",
-        "0.00031733299999999999"
+        "0.00031924999999999998"
       ],
       [
         "explicit_stability",
@@ -1566,7 +1566,7 @@
         "0.5",
         "10.412124945472909",
         "0.038458626712648325",
-        "0.000157083"
+        "0.000160292"
       ],
       [
         "explicit_stability",
@@ -1575,7 +1575,7 @@
         "0.90000000000000002",
         "10.413209161477296",
         "0.037374410708261863",
-        "8.8499999999999996e-05"
+        "9.5791000000000005e-05"
       ],
       [
         "explicit_stability",
@@ -1584,7 +1584,7 @@
         "0.98999999999999999",
         "10.413455903939616",
         "0.037127668245942047",
-        "8.0375000000000002e-05"
+        "8.1625000000000005e-05"
       ],
       [
         "explicit_stability",
@@ -1593,7 +1593,7 @@
         "1.01",
         "10.413511358166508",
         "0.03707221401904981",
-        "7.9332999999999994e-05"
+        "8.0500000000000005e-05"
       ],
       [
         "explicit_stability",
@@ -1602,7 +1602,7 @@
         "1.5",
         "10.41484713533244",
         "0.035736436853117226",
-        "5.4540999999999998e-05"
+        "5.5667000000000001e-05"
       ],
       [
         "explicit_stability",
@@ -1611,7 +1611,7 @@
         "2",
         "-409265114799.41644",
         "409265114809.867",
-        "4.1375000000000003e-05"
+        "4.1875000000000001e-05"
       ],
       [
         "sensitivity",
@@ -1620,7 +1620,7 @@
         "0.10000000000000001",
         "2.6545528145219022",
         "0.010279407117285366",
-        "0.002868167"
+        "0.002820417"
       ],
       [
         "sensitivity",
@@ -1629,7 +1629,7 @@
         "0.10000000000000001",
         "6.7995910149215142",
         "0.0053666939006298264",
-        "0.002871167"
+        "0.0028166250000000001"
       ],
       [
         "sensitivity",
@@ -1638,7 +1638,7 @@
         "0.10000000000000001",
         "15.638898976626042",
         "0.0032154358339901989",
-        "0.0029320420000000002"
+        "0.0028269580000000001"
       ],
       [
         "sensitivity",
@@ -1647,7 +1647,7 @@
         "0.20000000000000001",
         "4.6100066394198453",
         "0.0049904901830100101",
-        "0.0028221660000000001"
+        "0.0028185839999999998"
       ],
       [
         "sensitivity",
@@ -1656,7 +1656,7 @@
         "0.20000000000000001",
         "10.448100858696224",
         "0.002482713489333932",
-        "0.002820417"
+        "0.0028207499999999999"
       ],
       [
         "sensitivity",
@@ -1665,7 +1665,7 @@
         "0.20000000000000001",
         "20.922941347906313",
         "0.0014196049888859363",
-        "0.0028218330000000002"
+        "0.0028240409999999998"
       ],
       [
         "sensitivity",
@@ -1674,7 +1674,7 @@
         "0.40000000000000002",
         "8.5501491244186401",
         "0.0024577571502373274",
-        "0.002864709"
+        "0.002820375"
       ],
       [
         "sensitivity",
@@ -1683,7 +1683,7 @@
         "0.40000000000000002",
         "18.021775132534366",
         "0.0011763176823222921",
-        "0.0028714169999999998"
+        "0.0028203339999999999"
       ],
       [
         "sensitivity",
@@ -1692,7 +1692,7 @@
         "0.40000000000000002",
         "32.737048734273188",
         "0.00099563218138598586",
-        "0.0028512500000000001"
+        "0.002984375"
       ],
       [
         "sensitivity",
@@ -1701,7 +1701,7 @@
         "0.80000000000000004",
         "16.380996623343609",
         "0.0011866213048783436",
-        "0.0028194579999999999"
+        "0.0028192920000000002"
       ],
       [
         "sensitivity",
@@ -1710,7 +1710,7 @@
         "0.80000000000000004",
         "32.815764840649784",
         "0.0052176263402685663",
-        "0.0028310420000000002"
+        "0.0028339580000000001"
       ],
       [
         "sensitivity",
@@ -1719,7 +1719,7 @@
         "0.80000000000000004",
         "53.963707667949805",
         "0.83198669807572401",
-        "0.002823458"
+        "0.0028544170000000002"
       ]
     ]
   }

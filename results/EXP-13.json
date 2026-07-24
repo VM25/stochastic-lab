@@ -1,0 +1,893 @@
+{
+  "build_metadata": {
+    "build_flags": "-ffp-contract=off -O3 -DNDEBUG",
+    "build_type": "Release",
+    "compiler_id": "AppleClang",
+    "compiler_version": "21.0.0.21000101",
+    "cpu_brand": "Apple M1",
+    "cxx_standard": "20",
+    "git_branch": "main",
+    "git_commit": "3846fb39667818220ac7a0f6e2bec3356dd0151f",
+    "git_commit_short": "3846fb3",
+    "git_dirty": false,
+    "hostname": "MacBookPro",
+    "logical_cores": 8,
+    "os_name": "Darwin",
+    "os_version": "25.5.0",
+    "timestamp_utc": "2026-07-24T00:40:30Z",
+    "version": "0.1.0"
+  },
+  "configuration": {
+    "agreement_sigma": 5.0,
+    "asian_monitoring_count": 12,
+    "dividend_yield": 0.0,
+    "fd_asset_nodes": 401,
+    "fd_relative_tolerance": 0.005,
+    "fd_time_steps": 400,
+    "heston_maturities": [
+      0.5,
+      2.0
+    ],
+    "heston_monte_carlo_paths": 200000,
+    "heston_monte_carlo_steps": 200,
+    "heston_vol_of_variances": [
+      0.3,
+      1.0
+    ],
+    "maturities": [
+      0.5,
+      2.0
+    ],
+    "monte_carlo_paths": 400000,
+    "monte_carlo_seed": 20260717,
+    "rate": 0.05,
+    "spot": 100.0,
+    "strike": 100.0,
+    "volatilities": [
+      0.2,
+      0.4
+    ]
+  },
+  "configuration_document": {
+    "command": "experiment",
+    "cross_method": {
+      "agreement_sigma": 5.0,
+      "asian_monitoring_count": 12,
+      "control_variate_pilot_paths": 2000,
+      "dividend_yield": 0.0,
+      "fd_asset_nodes": 401,
+      "fd_relative_tolerance": 0.005,
+      "fd_time_steps": 400,
+      "heston_correlation": -0.7,
+      "heston_initial_variance": 0.04,
+      "heston_long_run_variance": 0.04,
+      "heston_maturities": [
+        0.5,
+        2.0
+      ],
+      "heston_mean_reversion": 2.0,
+      "heston_monte_carlo_paths": 200000,
+      "heston_monte_carlo_seed": 20260717,
+      "heston_monte_carlo_steps": 200,
+      "heston_vol_of_variances": [
+        0.3,
+        1.0
+      ],
+      "maturities": [
+        0.5,
+        2.0
+      ],
+      "monte_carlo_paths": 400000,
+      "monte_carlo_seed": 20260717,
+      "rate": 0.05,
+      "spot": 100.0,
+      "strike": 100.0,
+      "volatilities": [
+        0.2,
+        0.4
+      ]
+    },
+    "schema_version": 1
+  },
+  "configuration_source": "configs/experiment/cross_method.json",
+  "id": "EXP-13",
+  "interpretation": "The methods agree wherever they price the same instrument, each used only where it is defined and judged against the right kind of reference. This is an accuracy-and-agreement study, not a performance one: it makes no claim about which method is faster, only about whether they describe the same price.\n\nFor the European option under Black-Scholes the analytic price is exact, and it is the reference. Crude and antithetic Monte Carlo agree with it within sampling uncertainty -- their difference from the analytic value is a fraction of their own standard error, and the 95% confidence interval covers the analytic price -- and the Crank-Nicolson finite-difference solver agrees to its grid-based relative tolerance. Three independent numerical routes, one analytic answer, no disagreement beyond what sampling and discretization explain.\n\nFor the European option under Heston the characteristic-function integration is the reference and the full-truncation Monte Carlo simulation agrees with it within sampling uncertainty, in both a Feller-satisfying and a Feller-violating regime. The step count is chosen so the scheme's discretization bias -- the subject of EXP-10 -- is smaller than the sampling error here, so the remaining difference is sampling, not a hidden bias; where a coarser grid would leave a resolved bias, that is EXP-10's finding, not this one's.\n\nThe arithmetic Asian has no closed form, so there is no exact reference to agree with. Instead the crude, antithetic, and control-variate estimators are checked against each other: they estimate the same price, so they must agree within their combined standard errors, and they do. That is the honest form of the agreement question when no oracle exists -- variance reduction changes the precision, not the answer -- and it is kept separate from the cases where an exact reference does exist rather than dressed up as one.",
+  "limitations": [
+    "Agreement is checked at a single seed per Monte Carlo method, using the run's own standard error as its uncertainty. That is the honest one-run uncertainty, but a single seed cannot detect a bias smaller than its standard error; the multi-seed coverage study is EXP-14, and the estimator-quality comparison is EXP-05.",
+    "The finite-difference method is compared only on the European option under Black-Scholes, which is where it is implemented; it is not presented as a reference for the Asian or Heston instruments it does not price. Each method is used only on the instruments it supports.",
+    "The Heston Monte Carlo step count is set so the full-truncation discretization bias is below the sampling error, so the agreement is within sampling uncertainty. It is not a claim that full truncation is unbiased -- it is not (EXP-10) -- only that its bias is not resolved at this resolution.",
+    "The arithmetic Asian agreement is mutual, not against an external truth. Three estimators agreeing is strong evidence they share an expectation, but a bias common to all three -- the same discretization on the same monitoring grid -- would not be caught by comparing them to each other. The monitoring convention is the same for all three by construction."
+  ],
+  "name": "Cross-Method Accuracy and Agreement",
+  "question": "Where independent methods price the same instrument, do they agree within their justified tolerances?",
+  "reproduction_command": "diffusionworks experiment --id EXP-13 --config configs/experiment/cross_method.json",
+  "results": {
+    "arithmetic_asian": [
+      {
+        "all_agree": true,
+        "estimators": [
+          {
+            "method": "monte_carlo_crude",
+            "standard_error": 0.009094773424493791,
+            "value": 4.087763624986015
+          },
+          {
+            "method": "monte_carlo_antithetic",
+            "standard_error": 0.004530377536032884,
+            "value": 4.104957047560177
+          },
+          {
+            "method": "monte_carlo_control_variate",
+            "standard_error": 0.00017546412590539688,
+            "value": 4.109540440680291
+          }
+        ],
+        "maturity": 0.5,
+        "pairwise_agreement": [
+          {
+            "agrees": true,
+            "combined_standard_error": 0.01016067046320615,
+            "difference": -0.01719342257416212,
+            "pair": "monte_carlo_crude vs monte_carlo_antithetic",
+            "sigmas": 1.6921543353288537
+          },
+          {
+            "agrees": true,
+            "combined_standard_error": 0.009096465868806317,
+            "difference": -0.021776815694276586,
+            "pair": "monte_carlo_crude vs monte_carlo_control_variate",
+            "sigmas": 2.3939864127840944
+          },
+          {
+            "agrees": true,
+            "combined_standard_error": 0.004533774175945592,
+            "difference": -0.004583393120114465,
+            "pair": "monte_carlo_antithetic vs monte_carlo_control_variate",
+            "sigmas": 1.0109442910571353
+          }
+        ],
+        "reference": "none (no closed form; cross-estimator agreement)",
+        "volatility": 0.2
+      },
+      {
+        "all_agree": true,
+        "estimators": [
+          {
+            "method": "monte_carlo_crude",
+            "standard_error": 0.0199654633141368,
+            "value": 9.272230328022623
+          },
+          {
+            "method": "monte_carlo_antithetic",
+            "standard_error": 0.00966790172319901,
+            "value": 9.31011140376154
+          },
+          {
+            "method": "monte_carlo_control_variate",
+            "standard_error": 0.0008147420054716268,
+            "value": 9.319600375255767
+          }
+        ],
+        "maturity": 2.0,
+        "pairwise_agreement": [
+          {
+            "agrees": true,
+            "combined_standard_error": 0.022183057703517268,
+            "difference": -0.03788107573891786,
+            "pair": "monte_carlo_crude vs monte_carlo_antithetic",
+            "sigmas": 1.7076579904001046
+          },
+          {
+            "agrees": true,
+            "combined_standard_error": 0.019982080219126896,
+            "difference": -0.04737004723314442,
+            "pair": "monte_carlo_crude vs monte_carlo_control_variate",
+            "sigmas": 2.3706264169534106
+          },
+          {
+            "agrees": true,
+            "combined_standard_error": 0.009702171317025603,
+            "difference": -0.009488971494226561,
+            "pair": "monte_carlo_antithetic vs monte_carlo_control_variate",
+            "sigmas": 0.9780255557408152
+          }
+        ],
+        "reference": "none (no closed form; cross-estimator agreement)",
+        "volatility": 0.2
+      },
+      {
+        "all_agree": true,
+        "estimators": [
+          {
+            "method": "monte_carlo_crude",
+            "standard_error": 0.018536691398015993,
+            "value": 7.436848081832863
+          },
+          {
+            "method": "monte_carlo_antithetic",
+            "standard_error": 0.010140860859581182,
+            "value": 7.471077900706489
+          },
+          {
+            "method": "monte_carlo_control_variate",
+            "standard_error": 0.0007104331260280108,
+            "value": 7.481065328101199
+          }
+        ],
+        "maturity": 0.5,
+        "pairwise_agreement": [
+          {
+            "agrees": true,
+            "combined_standard_error": 0.021129268490855658,
+            "difference": -0.03422981887362653,
+            "pair": "monte_carlo_crude vs monte_carlo_antithetic",
+            "sigmas": 1.6200191165368805
+          },
+          {
+            "agrees": true,
+            "combined_standard_error": 0.018550300353682634,
+            "difference": -0.04421724626833612,
+            "pair": "monte_carlo_crude vs monte_carlo_control_variate",
+            "sigmas": 2.3836404492263674
+          },
+          {
+            "agrees": true,
+            "combined_standard_error": 0.010165715626552984,
+            "difference": -0.009987427394709592,
+            "pair": "monte_carlo_antithetic vs monte_carlo_control_variate",
+            "sigmas": 0.9824618119970127
+          }
+        ],
+        "reference": "none (no closed form; cross-estimator agreement)",
+        "volatility": 0.4
+      },
+      {
+        "all_agree": true,
+        "estimators": [
+          {
+            "method": "monte_carlo_crude",
+            "standard_error": 0.04206451144794717,
+            "value": 15.459277441199411
+          },
+          {
+            "method": "monte_carlo_antithetic",
+            "standard_error": 0.024241057959456726,
+            "value": 15.53500527282034
+          },
+          {
+            "method": "monte_carlo_control_variate",
+            "standard_error": 0.0034205378981801106,
+            "value": 15.55657665347639
+          }
+        ],
+        "maturity": 2.0,
+        "pairwise_agreement": [
+          {
+            "agrees": true,
+            "combined_standard_error": 0.04854948006259407,
+            "difference": -0.07572783162092911,
+            "pair": "monte_carlo_crude vs monte_carlo_antithetic",
+            "sigmas": 1.5598072630910655
+          },
+          {
+            "agrees": true,
+            "combined_standard_error": 0.042203355350817366,
+            "difference": -0.0972992122769778,
+            "pair": "monte_carlo_crude vs monte_carlo_control_variate",
+            "sigmas": 2.3054852266644095
+          },
+          {
+            "agrees": true,
+            "combined_standard_error": 0.0244811962637986,
+            "difference": -0.02157138065604869,
+            "pair": "monte_carlo_antithetic vs monte_carlo_control_variate",
+            "sigmas": 0.8811407916347298
+          }
+        ],
+        "reference": "none (no closed form; cross-estimator agreement)",
+        "volatility": 0.4
+      }
+    ],
+    "black_scholes_european": [
+      {
+        "all_agree": true,
+        "maturity": 0.5,
+        "methods": [
+          {
+            "agrees": true,
+            "is_reference": true,
+            "method": "analytic",
+            "value": 6.888728577680624
+          },
+          {
+            "agrees": true,
+            "confidence_interval_covers_reference": true,
+            "difference": 0.008375922745947229,
+            "method": "monte_carlo_crude",
+            "sigmas": 0.5414039671749241,
+            "standard_error": 0.015470745051339866,
+            "value": 6.897104500426571
+          },
+          {
+            "agrees": true,
+            "confidence_interval_covers_reference": true,
+            "difference": 0.0033244081393686287,
+            "method": "monte_carlo_antithetic",
+            "sigmas": 0.427644002974791,
+            "standard_error": 0.007773774719727796,
+            "value": 6.892052985819992
+          },
+          {
+            "agrees": true,
+            "difference": -0.003512359676248522,
+            "method": "finite_difference_crank_nicolson",
+            "relative_error": 0.0005098705278690343,
+            "relative_tolerance": 0.005,
+            "value": 6.885216218004375
+          }
+        ],
+        "reference": 6.888728577680624,
+        "reference_method": "analytic",
+        "volatility": 0.2
+      },
+      {
+        "all_agree": true,
+        "maturity": 2.0,
+        "methods": [
+          {
+            "agrees": true,
+            "is_reference": true,
+            "method": "analytic",
+            "value": 16.12677972497861
+          },
+          {
+            "agrees": true,
+            "confidence_interval_covers_reference": true,
+            "difference": 0.01808906971274382,
+            "method": "monte_carlo_crude",
+            "sigmas": 0.5078950296601689,
+            "standard_error": 0.035615764392983265,
+            "value": 16.144868794691355
+          },
+          {
+            "agrees": true,
+            "confidence_interval_covers_reference": true,
+            "difference": 0.0060071681714894964,
+            "method": "monte_carlo_antithetic",
+            "sigmas": 0.3394520505198325,
+            "standard_error": 0.01769666190641711,
+            "value": 16.1327868931501
+          },
+          {
+            "agrees": true,
+            "difference": -0.0017262286403010307,
+            "method": "finite_difference_crank_nicolson",
+            "relative_error": 0.00010704112474651663,
+            "relative_tolerance": 0.005,
+            "value": 16.12505349633831
+          }
+        ],
+        "reference": 16.12677972497861,
+        "reference_method": "analytic",
+        "volatility": 0.2
+      },
+      {
+        "all_agree": true,
+        "maturity": 0.5,
+        "methods": [
+          {
+            "agrees": true,
+            "is_reference": true,
+            "method": "analytic",
+            "value": 12.385029206686
+          },
+          {
+            "agrees": true,
+            "confidence_interval_covers_reference": true,
+            "difference": 0.014954013827800594,
+            "method": "monte_carlo_crude",
+            "sigmas": 0.46482344420428806,
+            "standard_error": 0.032171384671441754,
+            "value": 12.3999832205138
+          },
+          {
+            "agrees": true,
+            "confidence_interval_covers_reference": true,
+            "difference": 0.0064441580820968625,
+            "method": "monte_carlo_antithetic",
+            "sigmas": 0.3572409437675771,
+            "standard_error": 0.018038688438493957,
+            "value": 12.391473364768096
+          },
+          {
+            "agrees": true,
+            "difference": -0.0016937934780933972,
+            "method": "finite_difference_crank_nicolson",
+            "relative_error": 0.00013676136324159905,
+            "relative_tolerance": 0.005,
+            "value": 12.383335413207906
+          }
+        ],
+        "reference": 12.385029206686,
+        "reference_method": "analytic",
+        "volatility": 0.4
+      },
+      {
+        "all_agree": true,
+        "maturity": 2.0,
+        "methods": [
+          {
+            "agrees": true,
+            "is_reference": true,
+            "method": "analytic",
+            "value": 26.290239831748274
+          },
+          {
+            "agrees": true,
+            "confidence_interval_covers_reference": true,
+            "difference": 0.024902052707009403,
+            "method": "monte_carlo_crude",
+            "sigmas": 0.31709392575039774,
+            "standard_error": 0.07853210258783447,
+            "value": 26.315141884455283
+          },
+          {
+            "agrees": true,
+            "confidence_interval_covers_reference": true,
+            "difference": 0.00784169870620488,
+            "method": "monte_carlo_antithetic",
+            "sigmas": 0.16655401574756365,
+            "standard_error": 0.047082015230963226,
+            "value": 26.29808153045448
+          },
+          {
+            "agrees": true,
+            "difference": -0.0007498069851372691,
+            "method": "finite_difference_crank_nicolson",
+            "relative_error": 2.8520355460272258e-05,
+            "relative_tolerance": 0.005,
+            "value": 26.289490024763136
+          }
+        ],
+        "reference": 26.290239831748274,
+        "reference_method": "analytic",
+        "volatility": 0.4
+      }
+    ],
+    "heston_european": [
+      {
+        "agrees": true,
+        "characteristic_function_price": 6.837200378703244,
+        "confidence_interval_covers_reference": true,
+        "difference": -0.008574193628371418,
+        "feller_ratio": 1.777777777777778,
+        "maturity": 0.5,
+        "monte_carlo_price": 6.828626185074873,
+        "monte_carlo_standard_error": 0.018400787906797493,
+        "satisfies_feller": true,
+        "sigmas": 0.4659688308892468,
+        "vol_of_variance": 0.3
+      },
+      {
+        "agrees": true,
+        "characteristic_function_price": 6.05199163096529,
+        "confidence_interval_covers_reference": true,
+        "difference": 0.0020148025509163503,
+        "feller_ratio": 0.16,
+        "maturity": 0.5,
+        "monte_carlo_price": 6.054006433516206,
+        "monte_carlo_standard_error": 0.013919295170552307,
+        "satisfies_feller": false,
+        "sigmas": 0.1447488918245567,
+        "vol_of_variance": 1.0
+      },
+      {
+        "agrees": true,
+        "characteristic_function_price": 16.142778936349053,
+        "confidence_interval_covers_reference": true,
+        "difference": -0.03499190091822513,
+        "feller_ratio": 1.777777777777778,
+        "maturity": 2.0,
+        "monte_carlo_price": 16.107787035430828,
+        "monte_carlo_standard_error": 0.042133856233662385,
+        "satisfies_feller": true,
+        "sigmas": 0.8304936705572353,
+        "vol_of_variance": 0.3
+      },
+      {
+        "agrees": true,
+        "characteristic_function_price": 15.126917394767815,
+        "confidence_interval_covers_reference": true,
+        "difference": 0.002488609218115556,
+        "feller_ratio": 0.16,
+        "maturity": 2.0,
+        "monte_carlo_price": 15.129406003985931,
+        "monte_carlo_standard_error": 0.03212106693701007,
+        "satisfies_feller": false,
+        "sigmas": 0.0774759201802281,
+        "vol_of_variance": 1.0
+      }
+    ],
+    "monte_carlo_confidence_interval_coverage": {
+      "cells": 12,
+      "covered": 12,
+      "note": "the fraction of 95% Monte Carlo intervals that contain the reference; reported as agreement evidence -- the rigorous coverage study is EXP-14"
+    }
+  },
+  "runtime_seconds": 7.160006,
+  "status": "pass",
+  "table": {
+    "headers": [
+      "family",
+      "regime",
+      "method",
+      "value",
+      "reference",
+      "difference",
+      "sigmas",
+      "agrees"
+    ],
+    "rows": [
+      [
+        "bs_european",
+        "sigma=0.2 T=0.5",
+        "analytic",
+        "6.88873",
+        "6.88873",
+        "0",
+        "0",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.2 T=0.5",
+        "monte_carlo_crude",
+        "6.8971",
+        "6.88873",
+        "0.00837592",
+        "0.541404",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.2 T=0.5",
+        "monte_carlo_antithetic",
+        "6.89205",
+        "6.88873",
+        "0.00332441",
+        "0.427644",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.2 T=0.5",
+        "finite_difference",
+        "6.88522",
+        "6.88873",
+        "-0.00351236",
+        "0.000509871",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.2 T=2",
+        "analytic",
+        "16.1268",
+        "16.1268",
+        "0",
+        "0",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.2 T=2",
+        "monte_carlo_crude",
+        "16.1449",
+        "16.1268",
+        "0.0180891",
+        "0.507895",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.2 T=2",
+        "monte_carlo_antithetic",
+        "16.1328",
+        "16.1268",
+        "0.00600717",
+        "0.339452",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.2 T=2",
+        "finite_difference",
+        "16.1251",
+        "16.1268",
+        "-0.00172623",
+        "0.000107041",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.4 T=0.5",
+        "analytic",
+        "12.385",
+        "12.385",
+        "0",
+        "0",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.4 T=0.5",
+        "monte_carlo_crude",
+        "12.4",
+        "12.385",
+        "0.014954",
+        "0.464823",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.4 T=0.5",
+        "monte_carlo_antithetic",
+        "12.3915",
+        "12.385",
+        "0.00644416",
+        "0.357241",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.4 T=0.5",
+        "finite_difference",
+        "12.3833",
+        "12.385",
+        "-0.00169379",
+        "0.000136761",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.4 T=2",
+        "analytic",
+        "26.2902",
+        "26.2902",
+        "0",
+        "0",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.4 T=2",
+        "monte_carlo_crude",
+        "26.3151",
+        "26.2902",
+        "0.0249021",
+        "0.317094",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.4 T=2",
+        "monte_carlo_antithetic",
+        "26.2981",
+        "26.2902",
+        "0.0078417",
+        "0.166554",
+        "yes"
+      ],
+      [
+        "bs_european",
+        "sigma=0.4 T=2",
+        "finite_difference",
+        "26.2895",
+        "26.2902",
+        "-0.000749807",
+        "2.85204e-05",
+        "yes"
+      ],
+      [
+        "heston_european",
+        "T=0.5 xi=0.3",
+        "characteristic_function",
+        "6.8372",
+        "6.8372",
+        "0",
+        "0",
+        "yes"
+      ],
+      [
+        "heston_european",
+        "T=0.5 xi=0.3",
+        "monte_carlo_full_truncation",
+        "6.82863",
+        "6.8372",
+        "-0.00857419",
+        "0.465969",
+        "yes"
+      ],
+      [
+        "heston_european",
+        "T=0.5 xi=1",
+        "characteristic_function",
+        "6.05199",
+        "6.05199",
+        "0",
+        "0",
+        "yes"
+      ],
+      [
+        "heston_european",
+        "T=0.5 xi=1",
+        "monte_carlo_full_truncation",
+        "6.05401",
+        "6.05199",
+        "0.0020148",
+        "0.144749",
+        "yes"
+      ],
+      [
+        "heston_european",
+        "T=2 xi=0.3",
+        "characteristic_function",
+        "16.1428",
+        "16.1428",
+        "0",
+        "0",
+        "yes"
+      ],
+      [
+        "heston_european",
+        "T=2 xi=0.3",
+        "monte_carlo_full_truncation",
+        "16.1078",
+        "16.1428",
+        "-0.0349919",
+        "0.830494",
+        "yes"
+      ],
+      [
+        "heston_european",
+        "T=2 xi=1",
+        "characteristic_function",
+        "15.1269",
+        "15.1269",
+        "0",
+        "0",
+        "yes"
+      ],
+      [
+        "heston_european",
+        "T=2 xi=1",
+        "monte_carlo_full_truncation",
+        "15.1294",
+        "15.1269",
+        "0.00248861",
+        "0.0774759",
+        "yes"
+      ],
+      [
+        "arithmetic_asian",
+        "sigma=0.2 T=0.5",
+        "monte_carlo_crude",
+        "4.08776",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      [
+        "arithmetic_asian",
+        "sigma=0.2 T=0.5",
+        "monte_carlo_antithetic",
+        "4.10496",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      [
+        "arithmetic_asian",
+        "sigma=0.2 T=0.5",
+        "monte_carlo_control_variate",
+        "4.10954",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      [
+        "arithmetic_asian",
+        "sigma=0.2 T=2",
+        "monte_carlo_crude",
+        "9.27223",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      [
+        "arithmetic_asian",
+        "sigma=0.2 T=2",
+        "monte_carlo_antithetic",
+        "9.31011",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      [
+        "arithmetic_asian",
+        "sigma=0.2 T=2",
+        "monte_carlo_control_variate",
+        "9.3196",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      [
+        "arithmetic_asian",
+        "sigma=0.4 T=0.5",
+        "monte_carlo_crude",
+        "7.43685",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      [
+        "arithmetic_asian",
+        "sigma=0.4 T=0.5",
+        "monte_carlo_antithetic",
+        "7.47108",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      [
+        "arithmetic_asian",
+        "sigma=0.4 T=0.5",
+        "monte_carlo_control_variate",
+        "7.48107",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      [
+        "arithmetic_asian",
+        "sigma=0.4 T=2",
+        "monte_carlo_crude",
+        "15.4593",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      [
+        "arithmetic_asian",
+        "sigma=0.4 T=2",
+        "monte_carlo_antithetic",
+        "15.535",
+        "-",
+        "-",
+        "-",
+        "-"
+      ],
+      [
+        "arithmetic_asian",
+        "sigma=0.4 T=2",
+        "monte_carlo_control_variate",
+        "15.5566",
+        "-",
+        "-",
+        "-",
+        "-"
+      ]
+    ]
+  }
+}
